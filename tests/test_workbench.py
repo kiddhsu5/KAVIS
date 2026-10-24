@@ -199,6 +199,11 @@ def test_status_server_workbench_endpoints() -> None:
     assert "manus-console" in wb_body
     assert "manusCreateTask" in wb_body
     assert "X-KHAVIS-Console-Token" in wb_body
+    for zone_label in ("歷史談話", "資料庫", "額度、設定", "對話串", "輸入框", "Agent 狀態", "Using 檔案"):
+        assert zone_label in wb_body
+    assert 'id="c-agent-status-list"' in wb_body
+    assert 'id="c-db-list"' in wb_body
+    assert 'id="c-using-files-host"' in wb_body
 
     # 1b. GET /workbench-legacy  (改版前介面，保留作為回退路徑)
     h_legacy = DummyStatusHandler("/workbench-legacy")

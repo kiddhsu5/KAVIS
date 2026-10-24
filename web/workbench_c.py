@@ -422,21 +422,36 @@ html:not(.dark) #live-results-container > div{
 #quota-capsule-strip span:nth-child(4){background:var(--m-apricot-soft)!important;color:var(--m-apricot)!important;border-color:rgba(201,161,126,.3)!important}
 
 /* ══════════════════════════════════════════════════════════════════
-   右側抽屜：執行明細
-   寬螢幕是常駐的第三欄，窄螢幕改成覆蓋式抽屜。
+   三欄七宮格工作台版面 (左3: 歷史談話/資料庫/額度設定 | 中2: 對話串/輸入框 | 右2: Agent狀態/Using檔案)
    ══════════════════════════════════════════════════════════════════ */
-.c-drawer{width:420px;flex-shrink:0;overflow:hidden}
-@media (min-width:1280px){
-  .c-drawer{
-    width:0;border-left:1px solid transparent;
-    transition:width .22s cubic-bezier(.16,1,.3,1),border-color .22s ease;
-  }
-  .c-drawer.c-open{width:420px;border-left-color:var(--m-line)}
+.c-zone-header{
+  display:flex;align-items:center;gap:.5rem;
+  padding:.55rem .75rem;border-bottom:1px solid var(--m-line);
+  background:var(--m-panel-2);flex-shrink:0;
 }
-@media (max-width:1279px){
+.c-zone-title{
+  font-size:12px;font-weight:700;letter-spacing:.04em;
+  color:var(--m-bone);display:inline-flex;align-items:center;gap:.4rem;
+}
+.c-zone-tag{
+  font-size:10px;font-family:ui-monospace,monospace;
+  padding:.05rem .4rem;border-radius:5px;
+  background:var(--m-mist-soft);color:var(--m-mist);
+  border:1px solid rgba(124,155,181,.28);
+}
+
+/* 右側欄：桌面常駐顯示為第三欄（上：Agent 狀態 / 下：Using 檔案），窄視窗為覆蓋抽屜 */
+.c-drawer{
+  width:370px;flex-shrink:0;overflow:hidden;
+  border-left:1px solid var(--m-line);
+}
+@media (min-width:1280px){
+  .c-drawer{width:390px}
+}
+@media (max-width:1080px){
   .c-drawer{
     position:fixed;top:0;right:0;bottom:0;z-index:45;
-    width:420px;max-width:92vw;
+    width:380px;max-width:92vw;
     transform:translateX(100%);
     transition:transform .22s cubic-bezier(.16,1,.3,1);
     box-shadow:-18px 0 50px -12px rgba(0,0,0,.55);
@@ -444,12 +459,32 @@ html:not(.dark) #live-results-container > div{
   .c-drawer.c-open{transform:none}
 }
 #c-drawer-scrim{display:none}
-@media (max-width:1279px){
+@media (max-width:1080px){
   #c-drawer-scrim{
     position:fixed;inset:0;z-index:44;background:rgba(8,10,14,.5);
     opacity:0;pointer-events:none;transition:opacity .2s ease;
+    display:block;
   }
   #c-drawer-scrim.c-on{opacity:1;pointer-events:auto}
+}
+
+/* 右下 Using 檔案區：讓 legacy workspace-control-bar 適配窄欄常駐顯示 */
+#c-using-files-host #workspace-control-bar{
+  background:transparent !important;border:none !important;padding:.5rem !important;
+  box-shadow:none !important;
+}
+#c-using-files-host #workspace-diff-panel{
+  display:flex !important;flex-direction:column !important;
+  gap:.625rem !important;padding-top:.5rem !important;
+}
+#c-using-files-host #workspace-diff-panel > div{
+  width:100% !important;
+}
+#c-using-files-host #ws-files-list{
+  max-height:11rem !important;
+}
+#c-using-files-host #ws-diff-viewer{
+  max-height:9rem !important;
 }
 html:not(.dark) .c-item:hover{background:rgba(27,35,48,.045)}
 html:not(.dark) .c-menu-item:hover{background:rgba(27,35,48,.05)}
@@ -460,163 +495,188 @@ html:not(.dark) .c-foot-chip:hover{background:rgba(27,35,48,.05)}
 # ── 新版外層版面 ───────────────────────────────────────────────────────────
 
 _SIDEBAR: Final[str] = """
-<aside id="c-sidebar" class="w-[268px] shrink-0 bg-ink-800/85 backdrop-blur border-r m-line flex flex-col">
-  <div class="h-12 flex items-center gap-2.5 px-3 border-b m-line shrink-0">
-    <div class="w-7 h-7 rounded-lg grid place-items-center text-[11px] font-black shrink-0"
-         style="background:linear-gradient(135deg,#7C9BB5,#8FA894);color:#16181D">K</div>
-    <span class="text-sm font-semibold truncate" style="color:var(--m-bone)">K.H.A.V.I.S.</span>
-    <button type="button" onclick="cToggleSidebar(false)" id="c-sidebar-close" class="ml-auto w-7 h-7 rounded-lg m-btn-ghost grid place-items-center shrink-0"
-            aria-label="關閉側欄">
-      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg>
-    </button>
-  </div>
+<aside id="c-sidebar" class="w-[284px] xl:w-[300px] shrink-0 bg-ink-800/85 backdrop-blur border-r m-line flex flex-col h-full">
 
-  <div class="p-3 space-y-2 shrink-0">
-    <button type="button" onclick="cNewTask()" id="c-new-task"
-            class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg m-btn-primary text-xs font-bold transition">
-      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
-      新任務
-    </button>
-
-    <!-- 目前工作區專案（派工實際執行的資料夾） -->
-    <div class="relative">
-      <button type="button" onclick="cToggleProjectMenu()" id="c-project-btn"
-              class="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-lg m-btn-ghost text-[11px] transition"
-              aria-haspopup="menu" aria-expanded="false">
-        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke-linejoin="round"/></svg>
-        <span class="truncate" id="c-active-project">shared-app</span>
-        <span class="ml-auto text-[10px] font-mono shrink-0" style="color:var(--m-faint)" id="c-project-count">--</span>
-        <svg class="shrink-0" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <!-- ═══════════════════════════════════════════════════════════════
+       左上區塊 1：歷史談話 (History Conversations)
+       ═══════════════════════════════════════════════════════════════ -->
+  <div class="flex-[4] min-h-0 flex flex-col border-b m-line">
+    <div class="c-zone-header">
+      <div class="w-6 h-6 rounded-md grid place-items-center text-[10px] font-black shrink-0"
+           style="background:linear-gradient(135deg,#7C9BB5,#8FA894);color:#16181D">K</div>
+      <span class="c-zone-title">歷史談話</span>
+      <span class="c-zone-tag">HISTORY</span>
+      <div class="flex-1"></div>
+      <button type="button" onclick="cNewTask()" id="c-new-task"
+              class="px-2.5 py-1 rounded-md m-btn-primary text-[11px] font-bold transition inline-flex items-center gap-1 shrink-0"
+              title="開始新對話">
+        <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
+        新對話
       </button>
-      <div id="c-project-menu" class="c-menu hidden" role="menu" aria-label="切換專案"></div>
+      <button type="button" onclick="cToggleSidebar(false)" id="c-sidebar-close" class="w-6 h-6 rounded-md m-btn-ghost grid place-items-center shrink-0"
+              aria-label="關閉側欄">
+        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg>
+      </button>
     </div>
 
-    <!-- 檢視切換：時間線 / 專案 / 執行電腦 / 協同模式 / 狀態 -->
-    <div class="relative">
-      <div class="flex items-center gap-1.5">
-        <button type="button" onclick="cToggleViewMenu()" id="c-view-btn"
-                class="flex-1 min-w-0 flex items-center gap-1.5 px-2 py-1.5 rounded-lg m-btn-ghost text-[11px] transition"
-                aria-haspopup="menu" aria-expanded="false">
-          <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h6" stroke-linecap="round"/></svg>
-          <span class="truncate" id="c-view-label">時間線</span>
-          <svg class="ml-auto shrink-0" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </button>
-        <button type="button" onclick="cToggleSearch()" id="c-search-btn"
-                class="w-8 h-8 shrink-0 rounded-lg m-btn-ghost grid place-items-center transition" title="搜尋任務" aria-label="搜尋任務">
-          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="m20 20-3.5-3.5" stroke-linecap="round"/></svg>
-        </button>
+    <div class="px-2.5 pt-2 pb-1.5 space-y-1.5 shrink-0">
+      <!-- 檢視切換：時間線 / 專案 / 執行電腦 / 協同模式 / 狀態 + 搜尋 -->
+      <div class="relative">
+        <div class="flex items-center gap-1.5">
+          <button type="button" onclick="cToggleViewMenu()" id="c-view-btn"
+                  class="flex-1 min-w-0 flex items-center gap-1.5 px-2 py-1 rounded-lg m-btn-ghost text-[11px] transition"
+                  aria-haspopup="menu" aria-expanded="false">
+            <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h6" stroke-linecap="round"/></svg>
+            <span class="truncate" id="c-view-label">時間線</span>
+            <svg class="ml-auto shrink-0" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <button type="button" onclick="cToggleSearch()" id="c-search-btn"
+                  class="w-7 h-7 shrink-0 rounded-lg m-btn-ghost grid place-items-center transition" title="搜尋歷史談話" aria-label="搜尋歷史談話">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="m20 20-3.5-3.5" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+
+        <div id="c-view-menu" class="c-menu hidden" role="menu" aria-label="檢視方式">
+          <button type="button" class="c-menu-item c-on" data-view="timeline" onclick="cSetView('timeline')" role="menuitem">
+            <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:var(--m-mist)"></span>時間線<span class="ml-auto text-[10px] opacity-70">依日期</span>
+          </button>
+          <button type="button" class="c-menu-item" data-view="project" onclick="cSetView('project')" role="menuitem">
+            <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:var(--m-sage)"></span>依專案<span class="ml-auto text-[10px] opacity-70">分組</span>
+          </button>
+          <button type="button" class="c-menu-item" data-view="backend" onclick="cSetView('backend')" role="menuitem">
+            <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:var(--m-lilac)"></span>依執行電腦<span class="ml-auto text-[10px] opacity-70">分組</span>
+          </button>
+          <button type="button" class="c-menu-item" data-view="mode" onclick="cSetView('mode')" role="menuitem">
+            <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:var(--m-apricot)"></span>依協同模式<span class="ml-auto text-[10px] opacity-70">分組</span>
+          </button>
+          <button type="button" class="c-menu-item" data-view="status" onclick="cSetView('status')" role="menuitem">
+            <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:var(--m-rose)"></span>依狀態<span class="ml-auto text-[10px] opacity-70">分組</span>
+          </button>
+        </div>
       </div>
 
-      <div id="c-view-menu" class="c-menu hidden" role="menu" aria-label="檢視方式">
-        <button type="button" class="c-menu-item c-on" data-view="timeline" onclick="cSetView('timeline')" role="menuitem">
-          <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:var(--m-mist)"></span>時間線<span class="ml-auto text-[10px] opacity-70">依日期</span>
-        </button>
-        <button type="button" class="c-menu-item" data-view="project" onclick="cSetView('project')" role="menuitem">
-          <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:var(--m-sage)"></span>依專案<span class="ml-auto text-[10px] opacity-70">分組</span>
-        </button>
-        <button type="button" class="c-menu-item" data-view="backend" onclick="cSetView('backend')" role="menuitem">
-          <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:var(--m-lilac)"></span>依執行電腦<span class="ml-auto text-[10px] opacity-70">分組</span>
-        </button>
-        <button type="button" class="c-menu-item" data-view="mode" onclick="cSetView('mode')" role="menuitem">
-          <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:var(--m-apricot)"></span>依協同模式<span class="ml-auto text-[10px] opacity-70">分組</span>
-        </button>
-        <button type="button" class="c-menu-item" data-view="status" onclick="cSetView('status')" role="menuitem">
-          <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:var(--m-rose)"></span>依狀態<span class="ml-auto text-[10px] opacity-70">分組</span>
-        </button>
+      <div id="c-search-row" class="hidden">
+        <input id="c-list-search" type="search" placeholder="搜尋談話、專案或 Agent…"
+               oninput="cFilterList(this.value)" autocomplete="off"
+               class="w-full px-2 py-1 text-[11px] rounded-lg m-line" style="background:var(--m-panel-2);color:var(--m-bone)">
+      </div>
+
+      <div class="flex items-center gap-1 text-[10px] font-mono">
+        <button type="button" onclick="cFilter('all')" data-cfilter="all" class="c-foot-chip m-nav-active">全部</button>
+        <button type="button" onclick="cFilter('running')" data-cfilter="running" class="c-foot-chip">執行 <span id="c-count-running">0</span></button>
+        <button type="button" onclick="cFilter('done')" data-cfilter="done" class="c-foot-chip">完成 <span id="c-count-done">0</span></button>
+        <button type="button" onclick="cFilter('failed')" data-cfilter="failed" class="c-foot-chip">失敗 <span id="c-count-failed">0</span></button>
       </div>
     </div>
 
-    <div id="c-search-row" class="hidden">
-      <input id="c-list-search" type="search" placeholder="搜尋任務、專案或 Agent…"
-             oninput="cFilterList(this.value)" autocomplete="off"
-             class="w-full px-2 py-1.5 text-[11px] rounded-lg m-line" style="background:var(--m-panel-2);color:var(--m-bone)">
+    <!-- 歷史談話清單 -->
+    <div id="c-item-list" class="flex-1 overflow-y-auto m-scroll px-2 pb-2 text-xs"></div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       左中區塊 2：資料庫 (Database / Deliverables & Knowledge Base)
+       ═══════════════════════════════════════════════════════════════ -->
+  <div class="flex-[3] min-h-0 flex flex-col border-b m-line">
+    <div class="c-zone-header">
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" style="color:var(--m-sage)" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"/></svg>
+      <span class="c-zone-title">資料庫</span>
+      <span id="artifacts-badge" class="text-[10px] font-mono px-1.5 py-0.5 rounded" style="background:var(--m-sage-soft);color:var(--m-sage)">--</span>
+      <div class="flex-1"></div>
+      <button type="button" onclick="switchTab('artifacts')" id="nav-artifacts" class="tab-btn px-2 py-0.5 rounded text-[10px] m-btn-ghost transition" title="展開完整資料庫檢視">
+        全頁檢視 ↗
+      </button>
+    </div>
+    <div id="c-db-list" class="flex-1 overflow-y-auto m-scroll p-2 space-y-1 text-xs">
+      <div class="text-[11px] py-4 text-center" style="color:var(--m-faint)">載入資料庫中…</div>
     </div>
   </div>
 
-  <!-- 項目清單（參考 MiniMax Code 的 session list：標題 + 次要資訊 + 選中態） -->
-  <div id="c-item-list" class="flex-1 overflow-y-auto m-scroll px-2 pb-2 text-xs"></div>
-
-  <!-- 系統頁籤（保留 legacy 的 nav-* id 與 switchTab 契約） -->
-  <div class="px-2 pb-2 grid grid-cols-2 gap-1 shrink-0">
-    <button type="button" onclick="switchTab('agents')" id="nav-agents" class="c-menu-item tab-btn">
-      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="18" r="2"/><path d="M12 7v4m0 0-5 5m5-5 5 5" stroke-linecap="round"/></svg>
-      Agent 拓撲
-    </button>
-    <button type="button" onclick="switchTab('artifacts')" id="nav-artifacts" class="c-menu-item tab-btn">
-      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke-linejoin="round"/></svg>
-      交付文件
-      <span id="artifacts-badge" class="ml-auto text-[10px] font-mono px-1.5 py-0.5 rounded" style="background:var(--m-sage-soft);color:var(--m-sage)">--</span>
-    </button>
-    <button type="button" onclick="switchTab('quotas')" id="nav-quotas" class="c-menu-item tab-btn">
-      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24"><path d="M12 3v18M7 8h7a3 3 0 1 1 0 6H7" stroke-linecap="round"/></svg>
-      額度與熔斷
-    </button>
-    <button type="button" onclick="switchTab('wizard')" id="nav-wizard" class="c-menu-item tab-btn">
-      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v2m0 14v2M3 12h2m14 0h2" stroke-linecap="round"/></svg>
-      模型與部署
-    </button>
-  </div>
-
-  <div class="p-3 border-t m-line shrink-0 space-y-2">
-    <div class="flex items-center gap-2 text-[11px]">
-      <span class="inline-flex items-center gap-1.5" style="color:var(--m-sage)">
-        <span class="w-1.5 h-1.5 rounded-full m-live" style="background:var(--m-sage)"></span>
-        <span id="c-fleet-count">6</span>/6 在線
-      </span>
-      <span class="ml-auto font-mono" style="color:var(--m-faint)" id="c-quota-pct">額度 --</span>
+  <!-- ═══════════════════════════════════════════════════════════════
+       左下區塊 3：額度、設定 (Quota & Settings)
+       ═══════════════════════════════════════════════════════════════ -->
+  <div class="shrink-0 flex flex-col">
+    <div class="c-zone-header">
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" style="color:var(--m-apricot)" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v2m0 14v2M3 12h2m14 0h2m-2.93-6.07-1.41 1.41M7.34 16.66l-1.41 1.41m0-11.31 1.41 1.41m9.32 9.32 1.41 1.41" stroke-linecap="round"/></svg>
+      <span class="c-zone-title">額度、設定</span>
+      <span class="ml-auto font-mono text-[10px]" style="color:var(--m-sage)" id="c-quota-pct">額度 95%</span>
+      <button type="button" onclick="toggleTheme()" class="w-6 h-6 rounded-md m-btn-ghost grid place-items-center transition shrink-0" title="切換深淺色主題">
+        <i id="theme-icon" class="fas fa-sun text-[11px]" style="color:var(--m-apricot)"></i>
+      </button>
     </div>
-    <div class="h-1 rounded-full overflow-hidden" style="background:var(--m-track)">
-      <div id="c-quota-bar" class="h-full rounded-full transition-all" style="width:0%;background:linear-gradient(90deg,#8FA894,#7C9BB5)"></div>
-    </div>
-    <div class="flex items-center gap-1.5 text-[10px] font-mono">
-      <button type="button" onclick="cFilter('running')" data-cfilter="running" class="c-foot-chip">執行 <span id="c-count-running">0</span></button>
-      <button type="button" onclick="cFilter('done')" data-cfilter="done" class="c-foot-chip">完成 <span id="c-count-done">0</span></button>
-      <button type="button" onclick="cFilter('failed')" data-cfilter="failed" class="c-foot-chip">失敗 <span id="c-count-failed">0</span></button>
+
+    <div class="p-2.5 space-y-2">
+      <div class="h-1.5 rounded-full overflow-hidden" style="background:var(--m-track)">
+        <div id="c-quota-bar" class="h-full rounded-full transition-all" style="width:94%;background:linear-gradient(90deg,#8FA894,#7C9BB5)"></div>
+      </div>
+
+      <div id="c-sidebar-quota-pills" class="grid grid-cols-2 gap-1 text-[10px] font-mono">
+        <div class="px-2 py-1 rounded m-line flex items-center justify-between" style="background:var(--m-panel-2)">
+          <span style="color:var(--m-dim)">MiniMax</span><span style="color:var(--m-sage)">95%</span>
+        </div>
+        <div class="px-2 py-1 rounded m-line flex items-center justify-between" style="background:var(--m-panel-2)">
+          <span style="color:var(--m-dim)">GLM-5.3</span><span style="color:var(--m-mist)">92%</span>
+        </div>
+        <div class="px-2 py-1 rounded m-line flex items-center justify-between" style="background:var(--m-panel-2)">
+          <span style="color:var(--m-dim)">GPT GO</span><span style="color:var(--m-lilac)">90%</span>
+        </div>
+        <div class="px-2 py-1 rounded m-line flex items-center justify-between" style="background:var(--m-panel-2)">
+          <span style="color:var(--m-dim)">AGY Pro</span><span style="color:var(--m-sage)">98%</span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-3 gap-1 pt-0.5">
+        <button type="button" onclick="switchTab('quotas')" id="nav-quotas" class="tab-btn px-2 py-1.5 rounded-lg m-btn-ghost text-[11px] font-medium flex items-center justify-center gap-1 transition">
+          <span>額度熔斷</span>
+        </button>
+        <button type="button" onclick="switchTab('wizard')" id="nav-wizard" class="tab-btn px-2 py-1.5 rounded-lg m-btn-ghost text-[11px] font-medium flex items-center justify-center gap-1 transition">
+          <span>模型設定</span>
+        </button>
+        <button type="button" onclick="switchTab('agents')" id="nav-agents" class="tab-btn px-2 py-1.5 rounded-lg m-btn-ghost text-[11px] font-medium flex items-center justify-center gap-1 transition">
+          <span>集群設定</span>
+        </button>
+      </div>
     </div>
   </div>
 </aside>
 """
 
 _TOPBAR: Final[str] = """
-<header class="h-12 shrink-0 bg-ink-800/60 backdrop-blur border-b m-line flex items-center justify-between px-3 sm:px-5 gap-3">
+<header class="h-11 shrink-0 bg-ink-800/60 backdrop-blur border-b m-line flex items-center justify-between px-3 sm:px-4 gap-3">
   <div class="flex items-center gap-2 text-xs min-w-0">
     <button type="button" onclick="cToggleSidebar(true)" id="c-menu-btn"
-            class="w-8 h-8 shrink-0 rounded-lg m-btn-ghost grid place-items-center"
+            class="w-7 h-7 shrink-0 rounded-lg m-btn-ghost grid place-items-center"
             aria-label="開啟側欄" aria-controls="c-sidebar" aria-expanded="false">
-      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16" stroke-linecap="round"/></svg>
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16" stroke-linecap="round"/></svg>
     </button>
-    <button type="button" onclick="switchTab('command')" id="nav-command" class="tab-btn m-nav rounded-lg px-2 py-1 truncate" title="回到任務工作台">shared-app</button>
-    <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--m-faint)" aria-hidden="true"><path d="m9 6 6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    <span class="font-medium truncate" id="c-view-title" style="color:var(--m-bone)">任務</span>
+    <span class="c-zone-title">
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" style="color:var(--m-mist)" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke-linejoin="round"/></svg>
+      對話串
+    </span>
+    <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--m-faint)" aria-hidden="true"><path d="m9 6 6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <button type="button" onclick="switchTab('command')" id="nav-command" class="tab-btn m-nav rounded-lg px-2 py-0.5 truncate text-[11px]" title="回到對話串主畫面">shared-app</button>
+    <span class="font-medium truncate text-[11px]" id="c-view-title" style="color:var(--m-faint)">主對話視窗</span>
   </div>
 
   <div class="flex items-center gap-2 min-w-0 overflow-hidden">
     <div id="c-task-filter" class="inline-flex rounded-lg p-0.5 m-line text-[11px] shrink-0" style="background:var(--m-ink-700)" role="group" aria-label="任務篩選">
-      <button type="button" onclick="cFilter('all')" class="c-filter-btn px-2.5 py-1 rounded-md font-medium" data-filter="all" aria-pressed="true">全部</button>
-      <button type="button" onclick="cFilter('running')" class="c-filter-btn px-2.5 py-1 rounded-md" data-filter="running" aria-pressed="false">執行中</button>
-      <button type="button" onclick="cFilter('done')" class="c-filter-btn px-2.5 py-1 rounded-md" data-filter="done" aria-pressed="false">已完成</button>
-      <button type="button" onclick="cFilter('failed')" class="c-filter-btn px-2.5 py-1 rounded-md" data-filter="failed" aria-pressed="false">失敗</button>
+      <button type="button" onclick="cFilter('all')" class="c-filter-btn px-2 py-0.5 rounded-md font-medium" data-filter="all" aria-pressed="true">全部</button>
+      <button type="button" onclick="cFilter('running')" class="c-filter-btn px-2 py-0.5 rounded-md" data-filter="running" aria-pressed="false">執行中</button>
+      <button type="button" onclick="cFilter('done')" class="c-filter-btn px-2 py-0.5 rounded-md" data-filter="done" aria-pressed="false">已完成</button>
+      <button type="button" onclick="cFilter('failed')" class="c-filter-btn px-2 py-0.5 rounded-md" data-filter="failed" aria-pressed="false">失敗</button>
     </div>
 
-    <!-- 配額晶片會隨 pool 數量增生，必須可捲動收邊，否則會把整個 topbar 撐爆 -->
-    <div id="quota-capsule-strip" class="c-strip items-center gap-2 text-[11px] font-mono min-w-0 overflow-x-auto"
+    <div id="quota-capsule-strip" class="c-strip items-center gap-1.5 text-[10px] font-mono min-w-0 overflow-x-auto"
          style="color:var(--m-faint);scrollbar-width:none"></div>
 
-    <!-- 模型名由 legacy 的 syncModelUIElements 直接寫進上面的配額帶，
-         這三個節點只是 legacy JS 的寫入目標（契約測試要求存在），不重複顯示。 -->
     <span id="c-model-claude" class="hidden"><strong id="card-title-claude">—</strong></span>
     <span id="c-model-codex" class="hidden"><strong id="card-title-codex">—</strong></span>
     <span id="c-model-antigravity" class="hidden"><strong id="card-title-antigravity">—</strong></span>
 
     <button type="button" onclick="cToggleDrawer()" id="c-drawer-btn"
-            class="w-8 h-8 rounded-lg m-btn-ghost grid place-items-center transition shrink-0 relative"
-            title="執行明細抽屜（各 Agent 輸出 / 延遲 / 流程圖）" aria-label="執行明細抽屜" aria-expanded="false">
-      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h9" stroke-linecap="round"/><path d="M17 14v6M14 17h6" stroke-linecap="round"/></svg>
+            class="w-7 h-7 rounded-lg m-btn-ghost grid place-items-center transition shrink-0 relative xl:hidden"
+            title="展開右側 Agent 狀態與 Using 檔案" aria-label="右側面板" aria-expanded="false">
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></svg>
       <span id="c-drawer-dot" class="hidden absolute top-1 right-1 w-1.5 h-1.5 rounded-full m-live" style="background:var(--m-mist)"></span>
-    </button>
-
-    <button type="button" onclick="toggleTheme()" class="w-8 h-8 rounded-lg m-btn-ghost grid place-items-center transition shrink-0" title="切換深淺色主題">
-      <i id="theme-icon" class="fas fa-sun" style="color:var(--m-apricot)"></i>
     </button>
   </div>
 </header>
@@ -633,12 +693,19 @@ _COLLAPSE_BOTTOM: Final[str] = """
 """
 
 _COMPOSER_CHROME_TOP: Final[str] = """
-<div class="shrink-0 border-t m-line px-4 sm:px-6 py-2.5" style="background:var(--m-panel);backdrop-filter:blur(12px)">
+<!-- ═══════════════════════════════════════════════════════════════
+     中下區塊 5：輸入框 (Prompt Input & Collaborative Composer)
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="shrink-0 border-t m-line px-3 sm:px-5 py-2.5" style="background:var(--m-panel);backdrop-filter:blur(12px)">
   <div class="max-w-4xl mx-auto">
     <div class="composer frost-2 m-line rounded-2xl p-3 transition">
 
-      <!-- 協同模式 + 參與 Agent（取代原本永遠展開的拓撲畫布） -->
+      <!-- 輸入框標題 + 協同模式 + 參與 Agent -->
       <div class="flex items-center gap-2 flex-wrap mb-2 pb-2" style="border-bottom:1px solid var(--m-line)">
+        <span class="c-zone-title mr-1">
+          <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--m-mist)" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" stroke-linejoin="round"/></svg>
+          輸入框
+        </span>
         <div class="inline-flex rounded-lg p-0.5 m-line text-[11px]" style="background:var(--m-panel-2)" role="group" aria-label="協同模式">
           <button type="button" class="c-collab-btn m-btn-primary px-2.5 py-1 rounded-md font-semibold transition" data-mode="auto_loop"  onclick="setCollabMode('auto_loop')">自動閉環</button>
           <button type="button" class="c-collab-btn m-btn-ghost px-2.5 py-1 rounded-md transition" data-mode="relay"    onclick="setCollabMode('relay')">接力</button>
@@ -1212,6 +1279,7 @@ function cToggleAgent(id, on) {
 function cSyncAgentChips() {
   // chip 的選中態是 inline style，因此直接重繪最簡單也最不易出錯
   cRenderAgentChips();
+  if (typeof cRenderAgentStatusPanel === 'function') cRenderAgentStatusPanel();
 }
 
 const C_AGENT_LABELS = {
@@ -1644,6 +1712,7 @@ function cBeginTask(prompt, agents, mode) {
   cFilter('all');
   cRenderConversation();
   cRenderStream();
+  if (typeof cRenderAgentStatusPanel === 'function') cRenderAgentStatusPanel();
   const main = document.getElementById('c-main');
   if (main) main.scrollTop = 0;   // 新任務在最上方，直接看得到
   return id;
@@ -1815,6 +1884,9 @@ function cFinishTask(ok, summaryHtml, consensus) {
   cRunningTask = null;
   _cAbortController = null;
   cRenderStream();
+  if (typeof cRenderAgentStatusPanel === 'function') cRenderAgentStatusPanel();
+  if (typeof cLoadSidebarDatabase === 'function') cLoadSidebarDatabase();
+  if (typeof cLoadSidebarQuotas === 'function') cLoadSidebarQuotas();
 }
 
 // ── 攔截既有 pipeline stepper ──────────────────────────────────────
@@ -1838,6 +1910,127 @@ function cMirrorStatus() {
     const a = document.getElementById(src), b = document.getElementById(dst);
     if (a && b && b.textContent !== a.textContent) b.textContent = a.textContent;
   });
+}
+
+// ── 右上「Agent 狀態」即時控制面板 ────────────────────────────────
+const C_AGENT_ROLES = {
+  claude:      'Claude Code · 極速實作與測試',
+  codex:       'OpenAI Codex · 高速代碼生成',
+  antigravity: 'Antigravity · 自主 Agentic CLI',
+  minimax:     'MiniMax Code · 中文與長上下文',
+  zcode:       'Zhipu zcode · GLM 專屬代碼',
+  khavis:      'LangGraph 7-Role 協同流水線'
+};
+
+function cRenderAgentStatusPanel() {
+  const host = document.getElementById('c-agent-status-list');
+  if (!host) return;
+  const seen = [];
+  document.querySelectorAll('input[name="agent_target"]').forEach(b => {
+    if (!seen.some(v => v.value === b.value)) seen.push(b);
+  });
+  const countEl = document.getElementById('c-fleet-count');
+  if (countEl) countEl.textContent = String(seen.length || 6);
+
+  host.innerHTML = seen.map(b => {
+    const id = b.value;
+    const hex = (C_AGENT_COLORS[id] || [])[1] || '#7C9BB5';
+    const label = C_AGENT_LABELS[id] || id;
+    const role = C_AGENT_ROLES[id] || '自訂 CLI / HTTP Agent';
+    const on = !!b.checked;
+    const isRunning = !!cRunningTask && on;
+    const statusText = isRunning ? '執行中' : (on ? '已啟用' : '待命');
+    const statusColor = isRunning ? 'var(--m-sage)' : (on ? hex : 'var(--m-faint)');
+    const curModel = (typeof currentAgentModels !== 'undefined' && currentAgentModels[id])
+      ? currentAgentModels[id]
+      : (id === 'khavis' ? 'LangGraph 7-Role' : '');
+
+    return `<div class="p-2 rounded-xl m-line transition flex items-center justify-between gap-2"
+                 style="background:${on ? hex + '14' : 'var(--m-panel-2)'};border-color:${on ? hex + '55' : 'var(--m-line)'}">
+      <button type="button" onclick="cToggleAgent('${escapeHtml(id)}', ${on ? 'false' : 'true'})"
+              class="flex items-center gap-2 min-w-0 flex-1 text-left">
+        <span class="w-2 h-2 rounded-full shrink-0 ${isRunning ? 'm-live' : ''}"
+              style="background:${statusColor}"></span>
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-1.5">
+            <span class="text-xs font-semibold truncate" style="color:var(--m-bone)">${escapeHtml(label)}</span>
+            <span class="text-[10px] font-mono truncate" style="color:var(--m-faint)">${escapeHtml(curModel)}</span>
+          </div>
+          <div class="text-[10px] truncate" style="color:var(--m-faint)">${escapeHtml(role)}</div>
+        </div>
+      </button>
+      <button type="button" onclick="cToggleAgent('${escapeHtml(id)}', ${on ? 'false' : 'true'})"
+              class="px-2 py-0.5 rounded text-[10px] font-mono shrink-0 transition"
+              style="background:${on ? hex + '28' : 'var(--m-faint-bg)'};color:${statusColor};border:1px solid ${on ? hex + '55' : 'var(--m-line)'}">
+        ${on ? '✓ ' : ''}${statusText}
+      </button>
+    </div>`;
+  }).join('');
+}
+
+// ── 左中「資料庫」清單載入 ────────────────────────────────────────
+async function cLoadSidebarDatabase() {
+  const host = document.getElementById('c-db-list');
+  if (!host) return;
+  try {
+    const res = await fetch('/api/workbench/artifacts');
+    if (!res.ok) return;
+    const data = await res.json();
+    const items = data.artifacts || [];
+    const badge = document.getElementById('artifacts-badge');
+    if (badge) badge.textContent = String(items.length);
+    if (!items.length) {
+      host.innerHTML = '<div class="text-[11px] py-4 text-center" style="color:var(--m-faint)">尚無資料庫產物</div>';
+      return;
+    }
+    host.innerHTML = items.map(item => `
+      <button type="button"
+              onclick="openArtifact('${escapeHtml(item.path)}', '${escapeHtml(item.name)}')"
+              class="c-item flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2 min-w-0">
+          <span class="text-[9px] font-mono px-1.5 py-0.5 rounded shrink-0"
+                style="background:var(--m-mist-soft);color:var(--m-mist)">${escapeHtml(item.badge || 'DOC')}</span>
+          <span class="text-[11px] truncate" style="color:var(--m-bone)">${escapeHtml(item.name)}</span>
+        </div>
+        <span class="text-[10px] font-mono shrink-0" style="color:var(--m-faint)">${escapeHtml(item.size || '')}</span>
+      </button>
+    `).join('');
+  } catch (_) {}
+}
+
+// ── 左下「額度、設定」即時同步 ────────────────────────────────────
+async function cLoadSidebarQuotas() {
+  try {
+    const res = await fetch('/api/quota');
+    if (!res.ok) return;
+    const data = await res.json();
+    const quotas = data.quotas || {};
+    const plans = [
+      { key: 'MiniMax-M3', short: 'MiniMax', color: 'var(--m-sage)', fallback: 95 },
+      { key: 'GLM-5.3', short: 'GLM-5.3', color: 'var(--m-mist)', fallback: 92 },
+      { key: 'OpenAI-API', short: 'GPT GO', color: 'var(--m-lilac)', fallback: 90 },
+      { key: 'Antigravity-Core', short: 'AGY Pro', color: 'var(--m-sage)', fallback: 98 }
+    ];
+    let total = 0;
+    const pillsHtml = plans.map(p => {
+      const q = quotas[p.key] || {};
+      const pct = q.is_exhausted ? 5 : (q.remaining_requests != null && q.limit_requests
+        ? Math.round((q.remaining_requests / q.limit_requests) * 100)
+        : p.fallback);
+      total += pct;
+      return `<div class="px-2 py-1 rounded m-line flex items-center justify-between" style="background:var(--m-panel-2)">
+        <span style="color:var(--m-dim)">${p.short}</span>
+        <span style="color:${q.is_exhausted ? 'var(--m-rose)' : p.color}">${pct}%</span>
+      </div>`;
+    }).join('');
+    const avg = Math.round(total / plans.length);
+    const pctEl = document.getElementById('c-quota-pct');
+    if (pctEl) pctEl.textContent = `額度 ${avg}%`;
+    const barEl = document.getElementById('c-quota-bar');
+    if (barEl) barEl.style.width = `${avg}%`;
+    const pillsEl = document.getElementById('c-sidebar-quota-pills');
+    if (pillsEl) pillsEl.innerHTML = pillsHtml;
+  } catch (_) {}
 }
 
 // ── composer 瘦身：把「快速任務範本」收進摺疊區，省下垂直空間 ──────
@@ -1873,6 +2066,7 @@ function cCompactComposer() {
 // ── 啟動 ────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   cRenderAgentChips();
+  cRenderAgentStatusPanel();
   cSetView('timeline');
   cFilter('all');
   // 把 legacy 的成果容器搬到中央對話串（同一個元素，legacy JS 照常寫入）
@@ -1884,14 +2078,19 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(cMirrorStatus, 400);
   cLoadTasks();
   cLoadProjects();
+  cLoadSidebarDatabase();
+  cLoadSidebarQuotas();
   cCompactComposer();
   cUpdateComposerHint();
   cRenderConversation();
   switchTab('command');
 
-  // Agent 勾選變動時回寫 composer chip
+  // Agent 勾選變動時回寫 composer chip 與右上 Agent 狀態面板
   document.addEventListener('change', e => {
-    if (e.target && e.target.name === 'agent_target') cSyncAgentChips();
+    if (e.target && e.target.name === 'agent_target') {
+      cSyncAgentChips();
+      cRenderAgentStatusPanel();
+    }
   });
   // ⌘/Ctrl+Enter 送出，一般 Enter 換行（避免打字或換行時誤觸直接送出執行）
   const pi = document.getElementById('prompt-input');
@@ -2096,7 +2295,7 @@ _MANUS_CONSOLE_JS: Final[str] = """
 
 
 def render_workbench_html_c() -> str:
-    """Render the Option-C task-stream Workbench (Morandi palette)."""
+    """Render the 3-column 7-panel Workbench layout (左3: 歷史談話/資料庫/額度設定 | 中2: 對話串/輸入框 | 右2: Agent狀態/Using檔案)."""
     workspace = _rebalance(_slice("workspace"))
     topology = _rebalance(_slice("topology"))
     composer_block = _rebalance(_slice("composer"))
@@ -2107,49 +2306,36 @@ def render_workbench_html_c() -> str:
     body = f"""<body class="font-sans antialiased h-screen flex overflow-hidden m-scroll">
 {_SIDEBAR}
 
-<div class="flex-1 flex flex-col min-w-0">
+<div class="flex-1 flex flex-col min-w-0 h-full">
 {_TOPBAR}
 
+<!-- ═══════════════════════════════════════════════════════════════
+     中上區塊 4：對話串 (Main Conversation Thread)
+     ═══════════════════════════════════════════════════════════════ -->
 <main id="c-main" class="flex-1 overflow-y-auto m-scroll">
-  <div class="max-w-4xl mx-auto px-4 sm:px-6 py-5">
+  <div class="max-w-4xl mx-auto px-4 sm:px-6 py-4">
 
     <section id="view-command" class="tab-content block space-y-3">
-      <!-- 中央 = 對話串（你的指令 → Agent 協同結果 → 追問）。
-           階段 / 延遲 / 各 Agent 原始輸出在右側抽屜，細節退到第二層。 -->
+      <!-- 中央 = 對話串（你的指令 → Agent 協同結果 → 追問） -->
       <div id="c-conversation" class="space-y-3">
         <div id="c-conv-header" class="c-conv-header"></div>
         <div id="c-conv-turns" class="space-y-3"></div>
         <!-- legacy 的 live-results-container 會被搬進來：
              hero card、「接下來怎麼辦」按鈕與追問框都在這一格，且永不重建。 -->
         <div id="c-live-slot" class="c-live-slot"></div>
-        {_MANUS_CONSOLE_PANEL}
+
+        <details class="m-collapse frost m-line rounded-2xl overflow-hidden">
+          <summary class="px-4 py-2.5 flex items-center gap-2 hover:bg-white/[.02] transition cursor-pointer">
+            <svg class="m-caret" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="m-chip" style="border-color:var(--m-mist);color:var(--m-mist)">MANUS API</span>
+            <span class="text-xs font-semibold" style="color:var(--m-dim)">雲端指令台 (Manus 規劃與遠端追問)</span>
+          </summary>
+          <div class="p-3 pt-0">{_MANUS_CONSOLE_PANEL}</div>
+        </details>
       </div>
 
       <!-- 總覽模式：所有任務的卡片流（次要視圖） -->
       <div id="c-task-stream" class="space-y-3 hidden"></div>
-
-      <!-- 工作區 -->
-      <details class="m-collapse frost m-line rounded-2xl overflow-hidden" id="c-workspace-collapse">
-        <summary class="px-4 py-3 flex items-center gap-2.5 hover:bg-white/[.02] transition cursor-pointer">
-          <svg class="m-caret" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          <span class="text-xs font-semibold shrink-0" style="color:var(--m-dim)">工作區</span>
-          <span class="text-[11px] truncate hidden sm:inline" style="color:var(--m-faint)">Git Worktree 與檔案 Diff</span>
-          <span class="flex-1"></span>
-          <span class="text-[11px] font-mono shrink-0" style="color:var(--m-faint)" id="c-ws-file-count">0</span>
-        </summary>
-        <div class="px-4 pb-4">{workspace}</div>
-      </details>
-
-      <!-- Agent 拓撲與模型 -->
-      <details class="m-collapse frost m-line rounded-2xl overflow-hidden" id="c-topology-collapse">
-        <summary class="px-4 py-3 flex items-center gap-2.5 hover:bg-white/[.02] transition cursor-pointer">
-          <svg class="m-caret" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          <span class="text-xs font-semibold shrink-0" style="color:var(--m-dim)">Agent 拓撲</span>
-          <span class="text-[11px] truncate hidden sm:inline" style="color:var(--m-faint)">模型設定 · 自訂 Agent · 進階設定</span>
-        </summary>
-        <div class="px-4 pb-4">{topology}</div>
-      </details>
-
     </section>
 
 {views}
@@ -2161,21 +2347,86 @@ def render_workbench_html_c() -> str:
 {_COMPOSER_CHROME_BOTTOM}
 </div>
 
-<!-- 右側抽屜：執行明細（寬螢幕是常駐第三欄，窄螢幕是覆蓋式抽屜） -->
-<aside id="c-drawer" class="c-drawer bg-ink-800 backdrop-blur flex flex-col">
-  <div class="h-12 shrink-0 flex items-center gap-2 px-4 border-b m-line">
-    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" style="color:var(--m-mist)" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h9" stroke-linecap="round"/></svg>
-    <span class="text-xs font-semibold shrink-0" style="color:var(--m-bone)">執行明細</span>
-    <span id="c-exec-status-text" class="text-[11px] truncate" style="color:var(--m-faint)">待命就緒</span>
-    <span class="flex-1"></span>
-    <span id="c-exec-timer" class="font-mono text-[11px] px-2 py-0.5 rounded shrink-0"
-          style="background:var(--m-mist-soft);color:var(--m-mist)">0.0s</span>
-    <button type="button" onclick="cToggleDrawer(false)" class="w-7 h-7 shrink-0 rounded-lg m-btn-ghost grid place-items-center" aria-label="關閉執行明細">
-      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg>
-    </button>
+<!-- ═══════════════════════════════════════════════════════════════
+     右側常駐第三欄（上：Agent 狀態 / 下：Using 檔案）
+     ═══════════════════════════════════════════════════════════════ -->
+<aside id="c-drawer" class="c-drawer bg-ink-800/90 backdrop-blur flex flex-col h-full">
+
+  <!-- 右上區塊 6：Agent 狀態 (Agent Status) -->
+  <div class="flex-1 min-h-0 flex flex-col border-b m-line">
+    <div class="c-zone-header">
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" style="color:var(--m-sage)" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="18" r="2"/><path d="M12 7v4m0 0-5 5m5-5 5 5" stroke-linecap="round"/></svg>
+      <span class="c-zone-title">Agent 狀態</span>
+      <span class="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded" style="background:var(--m-sage-soft);color:var(--m-sage)">
+        <span class="w-1.5 h-1.5 rounded-full m-live" style="background:var(--m-sage)"></span>
+        <span id="c-fleet-count">6</span>/6 在線
+      </span>
+      <div class="flex-1"></div>
+      <span id="c-exec-timer" class="font-mono text-[10px] px-1.5 py-0.5 rounded shrink-0"
+            style="background:var(--m-mist-soft);color:var(--m-mist)">0.0s</span>
+      <button type="button" onclick="cAddAgent()" class="px-2 py-0.5 rounded text-[10px] m-btn-ghost shrink-0" title="新增或設定 Agent">＋自訂</button>
+      <button type="button" onclick="cToggleDrawer(false)" class="w-6 h-6 shrink-0 rounded-md m-btn-ghost grid place-items-center xl:hidden" aria-label="關閉右側欄">
+        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+
+    <div class="px-3 py-1.5 border-b m-line flex items-center justify-between gap-2 text-[11px]" style="background:var(--m-panel-2)">
+      <span id="c-exec-status-text" class="truncate" style="color:var(--m-dim)">待命就緒 · 點擊下方節點可啟用/停用參與派工</span>
+    </div>
+
+    <div id="c-drawer-body" class="flex-1 overflow-y-auto m-scroll p-2.5 space-y-2">
+      <!-- 即時 Agent 狀態清單 -->
+      <div id="c-agent-status-list" class="space-y-1.5"></div>
+
+      <!-- 執行流程與延遲明細 -->
+      <details class="m-collapse frost m-line rounded-xl overflow-hidden" id="c-exec-detail-collapse">
+        <summary class="px-3 py-2 flex items-center gap-2 hover:bg-white/[.02] transition cursor-pointer">
+          <svg class="m-caret" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="text-[11px] font-semibold" style="color:var(--m-dim)">7 角色流水線與延遲明細</span>
+        </summary>
+        <div class="p-2.5 pt-0 space-y-2">{result}</div>
+      </details>
+
+      <!-- Agent 拓撲與模型進階設定 -->
+      <details class="m-collapse frost m-line rounded-xl overflow-hidden" id="c-topology-collapse">
+        <summary class="px-3 py-2 flex items-center gap-2 hover:bg-white/[.02] transition cursor-pointer">
+          <svg class="m-caret" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="text-[11px] font-semibold" style="color:var(--m-dim)">拓撲畫布 · 模型切換 · 自訂 Agent</span>
+        </summary>
+        <div class="p-2.5 pt-0">{topology}</div>
+      </details>
+    </div>
   </div>
-  <div id="c-drawer-body" class="flex-1 overflow-y-auto m-scroll p-4 space-y-4">
-    {result}
+
+  <!-- 右下區塊 7：Using 檔案 (Active Workspace & Files / Diff) -->
+  <div class="flex-1 min-h-0 flex flex-col">
+    <div class="c-zone-header">
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" style="color:var(--m-mist)" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+      <span class="c-zone-title">Using 檔案</span>
+      <span class="text-[10px] font-mono px-1.5 py-0.5 rounded" style="background:var(--m-mist-soft);color:var(--m-mist)" id="c-ws-file-count">0</span>
+      <div class="flex-1"></div>
+
+      <!-- 工作區專案快速切換 -->
+      <div class="relative">
+        <button type="button" onclick="cToggleProjectMenu()" id="c-project-btn"
+                class="flex items-center gap-1 px-2 py-0.5 rounded-md m-btn-ghost text-[10px] font-mono transition"
+                aria-haspopup="menu" aria-expanded="false" title="切換工作區專案資料夾">
+          <span class="truncate max-w-[96px]" id="c-active-project">shared-app</span>
+          <span style="color:var(--m-faint)" id="c-project-count">--</span>
+          <svg class="shrink-0" width="9" height="9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div id="c-project-menu" class="c-menu hidden" style="right:0;left:auto" role="menu" aria-label="切換專案"></div>
+      </div>
+
+      <button type="button" onclick="loadWorkspaceStatus()" class="px-2 py-0.5 rounded text-[10px] m-btn-ghost shrink-0" title="重新整理工作區檔案與 Diff">刷新</button>
+    </div>
+
+    <div id="c-using-files-host" class="flex-1 overflow-y-auto m-scroll p-2 space-y-2">
+      <details class="m-collapse" id="c-workspace-collapse" open>
+        <summary class="hidden">工作區</summary>
+        <div>{workspace}</div>
+      </details>
+    </div>
   </div>
 </aside>
 
