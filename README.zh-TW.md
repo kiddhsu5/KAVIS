@@ -5,7 +5,10 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org)
 [![Status](https://img.shields.io/badge/status-v0.4.0-emerald.svg)](#roadmap)
+[![Live Demo](https://img.shields.io/badge/Live_Demo-khavis.khorus.tech-0EA5E9)](https://khavis.khorus.tech)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
+🌐 **線上入口與唯讀展示 (Live Demo)**：[**https://khavis.khorus.tech**](https://khavis.khorus.tech) · **統一工作台**：[**https://khavis.khorus.tech/workbench**](https://khavis.khorus.tech/workbench)
 
 ```
     ┌────────────────────────────────────────────────────────────────────┐
@@ -222,8 +225,8 @@ docker run -d \
 ### 選項 C —— 從原始碼安裝(給貢獻者)
 
 ```bash
-git clone https://github.com/kiddhsu5/K.H.A.V.I.S..git
-cd khavis
+git clone https://github.com/kiddhsu5/KHAVIS.git
+cd KHAVIS
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 pytest -q
@@ -449,7 +452,7 @@ class MyProvider(ProviderPlugin):
 - [x] **v0.6.0** —— 即時監控 pool 健康與額度的 Web UI(`/dashboard`)。
 - [x] **v1.0.0** —— 穩定的 plugin API(`docs/PLUGIN_API.md`)。
 
-有想法嗎?開個 issue,或在 [discussion board](https://github.com/kiddhsu5/K.H.A.V.I.S./discussions) 投票。
+有想法嗎?開個 issue,或在 [discussion board](https://github.com/kiddhsu5/KHAVIS/discussions) 投票。
 
 ---
 
@@ -477,7 +480,7 @@ class MyProvider(ProviderPlugin):
     - **多人共享 Coding Plan 配額池與 RBAC 權限管理**（統一納管團隊的 MiniMax / GLM / OpenAI / Anthropic 訂閱）
     - **企業內網私有化部署與自訂 CLI / 內部系統工具鏈整合**
     - **團隊級 Prompt 與 Git Worktree 變更審計日誌（Audit & Compliance）**
-  - 📩 商業合作、技術顧問或私有化定制請聯繫：[`security@kiddhsu.taipei`](mailto:security@kiddhsu.taipei) 或透過 [GitHub Discussions](https://github.com/kiddhsu5/K.H.A.V.I.S./discussions) 留言。
+  - 📩 商業合作、技術顧問或私有化定制請聯繫：[`security@kiddhsu.taipei`](mailto:security@kiddhsu.taipei) 或透過 [GitHub Discussions](https://github.com/kiddhsu5/KHAVIS/discussions) 留言。
 
 ---
 

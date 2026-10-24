@@ -1,6 +1,6 @@
 # Frequently Asked Questions
 
-> **15+ common questions about khavis.** If yours is not here, open a [Discussion](https://github.com/kiddhsu5/K.H.A.V.I.S./discussions).
+> **15+ common questions about khavis.** If yours is not here, open a [Discussion](https://github.com/kiddhsu5/KHAVIS/discussions).
 
 ---
 
@@ -159,5 +159,5 @@ See the [README roadmap](../README.md#roadmap). Highlights: cost budgeting (v0.2
 - `khavis doctor` — first thing to run.
 - [`INSTALLATION.md`](../INSTALLATION.md) — common install errors.
 - [`docs/CONFIGURATION.md`](CONFIGURATION.md) — every YAML knob.
-- [GitHub Issues](https://github.com/kiddhsu5/K.H.A.V.I.S./issues) — bug reports.
-- [GitHub Discussions](https://github.com/kiddhsu5/K.H.A.V.I.S./discussions) — questions.
+- [GitHub Issues](https://github.com/kiddhsu5/KHAVIS/issues) — bug reports.
+- [GitHub Discussions](https://github.com/kiddhsu5/KHAVIS/discussions) — questions.

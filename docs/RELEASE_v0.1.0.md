@@ -186,8 +186,8 @@ docker run -d \
 ### From source
 
 ```bash
-git clone https://github.com/kiddhsu5/K.H.A.V.I.S..git
-cd khavis
+git clone https://github.com/kiddhsu5/KHAVIS.git
+cd KHAVIS
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 pytest -q
@@ -268,9 +268,9 @@ release honest.
   drop-in `BaseChatModel` subclass.
 
 Have an idea? Open an issue or vote on the
-[discussion board](https://github.com/kiddhsu5/K.H.A.V.I.S./discussions).
+[discussion board](https://github.com/kiddhsu5/KHAVIS/discussions).
 
 ---
 
-[v0.1.0]: https://github.com/kiddhsu5/K.H.A.V.I.S./releases/tag/v0.1.0
-[Unreleased]: https://github.com/kiddhsu5/K.H.A.V.I.S./compare/v0.1.0...HEAD
+[v0.1.0]: https://github.com/kiddhsu5/KHAVIS/releases/tag/v0.1.0
+[Unreleased]: https://github.com/kiddhsu5/KHAVIS/compare/v0.1.0...HEAD

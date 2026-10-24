@@ -173,6 +173,19 @@ def test_manus_console_routes_are_protected_and_proxy_tasks(monkeypatch) -> None
 
 
 def test_status_server_workbench_endpoints() -> None:
+    # 0. GET /  (一頁式宣傳與 Console Token 登入入口頁)
+    h_root = DummyStatusHandler("/")
+    h_root.do_GET()
+    assert len(h_root.responses) == 1
+    root_status, root_body, root_ctype = h_root.responses[0]
+    assert root_status == 200
+    assert "text/html" in root_ctype
+    root_html = root_body.decode("utf-8")
+    assert "KHAVIS" in root_html
+    assert "handleConsoleLogin" in root_html
+    assert "github.com/kiddhsu5/KHAVIS" in root_html
+    assert "/workbench" in root_html
+
     # 1. GET /workbench  (現行介面 = 選項 C 任務卡片流)
     h_wb = DummyStatusHandler("/workbench")
     h_wb.do_GET()

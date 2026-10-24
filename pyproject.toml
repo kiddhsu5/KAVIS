@@ -78,10 +78,11 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/kiddhsu5/K.H.A.V.I.S."
-Documentation = "https://github.com/kiddhsu5/K.H.A.V.I.S./blob/main/README.md"
-Issues = "https://github.com/kiddhsu5/K.H.A.V.I.S./issues"
-Changelog = "https://github.com/kiddhsu5/K.H.A.V.I.S./blob/main/CHANGELOG.md"
+Homepage = "https://khavis.khorus.tech"
+Repository = "https://github.com/kiddhsu5/KHAVIS"
+Documentation = "https://github.com/kiddhsu5/KHAVIS/blob/main/README.md"
+Issues = "https://github.com/kiddhsu5/KHAVIS/issues"
+Changelog = "https://github.com/kiddhsu5/KHAVIS/blob/main/CHANGELOG.md"
 
 [project.scripts]
 khavis = "core.cli:main"
@@ -89,7 +90,7 @@ khavis-bot = "bot.main:main"
 khavis-serve = "server.openai_api:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["core", "providers", "bot", "server", "agents"]
+packages = ["core", "providers", "bot", "server", "agents", "web"]
 
 # `include` is a *filter*, not an inclusion list — once `packages` is set it
 # cannot add files from outside those directories, so the previous config

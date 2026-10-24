@@ -5,9 +5,10 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org)
 [![Status](https://img.shields.io/badge/status-v0.4.0-emerald.svg)](#roadmap)
+[![Live Demo](https://img.shields.io/badge/Live_Demo-khavis.khorus.tech-0EA5E9)](https://khavis.khorus.tech)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-[繁體中文說明文件 (README.zh-TW.md)](README.zh-TW.md)
+[繁體中文說明文件 (README.zh-TW.md)](README.zh-TW.md) · 🌐 **Live Portal**: [**https://khavis.khorus.tech**](https://khavis.khorus.tech) · **Workbench**: [**https://khavis.khorus.tech/workbench**](https://khavis.khorus.tech/workbench)
 
 ```
     ┌────────────────────────────────────────────────────────────────────┐
@@ -240,8 +241,8 @@ The image ships with all provider plugins pre-installed. Mount your `config/` di
 ### Option C — from source (contributors)
 
 ```bash
-git clone https://github.com/kiddhsu5/K.H.A.V.I.S..git
-cd khavis
+git clone https://github.com/kiddhsu5/KHAVIS.git
+cd KHAVIS
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 pytest -q
@@ -470,7 +471,7 @@ Register it in `pools.yaml`, add capability tags, submit a PR. Full walkthrough 
 - [x] **v1.0.0** — Stable plugin API (`docs/PLUGIN_API.md`), SemVer guarantees.
 - [ ] **Streaming** — `stream()` generator API on `ProviderPlugin` + true SSE passthrough (today's `stream: true` emits a single final chunk).
 
-Have an idea? Open an issue or vote on the [discussion board](https://github.com/kiddhsu5/K.H.A.V.I.S./discussions).
+Have an idea? Open an issue or vote on the [discussion board](https://github.com/kiddhsu5/KHAVIS/discussions).
 
 ---
 
@@ -498,7 +499,7 @@ Highlights:
     - **Shared Team Coding-Plan Quota Pools & RBAC Access Control**
     - **On-Premise / VPC Private Deployment & Custom Internal CLI Integration**
     - **Team-Wide Git Worktree Audit Logs & Governance**
-  - 📩 Contact for commercial inquiries, private deployment, or ecosystem partnerships: [`security@kiddhsu.taipei`](mailto:security@kiddhsu.taipei) or via [GitHub Discussions](https://github.com/kiddhsu5/K.H.A.V.I.S./discussions).
+  - 📩 Contact for commercial inquiries, private deployment, or ecosystem partnerships: [`security@kiddhsu.taipei`](mailto:security@kiddhsu.taipei) or via [GitHub Discussions](https://github.com/kiddhsu5/KHAVIS/discussions).
 
 ---
 

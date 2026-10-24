@@ -57,4 +57,4 @@ ssh -q -o BatchMode=yes -o StrictHostKeyChecking=accept-new -i "$SSH_KEY" "$REMO
    curl -fsS --max-time 10 http://127.0.0.1:8080/healthz >/dev/null"
 
 echo "Manus bridge configured and khavis-workbench.service is active."
-echo "Open http://43.156.115.110/workbench, enter the Console Token in the Manus console, and keep it out of URLs and chat messages."
+echo "Open https://khavis.khorus.tech (or https://khavis.khorus.tech/workbench), enter the Console Token, and keep it out of URLs and chat messages."

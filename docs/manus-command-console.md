@@ -13,7 +13,7 @@ SSH_KEY=/Users/kiddhsu/data/.work/kiddhsu.pem ./scripts/configure_manus_api_key.
 
 腳本會以隱藏輸入讀取兩個不同的值：Manus API Key 與 K.H.A.V.I.S. Console Token。前者只供後端呼叫 `https://api.manus.ai/v2`；後者只用於瀏覽器到 K.H.A.V.I.S. 的管理路由。腳本透過 mode `0600` 的暫存檔傳送設定，接著安裝 `/home/ubuntu/.config/khavis/manus.env`、systemd drop-in 並重啟 `khavis-workbench.service`。不要把任一值貼入 URL、Git、聊天訊息或 shell 命令列。
 
-服務完成後開啟 `http://43.156.115.110/workbench`，在「雲端指令台」輸入 Console Token。Token 只存於目前瀏覽器分頁的 `sessionStorage`，關閉分頁即移除；它不是 Manus API Key。
+服務完成後開啟 `https://khavis.khorus.tech/workbench`（或首頁 `https://khavis.khorus.tech` 登入入口），在「雲端指令台」輸入 Console Token。Token 只存於目前瀏覽器分頁的 `sessionStorage`，關閉分頁即移除；它不是 Manus API Key。
 
 ## API 路由
 
