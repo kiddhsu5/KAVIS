@@ -2607,8 +2607,38 @@ _WORKBENCH_CLIENT_JS = """    let currentTab = 'command';
           chartBox.classList.remove('hidden');
         }
 
-        // 2. HERO CARD: 🏆 最終高完成度整合交付成果 (Top Priority Focus — Result First, Review Collapsible!)
+        // 2. FILE OUTPUTS (if any) + 🚀 NEXT-STEP CONTINUATION BAR (移除重複的文字成果區塊，僅在有文件產出時呈現文件卡片，並保留「接下來要怎麼做」)
         const sharedChanged = Array.isArray(data.shared_changed_files) ? data.shared_changed_files : [];
+        const producedMap = new Map();
+        const baseDir = String(data.shared_dir || '').replace(/\\/+$/, '');
+        sharedChanged.forEach(f => {
+          const p = typeof f === 'string' ? f : (f && f.path ? String(f.path) : '');
+          if (!p) return;
+          const full = (f && f.full_path) ? String(f.full_path) : (baseDir ? `${baseDir}/${p}` : p);
+          producedMap.set(p, {
+            path: p,
+            full_path: full,
+            status: (f && f.status) ? String(f.status) : 'M',
+            size: (f && f.size) ? String(f.size) : ''
+          });
+        });
+        if (Array.isArray(data.results)) {
+          data.results.forEach(r => {
+            const rDir = String((r && r.cwd) || baseDir || '').replace(/\\/+$/, '');
+            (Array.isArray(r && r.changed_files) ? r.changed_files : []).forEach(cf => {
+              const p = typeof cf === 'string' ? cf : (cf && cf.path ? String(cf.path) : '');
+              if (!p || producedMap.has(p)) return;
+              producedMap.set(p, {
+                path: p,
+                full_path: (cf && cf.full_path) ? String(cf.full_path) : (rDir ? `${rDir}/${p}` : p),
+                status: (cf && cf.status) ? String(cf.status) : 'M',
+                size: (cf && cf.size) ? String(cf.size) : ''
+              });
+            });
+          });
+        }
+        const producedFiles = Array.from(producedMap.values());
+
         const nextButtonsHtml = latestNextActions.map((act, idx) => `
           <button type="button" onclick="runNextStepAction(${idx})" class="px-3 py-2 rounded-xl bg-sky-500/15 hover:bg-sky-500/30 text-sky-200 border border-sky-500/30 text-xs font-medium text-left transition flex items-center justify-between gap-2 group">
             <span>${escapeHtml(act.label)}</span>
@@ -2616,43 +2646,38 @@ _WORKBENCH_CLIENT_JS = """    let currentTab = 'command';
           </button>
         `).join('');
 
-        const heroCard = document.createElement('div');
-        heroCard.className = 'rounded-2xl bg-gradient-to-b from-emerald-950/30 to-[#080E1E] border border-emerald-500/40 p-5 space-y-4 shadow-xl';
-        heroCard.innerHTML = `
-          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
-            <div class="flex items-center gap-2.5 flex-wrap">
-              <span class="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-bold flex items-center gap-1.5">
-                <i class="fas fa-trophy text-amber-400"></i>
-                <span>🏆 最終高完成度交付成果</span>
-              </span>
-              <span class="text-xs font-mono text-sky-300 bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/20">
-                來源: ${escapeHtml(data.consensus_source || 'Multi-Agent Synthesis')}
-              </span>
-              ${sharedChanged.length > 0 ? `
-                <span class="text-xs font-mono text-teal-300 bg-teal-500/15 px-2 py-0.5 rounded border border-teal-500/30">
-                  <i class="fas fa-file-code mr-1"></i>已變更 ${sharedChanged.length} 個專案檔案
-                </span>
-              ` : ''}
+        const filesSectionHtml = producedFiles.length > 0 ? `
+          <div class="p-4 rounded-xl bg-teal-950/25 border border-teal-500/35 space-y-2.5">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="flex items-center gap-2 text-xs font-bold text-teal-200">
+                <i class="fas fa-file-code text-teal-400"></i>
+                <span>📄 本輪產出與變更文件 (${producedFiles.length})</span>
+              </div>
+              <button type="button" onclick="if(typeof cShowDiff==='function'){cShowDiff();}else{toggleWorkspaceDiffPanel();}" class="px-2.5 py-1 rounded-lg bg-teal-500/15 hover:bg-teal-500/30 text-teal-200 border border-teal-500/30 text-[11px] font-mono transition">
+                查看檔案 Diff 差異
+              </button>
             </div>
-            <button type="button" onclick="copyFinalDeliverable()" class="px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition flex items-center gap-1.5">
-              <i class="fas fa-copy text-emerald-400"></i>複製最終成果
-            </button>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              ${producedFiles.map(f => {
+                const badgeText = (f.status === '??' || f.status === 'A') ? '新增' : '更新';
+                return `
+                  <button type="button" onclick="openArtifact('${escapeHtml(f.full_path)}', '${escapeHtml(f.path)}')" class="px-3 py-2 rounded-lg bg-[#050811]/85 hover:bg-teal-500/15 border border-white/10 hover:border-teal-500/40 text-left transition flex items-center justify-between gap-2 group">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-teal-500/20 text-teal-300 shrink-0">${badgeText}</span>
+                      <span class="text-xs font-mono text-sky-300 group-hover:underline truncate" title="${escapeHtml(f.path)}">${escapeHtml(f.path)}</span>
+                    </div>
+                    <span class="text-[10px] font-mono text-slate-400 shrink-0">${escapeHtml(f.size || '預覽 →')}</span>
+                  </button>
+                `;
+              }).join('')}
+            </div>
           </div>
+        ` : '';
 
-          <div class="text-xs sm:text-sm font-mono text-slate-100 whitespace-pre-wrap leading-relaxed max-h-[34rem] overflow-y-auto p-4 bg-[#050811]/90 border border-white/10 rounded-xl">${escapeHtml(finalConsensus || '無返回內容')}</div>
-
-          ${latestReviewDetailsText ? `
-            <details class="rounded-xl bg-amber-500/5 border border-amber-500/25 overflow-hidden">
-              <summary class="px-3.5 py-2.5 cursor-pointer hover:bg-amber-500/10 transition flex items-center justify-between text-xs font-bold text-amber-200 select-none">
-                <span class="flex items-center gap-2">
-                  <i class="fas fa-search-plus text-amber-400"></i>
-                  <span>🔍 點選展開 / 隱藏 Agent 交叉審查與節點比較摘要</span>
-                </span>
-                <span class="text-[11px] font-mono text-amber-300">預設收起 · 點擊展開 ▾</span>
-              </summary>
-              <div class="p-3.5 border-t border-amber-500/20 text-xs font-mono text-slate-200 whitespace-pre-wrap leading-relaxed max-h-72 overflow-y-auto bg-[#050811]/80">${escapeHtml(latestReviewDetailsText)}</div>
-            </details>
-          ` : ''}
+        const heroCard = document.createElement('div');
+        heroCard.className = 'rounded-2xl bg-[#080E1E]/90 border border-white/10 p-4 space-y-3 shadow-lg';
+        heroCard.innerHTML = `
+          ${filesSectionHtml}
 
           <!-- 🚀 NEXT-STEP CONTINUATION BAR (一鍵下一步 & 直接追問接力) -->
           <div class="p-4 rounded-xl bg-[#0B1326] border border-sky-500/30 space-y-3">

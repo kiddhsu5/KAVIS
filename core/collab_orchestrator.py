@@ -24,7 +24,7 @@ from typing import Any
 from bot.backends._http_fallback import call_upstream_llm_fallback, has_any_upstream_key
 from bot.dispatch import DispatchRouter
 from bot.models import BackendResult, DispatchEnvelope
-from core.workspace_manager import collect_directory_diff
+from core.workspace_manager import collect_directory_diff, list_project_files
 
 _ACTION_MANDATE = (
     "\n\n【最高行動準則 (Autonomous Action-First Execution Mandate)】\n"
@@ -172,6 +172,10 @@ async def run_collaborative_workflow(
     contextual_prompt = build_contextual_prompt(prompt, previous_context)
     collaboration_steps: list[dict[str, Any]] = []
     results: list[BackendResult] = []
+    before_snap: dict[str, tuple[Any, Any]] = {
+        str(f.get("rel_path")): (f.get("size_bytes"), f.get("mtime"))
+        for f in list_project_files(shared_dir)
+    }
 
     if mode == "relay" and len(agents) >= 2:
         # ------------------------------------------------------------------
@@ -354,9 +358,42 @@ async def run_collaborative_workflow(
         results_dump.append(d)
 
     shared_diff = collect_directory_diff(shared_dir)
+    after_map: dict[str, dict[str, Any]] = {
+        str(f.get("rel_path")): f for f in list_project_files(shared_dir)
+    }
+    shared_changed_list: list[dict[str, Any]] = []
+    seen_rel: set[str] = set()
+
     for cf in shared_diff.get("changed_files", []):
-        if cf not in all_changed_files:
-            all_changed_files.append(cf)
+        rel_p = str(cf.get("path") or "").strip()
+        if not rel_p or rel_p in seen_rel:
+            continue
+        seen_rel.add(rel_p)
+        fmeta = after_map.get(rel_p, {})
+        entry = {
+            "path": rel_p,
+            "full_path": str(fmeta.get("path") or (shared_dir / rel_p)),
+            "status": str(cf.get("status") or "M"),
+            "size": str(fmeta.get("size") or ""),
+        }
+        shared_changed_list.append(entry)
+        if entry not in all_changed_files:
+            all_changed_files.append(entry)
+
+    for rel_p, fmeta in after_map.items():
+        if rel_p in seen_rel:
+            continue
+        prev = before_snap.get(rel_p)
+        if prev is None or prev != (fmeta.get("size_bytes"), fmeta.get("mtime")):
+            seen_rel.add(rel_p)
+            entry = {
+                "path": rel_p,
+                "full_path": str(fmeta.get("path") or (shared_dir / rel_p)),
+                "status": "A" if prev is None else "M",
+                "size": str(fmeta.get("size") or ""),
+            }
+            shared_changed_list.append(entry)
+            all_changed_files.append(entry)
 
     next_actions = generate_next_step_actions(prompt, clean_consensus, all_changed_files)
 
@@ -370,6 +407,6 @@ async def run_collaborative_workflow(
         "collaboration_steps": collaboration_steps,
         "next_actions": next_actions,
         "results": results_dump,
-        "shared_changed_files": shared_diff.get("changed_files", []),
+        "shared_changed_files": shared_changed_list,
         "shared_diff": shared_diff.get("diff", ""),
     }
