@@ -126,7 +126,7 @@ class El {
 const html = fs.readFileSync(process.argv[2] || '/tmp/live_wb.html', 'utf8');
 for (const id of new Set([...html.matchAll(/id="([^"]+)"/g)].map(m => m[1]))) reg(id, new El('div'));
 
-agentCheckboxes = ['claude','codex','antigravity','minimax','zcode','khavis'].map(v => {
+agentCheckboxes = ['claude','codex','antigravity','minimax','opencode','khavis'].map(v => {
   const cb = new El('input'); cb.name = 'agent_target'; cb.value = v;
   cb.checked = (v === 'antigravity' || v === 'khavis'); cb.setName = v;
   return cb;

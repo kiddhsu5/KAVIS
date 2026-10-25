@@ -26,7 +26,7 @@ def test_render_workbench_html() -> None:
     assert "Codex" in html_content
     assert "Antigravity" in html_content
     assert "MiniMax Code" in html_content
-    assert "zcode" in html_content
+    assert "opencode" in html_content
     assert "MiniMax-M3.1-Flash" in html_content
     assert "glm-5.3-flashx" in html_content
     assert "GPT GO" in html_content
@@ -42,7 +42,7 @@ def test_get_agent_fleet_status() -> None:
     assert "codex" in ids
     assert "antigravity" in ids
     assert "minimax" in ids
-    assert "zcode" in ids
+    assert "opencode" in ids
     assert "khavis" in ids
 
     claude_node = next(a for a in fleet if a["id"] == "claude")
@@ -453,3 +453,58 @@ def test_collaborative_orchestrator_relay_and_next_actions() -> None:
         assert len(data["collaboration_steps"]) == 2
         assert len(data["next_actions"]) >= 2
         assert "Step 2 executed by codex" in data["consensus"]
+        assert "review_details" in data
+
+
+def test_agent_skills_and_result_review_split(tmp_path) -> None:
+    from bot.models import BackendResult
+    from core.agent_skills import execute_skill
+    from core.collab_orchestrator import _split_result_and_review
+    from web.workbench_c import render_workbench_html_c
+
+    # 1. Test scaffold_project, edit_file, git_ops, run_tests
+    out_scaf = execute_skill({"tool": "scaffold_project", "remote_url": "https://github.com/kiddhsu5/KHAVIS.git"}, cwd=str(tmp_path))
+    assert "[OK]" in out_scaf
+    assert (tmp_path / "README.md").is_file()
+    assert (tmp_path / "LICENSE").is_file()
+    assert (tmp_path / "CONTRIBUTING.md").is_file()
+    assert (tmp_path / "scripts" / "run.sh").is_file()
+    assert (tmp_path / "tests" / "test_app.py").is_file()
+    assert (tmp_path / ".github" / "workflows" / "ci.yml").is_file()
+
+    out_git = execute_skill({"tool": "git_ops", "action": "remote"}, cwd=str(tmp_path))
+    assert "https://github.com/kiddhsu5/KHAVIS.git" in out_git
+
+    out_edit = execute_skill(
+        {"tool": "edit_file", "path": "README.md", "target": "專案簡介", "replacement": "專案核心簡介"},
+        cwd=str(tmp_path),
+    )
+    assert "[OK]" in out_edit
+
+    out_test = execute_skill({"tool": "run_tests"}, cwd=str(tmp_path))
+    assert "exit_code=0" in out_test
+
+    # 2. Test result-first splitting & collapsible review extraction
+    sample_raw = (
+        "1. **【🏆 最終完成交付成果】**\n已完成所有檔案修改與測試驗證。\n"
+        "<!-- KHAVIS_REVIEW_SPLIT -->\n"
+        "2. **【🔍 多 Agent 交叉審查與互評摘要】**\nopencode 與 antigravity 比較結果一致。"
+    )
+    main_res, rev_details = _split_result_and_review(
+        sample_raw,
+        [BackendResult(backend="opencode", ok=True, text="Done", latency_ms=42)],
+        "已完成 2 個 Agent 交叉審查。",
+    )
+    assert "已完成所有檔案修改與測試驗證" in main_res
+    assert "多 Agent 交叉審查與互評摘要" not in main_res
+    assert "多 Agent 交叉審查與互評摘要" in rev_details
+    assert "opencode" in rev_details
+
+    # 3. Test workbench_c UI has left/right chat layout, collapsible review, and zero zcode
+    html_c = render_workbench_html_c()
+    assert "c-turn-user" in html_c
+    assert "c-turn-agent" in html_c
+    assert "c-review-collapse" in html_c
+    assert "opencode" in html_c
+    assert "zcode" not in html_c.lower()
+

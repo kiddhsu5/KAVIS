@@ -91,7 +91,7 @@ const doc = {
     if (sel.startsWith('#')) { const e = byId.get(sel.slice(1)); return e ? [e] : []; }
     if (sel.includes('agent_target')) {
       // six agent checkboxes, matching the real page
-      return ['claude', 'codex', 'antigravity', 'minimax', 'zcode', 'khavis'].map(v => {
+      return ['claude', 'codex', 'antigravity', 'minimax', 'opencode', 'khavis'].map(v => {
         const cb = new El('input'); cb.name = 'agent_target'; cb.value = v;
         cb.checked = (v === 'antigravity' || v === 'khavis');
         return cb;

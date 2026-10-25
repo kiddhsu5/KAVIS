@@ -1,7 +1,7 @@
 """K.H.A.V.I.S. Unified Graphical Web Workbench (全域圖形化智慧指揮工作台).
 
 Provides a graphical, interactive, single-page command console to:
-1. Visually orchestrate 5 Tencent Cloud CLI Agents (Claude Code [MiniMax-M3.1-Flash], Codex [GLM 5.3 FlashX], Antigravity [AGY], MiniMax Code [MiniMax-M3.1], zcode [GLM 5.3 FlashX]) + K.H.A.V.I.S. Multi-Agent Team via an interactive SVG Topology Canvas.
+1. Visually orchestrate 5 Tencent Cloud CLI Agents (Claude Code [MiniMax-M3.1-Flash], Codex [GLM 5.3 FlashX], Antigravity [AGY], MiniMax Code [MiniMax-M3.1], opencode [GLM 5.3 FlashX]) + K.H.A.V.I.S. Multi-Agent Team via an interactive SVG Topology Canvas.
 2. Monitor real-time quotas, 429 breakers & dynamic reset timers with SVG radial gauges.
 3. Track execution progress via a graphical 7-Role LangGraph DAG visualizer and latency bar charts.
 4. Safely browse, preview, copy, and download whitelisted deliverables and artifacts.
@@ -70,8 +70,8 @@ AGENT_MODEL_SPECS: dict[str, dict[str, Any]] = {
             "MiniMax-Text-01",
         ],
     },
-    "zcode": {
-        "env": "ZCODE_DISPATCH_MODEL",
+    "opencode": {
+        "env": "OPENCODE_DISPATCH_MODEL",
         "default": "glm-5.3-flashx",
         "label": "OpenCode",
         "options": [
@@ -319,7 +319,7 @@ def get_setup_wizard_status() -> dict[str, Any]:
         f"CODEX_DISPATCH_MODEL={models_cfg['models'].get('codex', 'glm-5.3-flashx')}",
         f"ANTIGRAVITY_DISPATCH_MODEL={models_cfg['models'].get('antigravity', 'antigravity-pro')}",
         f"MINIMAX_DISPATCH_MODEL={models_cfg['models'].get('minimax', 'MiniMax-M3.1')}",
-        f"ZCODE_DISPATCH_MODEL={models_cfg['models'].get('zcode', 'glm-5.3-flashx')}",
+        f"OPENCODE_DISPATCH_MODEL={models_cfg['models'].get('opencode', 'glm-5.3-flashx')}",
         f"KHAVIS_ACTIVE_PROJECT={ws['active_project']}",
         f"KHAVIS_ISOLATION_MODE={ws['isolation_mode']}",
         "",
@@ -456,16 +456,16 @@ def get_agent_fleet_status() -> list[dict[str, Any]]:
             "color": "#14B8A6",
         },
         {
-            "id": "zcode",
+            "id": "opencode",
             "name": "OpenCode",
             "binary": "opencode",
-            "model": active_models["zcode"],
-            "default_model": default_models["zcode"],
-            "options": model_options["zcode"],
+            "model": active_models["opencode"],
+            "default_model": default_models["opencode"],
+            "options": model_options["opencode"],
             "adjustable": True,
             "custom": False,
-            "plan": f"GLM Coding Plan ({active_models['zcode']})",
-            "desc": f"OpenCode 跨模型編碼 CLI (當前綁定 {active_models['zcode']})",
+            "plan": f"GLM Coding Plan ({active_models['opencode']})",
+            "desc": f"OpenCode 跨模型編碼 CLI (當前綁定 {active_models['opencode']})",
             "tier": "Tier-2",
             "icon": "fa-bolt",
             "color": "#F59E0B",
@@ -495,7 +495,7 @@ def get_agent_fleet_status() -> list[dict[str, Any]]:
             a["status"] = "ready"
             continue
 
-        binary_path = shutil.which(a["binary"]) or (shutil.which("zcode") if a["id"] == "zcode" else None)
+        binary_path = shutil.which(a["binary"])
         if not binary_path and a["id"] == "antigravity":
             binary_path = shutil.which("agy")
         if not binary_path and a["id"] == "minimax":
@@ -851,7 +851,7 @@ _WORKBENCH_PAGE_HEAD = """<!DOCTYPE html>
             <div class="flex justify-between gap-1"><span>Codex:</span><span id="side-model-codex" class="text-indigo-400 truncate">glm-5.3-flashx</span></div>
             <div class="flex justify-between gap-1"><span>Antigravity:</span><span id="side-model-antigravity" class="text-sky-400 truncate">antigravity-pro</span></div>
             <div class="flex justify-between gap-1"><span>MiniMax:</span><span id="side-model-minimax" class="text-teal-400 truncate">MiniMax-M3.1</span></div>
-            <div class="flex justify-between gap-1"><span>opencode:</span><span id="side-model-zcode" class="text-amber-400 truncate">glm-5.3-flashx</span></div>
+            <div class="flex justify-between gap-1"><span>opencode:</span><span id="side-model-opencode" class="text-amber-400 truncate">glm-5.3-flashx</span></div>
           </div>
         </div>
       </div>
@@ -1106,7 +1106,7 @@ _WORKBENCH_PAGE_HEAD = """<!DOCTYPE html>
               </div>
               <div class="p-2.5 rounded-lg bg-black/40 border border-white/5 space-y-1.5">
                 <label class="text-amber-400 font-bold block">OpenCode (opencode) 模型</label>
-                <input id="custom-input-zcode" type="text" value="glm-5.3-flashx" oninput="onCustomModelInput('zcode', this.value)" class="w-full bg-[#050811] border border-white/15 rounded px-2 py-1 text-xs font-mono text-white focus:outline-none focus:border-amber-400" placeholder="輸入或選擇模型..." />
+                <input id="custom-input-opencode" type="text" value="glm-5.3-flashx" oninput="onCustomModelInput('opencode', this.value)" class="w-full bg-[#050811] border border-white/15 rounded px-2 py-1 text-xs font-mono text-white focus:outline-none focus:border-amber-400" placeholder="輸入或選擇模型..." />
                 <div class="text-[10px] text-slate-400 font-mono">預設: glm-5.3-flashx</div>
               </div>
             </div>
@@ -1133,7 +1133,7 @@ _WORKBENCH_PAGE_HEAD = """<!DOCTYPE html>
               <path id="beam-codex" d="M500,22 C500,55 250,40 250,90" fill="none" stroke="#1E293B" stroke-width="2.5" />
               <path id="beam-antigravity" d="M500,22 C500,55 416,40 416,90" fill="none" stroke="#1E293B" stroke-width="2.5" />
               <path id="beam-minimax" d="M500,22 C500,55 583,40 583,90" fill="none" stroke="#1E293B" stroke-width="2.5" />
-              <path id="beam-zcode" d="M500,22 C500,55 750,40 750,90" fill="none" stroke="#1E293B" stroke-width="2.5" />
+              <path id="beam-opencode" d="M500,22 C500,55 750,40 750,90" fill="none" stroke="#1E293B" stroke-width="2.5" />
               <path id="beam-khavis" d="M500,22 C500,55 916,40 916,90" fill="none" stroke="url(#beamGrad)" stroke-width="3" class="flow-line-active" />
             </svg>
 
@@ -1253,18 +1253,18 @@ _WORKBENCH_PAGE_HEAD = """<!DOCTYPE html>
               </div>
 
               <!-- Node 5: OpenCode -->
-              <div id="node-card-zcode" onclick="toggleAgentNode('zcode')" class="agent-node-card cursor-pointer rounded-xl p-3 bg-[#0E1525] border border-white/10 flex flex-col justify-between space-y-2.5 select-none">
-                <input type="checkbox" name="agent_target" value="zcode" class="hidden" onchange="syncTopologyBeams()">
+              <div id="node-card-opencode" onclick="toggleAgentNode('opencode')" class="agent-node-card cursor-pointer rounded-xl p-3 bg-[#0E1525] border border-white/10 flex flex-col justify-between space-y-2.5 select-none">
+                <input type="checkbox" name="agent_target" value="opencode" class="hidden" onchange="syncTopologyBeams()">
                 <div class="flex items-center justify-between">
                   <div class="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
                     <i class="fas fa-bolt"></i>
                   </div>
-                  <span id="badge-node-zcode" class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-slate-400">待命</span>
+                  <span id="badge-node-opencode" class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-slate-400">待命</span>
                 </div>
                 <div class="space-y-1">
                   <div class="font-bold text-white text-xs">OpenCode</div>
                   <div onclick="event.stopPropagation()">
-                    <select id="model-select-zcode" onchange="onAgentModelChange('zcode', this.value)" class="w-full bg-[#070B14] border border-amber-500/30 rounded px-1.5 py-1 text-[10px] font-mono text-amber-300 focus:outline-none focus:border-amber-400 cursor-pointer" title="調整 opencode 綁定模型">
+                    <select id="model-select-opencode" onchange="onAgentModelChange('opencode', this.value)" class="w-full bg-[#070B14] border border-amber-500/30 rounded px-1.5 py-1 text-[10px] font-mono text-amber-300 focus:outline-none focus:border-amber-400 cursor-pointer" title="調整 opencode 綁定模型">
                       <option value="glm-5.3-flashx" selected>glm-5.3-flashx</option>
                       <option value="glm-5.3">glm-5.3</option>
                       <option value="codegeex-4">codegeex-4</option>
@@ -1586,7 +1586,7 @@ _WORKBENCH_PAGE_HEAD = """<!DOCTYPE html>
                 <div class="text-emerald-300 select-all">bash scripts/quick_setup_wizard.sh</div>
               </div>
               <div class="p-3 rounded-xl bg-[#050811] border border-white/10 space-y-1">
-                <div class="text-[10px] text-sky-400">2. 安裝/更新 5 大 CLI 轉接執行檔 (Claude/Codex/AGY/MiniMax/zcode)：</div>
+                <div class="text-[10px] text-sky-400">2. 安裝/更新 5 大 CLI 轉接執行檔 (Claude/Codex/AGY/MiniMax/opencode)：</div>
                 <div class="text-emerald-300 select-all">sudo bash scripts/setup_tencent_agents.sh</div>
               </div>
               <div class="p-3 rounded-xl bg-[#050811] border border-white/10 space-y-1">
@@ -1647,14 +1647,14 @@ _WORKBENCH_CLIENT_JS = """    let currentTab = 'command';
     let execTimerInterval = null;
     let execStartTime = 0;
 
-    let AGENT_IDS = ['claude', 'codex', 'antigravity', 'minimax', 'zcode', 'khavis'];
-    let ADJUSTABLE_AGENTS = ['claude', 'codex', 'antigravity', 'minimax', 'zcode'];
+    let AGENT_IDS = ['claude', 'codex', 'antigravity', 'minimax', 'opencode', 'khavis'];
+    let ADJUSTABLE_AGENTS = ['claude', 'codex', 'antigravity', 'minimax', 'opencode'];
     let currentAgentModels = {
       claude: 'MiniMax-M3.1-Flash',
       codex: 'glm-5.3-flashx',
       antigravity: 'antigravity-pro',
       minimax: 'MiniMax-M3.1',
-      zcode: 'glm-5.3-flashx'
+      opencode: 'glm-5.3-flashx'
     };
     let currentIsolationMode = 'shared';
     let currentProjectName = 'shared-app';
@@ -1905,7 +1905,7 @@ _WORKBENCH_CLIENT_JS = """    let currentTab = 'command';
         keyEl.value = 'MINIMAX_API_KEY';
         urlEl.value = '';
       } else if (preset === 'opencode') {
-        idEl.value = 'opencode';
+        idEl.value = 'opencode-ext';
         nameEl.value = 'OpenCode CLI';
         typeEl.value = 'cli';
         modelEl.value = 'glm-5.3-flashx';
@@ -1991,8 +1991,8 @@ _WORKBENCH_CLIENT_JS = """    let currentTab = 'command';
         const allAgents = data.agents || [];
         const customAgents = allAgents.filter(a => a.custom);
 
-        AGENT_IDS = ['claude', 'codex', 'antigravity', 'minimax', 'zcode', 'khavis', ...customAgents.map(a => a.id)];
-        ADJUSTABLE_AGENTS = ['claude', 'codex', 'antigravity', 'minimax', 'zcode', ...customAgents.map(a => a.id)];
+        AGENT_IDS = ['claude', 'codex', 'antigravity', 'minimax', 'opencode', 'khavis', ...customAgents.map(a => a.id)];
+        ADJUSTABLE_AGENTS = ['claude', 'codex', 'antigravity', 'minimax', 'opencode', ...customAgents.map(a => a.id)];
         customAgents.forEach(a => {
           if (!currentAgentModels[a.id]) currentAgentModels[a.id] = a.model;
         });
@@ -2394,6 +2394,7 @@ _WORKBENCH_CLIENT_JS = """    let currentTab = 'command';
     let previousTurnContext = null;
     let latestNextActions = [];
     let latestFinalDeliverableText = '';
+    let latestReviewDetailsText = '';
 
     const COLLAB_MODE_DESCS = {
       auto_loop: '🔥 預設推薦：各 Agent 同時動手實作 → 自動交叉檢查與相互批評 → 自動補執行並產出唯一高完成度結果',
@@ -2571,6 +2572,7 @@ _WORKBENCH_CLIENT_JS = """    let currentTab = 'command';
 
         const finalConsensus = data.consensus || ((data.results && data.results[0]) ? (data.results[0].text || data.results[0].error) : '');
         latestFinalDeliverableText = finalConsensus || '';
+        latestReviewDetailsText = data.review_details || data.critique_summary || '';
         latestNextActions = Array.isArray(data.next_actions) ? data.next_actions : [];
 
         // Save context for seamless next-step continuation
@@ -2578,6 +2580,7 @@ _WORKBENCH_CLIENT_JS = """    let currentTab = 'command';
         previousTurnContext = {
           prompt: prompt,
           consensus: finalConsensus,
+          review_details: latestReviewDetailsText,
           thread: prevThread,
           step: (previousTurnContext ? (previousTurnContext.step || 1) + 1 : 1)
         };
@@ -2604,7 +2607,7 @@ _WORKBENCH_CLIENT_JS = """    let currentTab = 'command';
           chartBox.classList.remove('hidden');
         }
 
-        // 2. HERO CARD: 🏆 最終高完成度整合交付成果 (Top Priority Focus)
+        // 2. HERO CARD: 🏆 最終高完成度整合交付成果 (Top Priority Focus — Result First, Review Collapsible!)
         const sharedChanged = Array.isArray(data.shared_changed_files) ? data.shared_changed_files : [];
         const nextButtonsHtml = latestNextActions.map((act, idx) => `
           <button type="button" onclick="runNextStepAction(${idx})" class="px-3 py-2 rounded-xl bg-sky-500/15 hover:bg-sky-500/30 text-sky-200 border border-sky-500/30 text-xs font-medium text-left transition flex items-center justify-between gap-2 group">
@@ -2636,14 +2639,20 @@ _WORKBENCH_CLIENT_JS = """    let currentTab = 'command';
             </button>
           </div>
 
-          ${data.critique_summary ? `
-            <div class="px-3.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-200 flex items-center gap-2">
-              <i class="fas fa-check-double text-amber-400"></i>
-              <span>${escapeHtml(data.critique_summary)}</span>
-            </div>
-          ` : ''}
-
           <div class="text-xs sm:text-sm font-mono text-slate-100 whitespace-pre-wrap leading-relaxed max-h-[34rem] overflow-y-auto p-4 bg-[#050811]/90 border border-white/10 rounded-xl">${escapeHtml(finalConsensus || '無返回內容')}</div>
+
+          ${latestReviewDetailsText ? `
+            <details class="rounded-xl bg-amber-500/5 border border-amber-500/25 overflow-hidden">
+              <summary class="px-3.5 py-2.5 cursor-pointer hover:bg-amber-500/10 transition flex items-center justify-between text-xs font-bold text-amber-200 select-none">
+                <span class="flex items-center gap-2">
+                  <i class="fas fa-search-plus text-amber-400"></i>
+                  <span>🔍 點選展開 / 隱藏 Agent 交叉審查與節點比較摘要</span>
+                </span>
+                <span class="text-[11px] font-mono text-amber-300">預設收起 · 點擊展開 ▾</span>
+              </summary>
+              <div class="p-3.5 border-t border-amber-500/20 text-xs font-mono text-slate-200 whitespace-pre-wrap leading-relaxed max-h-72 overflow-y-auto bg-[#050811]/80">${escapeHtml(latestReviewDetailsText)}</div>
+            </details>
+          ` : ''}
 
           <!-- 🚀 NEXT-STEP CONTINUATION BAR (一鍵下一步 & 直接追問接力) -->
           <div class="p-4 rounded-xl bg-[#0B1326] border border-sky-500/30 space-y-3">
@@ -2850,7 +2859,7 @@ _WORKBENCH_CLIENT_JS = """    let currentTab = 'command';
 
         const corePlans = [
           { key: 'MiniMax-M3', label: 'MiniMax Token Plan (MiniMax-M3.1-Flash)', role: 'Claude Code 預設 / 極速中文與測試', color: '#10B981', pct: 95 },
-          { key: 'GLM-5.3', label: 'GLM Coding Plan (GLM 5.3 FlashX)', role: 'Codex & zcode 驅動 / 高速代碼生成', color: '#6366F1', pct: 92 },
+          { key: 'GLM-5.3', label: 'GLM Coding Plan (GLM 5.3 FlashX)', role: 'Codex & opencode 驅動 / 高速代碼生成', color: '#6366F1', pct: 92 },
           { key: 'OpenAI-API', label: 'GPT GO (OpenAI Platform)', role: '系統架構 / 深度推理', color: '#0EA5E9', pct: 90 },
           { key: 'Antigravity-Core', label: 'Antigravity AI Pro (AGY)', role: '全域自主 Agentic CLI 驅動', color: '#06B6D4', pct: 98 }
         ];

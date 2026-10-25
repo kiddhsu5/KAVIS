@@ -26,7 +26,8 @@
    - **OpenAI Codex (`codex`)**：預設驅動 **`glm-5.3-flashx`**（GLM Coding Plan）或 `gpt-5-codex`。
    - **Google Antigravity (`antigravity` / `agy`)**：預設驅動 **`antigravity-pro`**，負責全域自主 Agentic 開發。
    - **MiniMax Code (`minimax` / `mcode`)**：預設驅動 **`MiniMax-M3.1`**。
-   - **Zhipu zcode (`zcode`)**：預設驅動 **`glm-5.3-flashx`**。
+   - **OpenCode (`opencode`)**：預設驅動 **`glm-5.3-flashx`**，開源跨模型終端編碼 CLI。
+   - **🛠️ 實作型 Agent Skills (`core/agent_skills.py`)**：內建 9 大自主執行技能（`run_shell`, `write_file`, `edit_file`, `read_file`, `list_dir`, `search_code`, `git_ops`, `run_tests`, `scaffold_project`）與多輪連續執行機制，確保 Agent 親自動手寫檔、設定 Git 遠端與跑通測試，而非只給建議。
 3. **🔌 用戶自訂 Agent 動態擴充機制 (`core/custom_agents.py`)**
    - 使用者可於 Web 介面一鍵加入自己常用的 CLI 工具（內建 **Aider**、**OpenCode**、**Block Goose**、**DeepSeek / Qwen** 範本）或自訂命令列與 OpenAI 相容 API 端點，註冊後立即整合至拓撲圖與並發派工佇列。
 4. **📁 共用專案資料夾 + Git Worktree 隔離與 Diff 視覺化對比 (`core/workspace_manager.py`)**
@@ -160,11 +161,22 @@ khavis chat --quiet "…"                   # 不顯示 pool/模型/token 資訊
 `khavis chat` 走的是和 HTTP API **同一套**熔斷器與 failover,所以額度用完或壞掉的
 pool 會被記錄並跳過,而不是把上游的錯誤丟給你。
 
-### 要跑成伺服器時
+### 要跑成伺服器與啟動 Web 工作台 (`/workbench`) 時
 
 ```bash
+# 1. 初始化環境與共用專案工作區
+bash scripts/quick_setup_wizard.sh
+
+# 2. 啟動統一 Web 智慧工作台 (預設 :8080/workbench)
+python3 -m scripts.status_server --port 8080
+
+# 3. 啟動 OpenAI 相容的 LLM Router HTTP API
 khavis init     # 產生範例設定檔(不會覆寫既有檔案)
 khavis serve    # OpenAI 相容的 HTTP API,預設 :8080
+
+# 4. 執行完整自動化測試與前端驗證 (GitHub Actions CI 同款流程)
+pytest -q
+node tests/smoke_workbench.js
 ```
 
 ```bash

@@ -4,7 +4,7 @@
 # 支援：
 # 1. 自動建立共用專案資料夾 (Shared Workspace) 與 Git Worktree 環境
 # 2. 自動配置 5 大 CLI 外殼 (Claude Code [MiniMax-M3.1-Flash], Codex [glm-5.3-flashx],
-#    Antigravity [agy], MiniMax Code, zcode)
+#    Antigravity [agy], MiniMax Code, opencode)
 # 3. 互動式或環境變數自動寫入 BYOK API 金鑰 (.env)
 # =============================================================================
 set -euo pipefail
@@ -25,7 +25,7 @@ if [ ! -d "$WORKSPACE_DIR/.git" ]; then
   git -C "$WORKSPACE_DIR" config user.email "workspace@khavis.local"
   cat > "$WORKSPACE_DIR/README.md" <<'EOF'
 # K.H.A.V.I.S. Shared Project Workspace
-此資料夾由 Claude Code、Codex、Antigravity、MiniMax Code、zcode 與自訂 Agent 共用。
+此資料夾由 Claude Code、Codex、Antigravity、MiniMax Code、opencode 與自訂 Agent 共用。
 EOF
   git -C "$WORKSPACE_DIR" add -A >/dev/null 2>&1 || true
   git -C "$WORKSPACE_DIR" commit -m "chore: init shared workspace" >/dev/null 2>&1 || true
@@ -47,7 +47,7 @@ set_env_default "CLAUDE_DISPATCH_MODEL" "MiniMax-M3.1-Flash"
 set_env_default "CODEX_DISPATCH_MODEL" "glm-5.3-flashx"
 set_env_default "ANTIGRAVITY_DISPATCH_MODEL" "antigravity-pro"
 set_env_default "MINIMAX_DISPATCH_MODEL" "MiniMax-M3.1"
-set_env_default "ZCODE_DISPATCH_MODEL" "glm-5.3-flashx"
+set_env_default "OPENCODE_DISPATCH_MODEL" "glm-5.3-flashx"
 set_env_default "KHAVIS_ACTIVE_PROJECT" "shared-app"
 set_env_default "KHAVIS_ISOLATION_MODE" "shared"
 

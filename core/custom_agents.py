@@ -19,7 +19,7 @@ from typing import Any
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CUSTOM_AGENTS_PATH = PROJECT_ROOT / "config" / "custom_agents.json"
 
-RESERVED_AGENT_IDS = {"claude", "codex", "antigravity", "minimax", "zcode", "khavis", "judge"}
+RESERVED_AGENT_IDS = {"claude", "codex", "antigravity", "minimax", "opencode", "khavis", "judge"}
 _AGENT_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_\-]{1,31}$")
 _MODEL_RE = re.compile(r"^[A-Za-z0-9._:\-/]{1,80}$")
 

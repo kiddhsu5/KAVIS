@@ -54,7 +54,7 @@ def render_landing_html(
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>KHAVIS · 跨廠牌 AI 編碼 CLI 統一智慧工作台 & 多模型配額路由器</title>
-  <meta name="description" content="KHAVIS — 並發調度 Claude Code、OpenAI Codex、Google Antigravity、MiniMax、智譜 zcode 與 Manus API，內建 Git Worktree 隔離、Unified Diff 視覺化合併與 12 模型池零額度中斷路由。">
+  <meta name="description" content="KHAVIS — 並發調度 Claude Code、OpenAI Codex、Google Antigravity、MiniMax、OpenCode (opencode) 與 Manus API，內建 Git Worktree 隔離、Unified Diff 視覺化合併與 12 模型池零額度中斷路由。">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
@@ -464,6 +464,9 @@ khavis serve   # 開啟 http://localhost:8080/workbench</code></pre>
         }}
         try {{
           sessionStorage.setItem('khavis_console_token', token);
+        }} catch (_) {{}}
+        try {{
+          localStorage.setItem('khavis_console_token', token);
         }} catch (_) {{}}
         showMsg('✓ 授權驗證成功！正在進入任務工作台…', false);
         window.location.href = '/workbench';

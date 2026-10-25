@@ -29,7 +29,7 @@ from .backends import (
     JudgeBackend,
     KhavisBackend,
     MinimaxBackend,
-    ZcodeBackend,
+    OpencodeBackend,
 )
 from .background import BackgroundDispatcher, UpdateDeduper
 from .dispatch import DispatchRouter
@@ -52,7 +52,7 @@ def _build_router_and_deps(secrets: BotSecrets) -> tuple[DispatchRouter, Handler
         "codex": CodexBackend(timeout_s=secrets.backend_timeout_s),
         "antigravity": AntigravityBackend(timeout_s=secrets.backend_timeout_s),
         "minimax": MinimaxBackend(timeout_s=secrets.backend_timeout_s),
-        "zcode": ZcodeBackend(timeout_s=secrets.backend_timeout_s),
+        "opencode": OpencodeBackend(timeout_s=secrets.backend_timeout_s),
         "khavis": KhavisBackend(),
     }
     router = DispatchRouter(backends)

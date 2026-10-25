@@ -25,7 +25,8 @@
   - **OpenAI Codex (`codex`)** — Default model: `glm-5.3-flashx` (GLM Coding Plan)
   - **Google Antigravity (`antigravity` / `agy`)** — Default model: `antigravity-pro`
   - **MiniMax Code (`minimax` / `mcode`)** — Default model: `MiniMax-M3.1`
-  - **Zhipu zcode (`zcode`)** — Default model: `glm-5.3-flashx`
+  - **OpenCode (`opencode`)** — Default model: `glm-5.3-flashx`
+- **🛠️ Autonomous Agent Skills (`core/agent_skills.py`)**: Built-in executable skills (`run_shell`, `write_file`, `edit_file`, `read_file`, `list_dir`, `search_code`, `git_ops`, `run_tests`, `scaffold_project`) with multi-round execution so agents actively write code, configure git remotes, and run tests instead of only giving advice.
 - **🔌 User-Defined Custom Agents (`core/custom_agents.py`)**: Register your own CLI tools (**Aider**, **OpenCode**, **Block Goose**, **DeepSeek/Qwen**, or custom scripts/HTTP endpoints) with 1 click in `/workbench`.
 - **📁 Shared Project Workspace + Git Worktree Isolation (`core/workspace_manager.py`)**:
   - **Shared Folder Mode (`shared`, default)**: All CLI agents execute inside the exact same project directory (`workspace/<project_name>`) for frictionless sequential collaboration.

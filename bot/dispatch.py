@@ -14,7 +14,7 @@ _ALL_BACKENDS: tuple[BackendName, ...] = (
     "codex",
     "antigravity",
     "minimax",
-    "zcode",
+    "opencode",
     "khavis",
 )
 

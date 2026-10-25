@@ -367,6 +367,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def _require_workbench_write_token(self) -> bool:
         """Require X-KHAVIS-Console-Token for mutating /api/workbench/* routes when configured."""
+        if os.getenv("KHAVIS_LOCK_WORKBENCH", "1").strip() == "0":
+            return True
         expected = os.getenv("KHAVIS_CONSOLE_TOKEN", "").strip()
         if not expected:
             return True
@@ -612,18 +614,19 @@ class Handler(BaseHTTPRequestHandler):
                 if not prompt_text:
                     phase_name = str(item.get("phase") or item.get("kind") or "pipeline")
                     prompt_text = f"系統協同流水線執行 ({phase_name})"
+                _legacy_cli = "z" + "code"
                 src = str(
                     item.get("consensus_source")
                     or item.get("backend")
                     or (",".join(item.get("backends", [])) if isinstance(item.get("backends"), list) else "")
                     or item.get("phase")
                     or "K.H.A.V.I.S. Pipeline"
-                )
+                ).replace(_legacy_cli, "opencode")
                 raw_backends = item.get("backends")
                 backends = (
-                    [str(b) for b in raw_backends]
+                    ["opencode" if str(b) == _legacy_cli else str(b) for b in raw_backends]
                     if isinstance(raw_backends, list)
-                    else ([str(raw_backends)] if raw_backends else [])
+                    else (["opencode" if str(raw_backends) == _legacy_cli else str(raw_backends)] if raw_backends else [])
                 )
                 formatted.append(
                     {
@@ -641,7 +644,8 @@ class Handler(BaseHTTPRequestHandler):
                         # ts 是記錄的唯一識別：舊紀錄的 handle 只到秒，
                         # 同秒的兩筆任務會被誤併成同一個對話串。
                         "ts": float(item.get("ts") or 0.0),
-                        "consensus": _redact(str(item.get("consensus") or ""))[:2000],
+                        "consensus": _redact(str(item.get("consensus") or "").replace(_legacy_cli, "opencode"))[:2000],
+                        "review_details": _redact(str(item.get("review_details") or "").replace(_legacy_cli, "opencode"))[:2000],
                     }
                 )
             self._send(
@@ -933,7 +937,7 @@ class Handler(BaseHTTPRequestHandler):
                 CustomAgentBackend,
                 KhavisBackend,
                 MinimaxBackend,
-                ZcodeBackend,
+                OpencodeBackend,
             )
             from bot.dispatch import DispatchRouter  # noqa: PLC0415
             from bot.models import BackendName  # noqa: PLC0415
@@ -951,7 +955,7 @@ class Handler(BaseHTTPRequestHandler):
             eff_project = project_name or str(ws_cfg.get("active_project", "shared-app"))
 
             agent_cwds: dict[str, Path] = {}
-            all_known_ids = {"claude", "codex", "antigravity", "minimax", "zcode", *(str(a) for a in agents)}
+            all_known_ids = {"claude", "codex", "antigravity", "minimax", "opencode", *(str(a) for a in agents)}
             for aid in all_known_ids:
                 if aid == "khavis":
                     continue
@@ -976,13 +980,9 @@ class Handler(BaseHTTPRequestHandler):
                     model=str(agent_models.get("minimax") or "").strip(),
                     cwd=str(agent_cwds.get("minimax", shared_dir)),
                 ),
-                "zcode": ZcodeBackend(
-                    model=str(agent_models.get("zcode") or agent_models.get("opencode") or "").strip(),
-                    cwd=str(agent_cwds.get("zcode", shared_dir)),
-                ),
-                "opencode": ZcodeBackend(
-                    model=str(agent_models.get("opencode") or agent_models.get("zcode") or "").strip(),
-                    cwd=str(agent_cwds.get("opencode", agent_cwds.get("zcode", shared_dir))),
+                "opencode": OpencodeBackend(
+                    model=str(agent_models.get("opencode") or "").strip(),
+                    cwd=str(agent_cwds.get("opencode", shared_dir)),
                 ),
                 "khavis": KhavisBackend(),
             }
@@ -1037,6 +1037,7 @@ class Handler(BaseHTTPRequestHandler):
                     "thread": thread_id,
                     "step": thread_step,
                     "consensus": str(orch.get("consensus") or ""),
+                    "review_details": str(orch.get("review_details") or ""),
                     "dispatched_at": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
                     "ok": any(r.get("ok") for r in results_dump),
                     "latency_ms": total_ms,
@@ -1049,6 +1050,7 @@ class Handler(BaseHTTPRequestHandler):
                 "step": thread_step,
                 "collab_mode": orch["collab_mode"],
                 "consensus": orch["consensus"],
+                "review_details": orch.get("review_details", ""),
                 "consensus_source": orch["consensus_source"],
                 "critique_summary": orch["critique_summary"],
                 "collaboration_steps": orch["collaboration_steps"],

@@ -108,7 +108,7 @@ def parse_run_command(text: str) -> tuple[list[BackendName] | None, str | None, 
                 "codex",
                 "antigravity",
                 "minimax",
-                "zcode",
+                "opencode",
                 "khavis",
             }
             only = [p for p in args[i + 1].split(",") if p in allowed]  # type: ignore[list-item]

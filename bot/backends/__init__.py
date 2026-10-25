@@ -6,7 +6,7 @@ Sub-modules:
 - ``codex``       subprocess wrapper around ``codex exec`` (Codex CLI)
 - ``antigravity`` subprocess wrapper around ``antigravity`` / ``agy`` CLI (Antigravity)
 - ``minimax``     subprocess wrapper around ``minimax`` CLI (MiniMax Token Plan)
-- ``zcode``       subprocess wrapper around ``zcode`` CLI (GLM Coding Plan)
+- ``opencode``    subprocess wrapper around ``opencode`` CLI (GLM / Multi-Model Coding Plan)
 - ``khavis``      in-process call to ``agents.run_team`` / ``core.registry``
 """
 
@@ -20,7 +20,7 @@ from .custom import CustomAgentBackend
 from .judge import JudgeBackend
 from .khavis import KhavisBackend
 from .minimax import MinimaxBackend
-from .zcode import ZcodeBackend
+from .opencode import OpencodeBackend
 
 __all__ = [
     "Backend",
@@ -29,7 +29,7 @@ __all__ = [
     "CodexBackend",
     "AntigravityBackend",
     "MinimaxBackend",
-    "ZcodeBackend",
+    "OpencodeBackend",
     "CustomAgentBackend",
     "JudgeBackend",
     "KhavisBackend",

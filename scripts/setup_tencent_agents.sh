@@ -3,7 +3,7 @@
 # K.H.A.V.I.S. 騰訊雲 Agent 集群與統一工作台一鍵環境檢測與啟動腳本
 # =============================================================================
 # 檢測項目:
-#   1. 五大 CLI Agent 安裝狀態 (claude code, codex, antigravity, minimax code, zcode)
+#   1. 五大 CLI Agent 安裝狀態 (claude code, codex, antigravity, minimax code, opencode)
 #   2. 四大 LLM 付費方案金鑰配置 (MiniMax, GLM, GPT GO, Antigravity AI Pro)
 #   3. K.H.A.V.I.S. 核心路由、統一 Web 工作台 (Unified Workbench) 啟動
 # =============================================================================
@@ -47,7 +47,7 @@ check_cli "Claude Code" "claude" "預設模型 MiniMax-M3.1-Flash (MiniMax Token
 check_cli "OpenAI Codex" "codex" "使用 GLM 5.3 FlashX (glm-5.3-flashx)"
 check_cli "Antigravity" "antigravity" "Google Antigravity Agentic CLI (agy / antigravity)"
 check_cli "MiniMax Code" "minimax" "預設模型 MiniMax-M3.1 (MiniMax Token Plan)"
-check_cli "Zhipu zcode" "zcode" "預設模型 GLM 5.3 FlashX (GLM Coding Plan)"
+check_cli "OpenCode" "opencode" "預設模型 GLM 5.3 FlashX (GLM Coding Plan)"
 
 # 3. 檢測 4 大付費方案金鑰環境
 echo -e "\n${CYAN}--- [2/3] 檢測四大 LLM 付費方案配置 ---${NC}"

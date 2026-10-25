@@ -27,11 +27,57 @@ from bot.models import BackendResult, DispatchEnvelope
 from core.workspace_manager import collect_directory_diff
 
 _ACTION_MANDATE = (
-    "\n\n【最高行動準則 (Autonomous Execution Mandate)】\n"
-    "你擁有完整的雲端主機指令執行與專案資料夾讀寫權限！"
-    "請直接動手把任務做完（執行檢查指令、撰寫/修改檔案、執行測試驗證），"
-    "直接交付高完成度的真實結果，不要只給出紙上談兵的規劃或叫使用者自己去跑指令！"
+    "\n\n【最高行動準則 (Autonomous Action-First Execution Mandate)】\n"
+    "你擁有完整的雲端主機指令執行與專案資料夾讀寫 Skills（`write_file`, `edit_file`, `git_ops`, `scaffold_project`, `run_tests`, `run_shell`, `read_file`, `list_dir`）！\n"
+    "⚠️ **嚴禁只給意見或只列出建議清單！**\n"
+    "當你發現專案缺少 Git 遠端設定、README 不足、缺少測試/腳本/範例/LICENSE/CI，或需要修改程式碼時，"
+    "**請立即在回覆中輸出 `<tool_call>` 親自動手建立與修改檔案並執行測試驗證**，直接交付已經執行完成的真實成果！"
 )
+
+
+def _split_result_and_review(raw_text: str, results: list[BackendResult], critique_summary: str) -> tuple[str, str]:
+    """Split synthesized text into (clean_final_result, collapsible_review_details)."""
+    text = (raw_text or "").strip()
+    review_parts: list[str] = []
+
+    # Check explicit split marker or section heading for cross-review
+    split_patterns = [
+        r"<!--\s*KHAVIS_REVIEW_SPLIT\s*-->",
+        r"(?=(?:^|\n)\s*(?:#+\s*|\d+\.\s*|\*\*)?【🔍\s*多\s*Agent\s*交叉審查)",
+        r"(?=(?:^|\n)\s*(?:#+\s*|\d+\.\s*|\*\*)?【?🔍?\s*多\s*Agent\s*交叉審查與互評)",
+    ]
+    main_result = text
+    extracted_review = ""
+    for pat in split_patterns:
+        parts = re.split(pat, text, maxsplit=1)
+        if len(parts) == 2 and parts[0].strip() and parts[1].strip():
+            main_result = parts[0].strip()
+            extracted_review = parts[1].strip()
+            break
+
+    # If the LLM put Section 1 (Review) before Section 2 (Final Deliverable), flip them so Result is main!
+    if not extracted_review and "【🏆 最終完成交付成果】" in text and "【🔍 多 Agent 交叉審查" in text:
+        idx_review = text.find("【🔍 多 Agent 交叉審查")
+        idx_final = text.find("【🏆 最終完成交付成果】")
+        if 0 <= idx_review < idx_final:
+            extracted_review = text[idx_review:idx_final].strip()
+            main_result = text[idx_final:].strip()
+
+    if critique_summary:
+        review_parts.append(f"📌 **協同審查結論**：{critique_summary}")
+    if extracted_review:
+        review_parts.append(extracted_review)
+
+    # Append concise per-agent execution comparison for the collapsible drawer
+    if results:
+        agent_lines = ["### 🤖 各 Agent 節點執行與審查明細"]
+        for r in results:
+            status_icon = "✅" if r.ok else "❌"
+            snip = re.sub(r"\s+", " ", (r.text or r.error or "").strip())[:260]
+            agent_lines.append(f"- {status_icon} **`{r.backend}`** (`{r.model or 'auto'}` · `{r.latency_ms}ms`): {snip}")
+        review_parts.append("\n".join(agent_lines))
+
+    return main_result, "\n\n".join(review_parts).strip()
 
 
 def build_contextual_prompt(
@@ -243,9 +289,11 @@ async def run_collaborative_workflow(
                 "剛才各個 Agent 已經在雲端主機與共用專案資料夾中執行了第一階段實作，結果如下：\n\n"
                 + "\n\n".join(candidates_dump)
                 + (f"\n\n目前共用專案資料夾的 Git Diff 變更：\n{diff_snippet}\n" if diff_snippet else "")
-                + "\n\n請你現在立即執行以下 **交互檢查、相互批評與最終閉環交付**（請直接輸出完整繁體中文報告，切勿再輸出任何 `<tool_call>` 標籤）：\n"
-                "1. **【🔍 多 Agent 交叉審查與互評摘要】**：比對各 Agent 的實作結果，明確指出哪個 Agent 做得最完整、哪個 Agent 有遺漏或錯誤。\n"
-                "2. **【🏆 最終完成交付成果】**：將所有 Agent 的優點、程式碼修改與實測數據整合成一份結構清晰、可直接使用的最終繁體中文成果報告。"
+                + "\n\n若上述 Agent 有任何還沒真正動手完成的檔案或設定（例如缺 Git remote、README 不足、缺測試/CI），請你先呼叫 `<tool_call>`（如 `scaffold_project`, `write_file`, `git_ops`, `run_tests`）當場補齊！\n"
+                "完成後，請嚴格依照以下順序輸出繁體中文報告（**務必先呈現最終交付成果，再放交叉審查比較**）：\n"
+                "1. **【🏆 最終完成交付成果】**：直接呈現已完成實作、修改與實測驗證的最終成果、執行指令與重點摘要（讓使用者第一眼就能看到乾淨的結果）。\n"
+                "<!-- KHAVIS_REVIEW_SPLIT -->\n"
+                "2. **【🔍 多 Agent 交叉審查與互評摘要】**：比對各 Agent 的實作結果，指出各節點優缺點與補強細節。"
             )
 
             loop = asyncio.get_running_loop()
@@ -255,9 +303,9 @@ async def run_collaborative_workflow(
                 review_prompt,
                 "MiniMax-M2.7",
                 "khavis",
-                30,
+                35,
                 str(shared_dir),
-                False,
+                True,
             )
             stage2_ms = int((time.perf_counter() - t_stage2) * 1000)
 
@@ -287,6 +335,8 @@ async def run_collaborative_workflow(
                 consensus_source = report.consensus_source or ok_results[0].backend
                 critique_summary = "已由多 Agent 並發完成並選取最佳執行結果。"
 
+    clean_consensus, review_details = _split_result_and_review(consensus_text, results, critique_summary)
+
     # Collect per-agent workspace diffs
     results_dump: list[dict[str, Any]] = []
     all_changed_files: list[Any] = []
@@ -308,12 +358,13 @@ async def run_collaborative_workflow(
         if cf not in all_changed_files:
             all_changed_files.append(cf)
 
-    next_actions = generate_next_step_actions(prompt, consensus_text, all_changed_files)
+    next_actions = generate_next_step_actions(prompt, clean_consensus, all_changed_files)
 
     return {
         "ok": True,
         "collab_mode": mode,
-        "consensus": consensus_text,
+        "consensus": clean_consensus,
+        "review_details": review_details,
         "consensus_source": consensus_source,
         "critique_summary": critique_summary,
         "collaboration_steps": collaboration_steps,

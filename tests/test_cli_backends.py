@@ -1,4 +1,4 @@
-"""Unit tests for Tencent Cloud CLI backends (Antigravity, Claude, MiniMax, zcode).
+"""Unit tests for Tencent Cloud CLI backends (Antigravity, Claude, MiniMax, opencode).
 
 Licensed under the Apache License, Version 2.0.
 """
@@ -8,7 +8,7 @@ from __future__ import annotations
 import asyncio
 from unittest.mock import AsyncMock, patch
 
-from bot.backends import AntigravityBackend, ClaudeBackend, MinimaxBackend, ZcodeBackend
+from bot.backends import AntigravityBackend, ClaudeBackend, MinimaxBackend, OpencodeBackend
 from bot.dispatch import DispatchRouter
 from bot.models import DispatchEnvelope
 
@@ -32,8 +32,8 @@ def test_minimax_backend_health_not_found() -> None:
     assert "not in PATH" in health.detail
 
 
-def test_zcode_backend_health_not_found() -> None:
-    backend = ZcodeBackend(binary="__non_existent_zcode_cli__")
+def test_opencode_backend_health_not_found() -> None:
+    backend = OpencodeBackend(binary="__non_existent_opencode_cli__")
     health = asyncio.run(backend.health())
     assert health.ok is False
     assert "not in PATH" in health.detail
@@ -68,17 +68,17 @@ def test_cli_backends_mock_run() -> None:
         assert res.backend == "minimax"
         assert "MiniMax" in res.text
 
-    # 3. Test zcode mock run
-    zcode = ZcodeBackend(binary="zcode")
+    # 3. Test opencode mock run
+    opencode = OpencodeBackend(binary="opencode")
     with patch("asyncio.create_subprocess_exec") as mock_exec:
         proc = AsyncMock()
         proc.communicate.return_value = (b'{"text": "GLM codegeex implementation"}', b"")
         proc.returncode = 0
         mock_exec.return_value = proc
 
-        res = asyncio.run(zcode.run(envelope))
+        res = asyncio.run(opencode.run(envelope))
         assert res.ok is True
-        assert res.backend == "zcode"
+        assert res.backend == "opencode"
         assert "GLM" in res.text
 
 
@@ -86,7 +86,7 @@ def test_dispatch_router_with_all_backends() -> None:
     backends = {
         "antigravity": AntigravityBackend(binary="__non_existent__"),
         "minimax": MinimaxBackend(binary="__non_existent__"),
-        "zcode": ZcodeBackend(binary="__non_existent__"),
+        "opencode": OpencodeBackend(binary="__non_existent__"),
     }
     router = DispatchRouter(backends)  # type: ignore[arg-type]
 

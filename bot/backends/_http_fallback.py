@@ -1,11 +1,12 @@
 """Agentic Tool-Executing HTTP Failover Engine for CLI Backends & K.H.A.V.I.S. Team.
 
-Upgrades Antigravity, zcode, MiniMax, Codex, and K.H.A.V.I.S. fallback from passive text
+Upgrades Antigravity, opencode, MiniMax, Codex, and K.H.A.V.I.S. fallback from passive text
 chat into a real autonomous Agentic Executor capable of:
 1. Running live shell/system diagnostics & commands (`run_shell`) on the host
-2. Reading files (`read_file`) and writing/modifying code (`write_file`) inside the
+2. Reading (`read_file`), writing (`write_file`), and editing (`edit_file`) code inside the
    shared project workspace (`cwd`)
-3. Automatically failing over across all configured upstream pools in `.env`:
+3. Executing specialized Agent Skills (`list_dir`, `search_code`, `git_ops`, `run_tests`, `scaffold_project`)
+4. Automatically failing over across all configured upstream pools in `.env`:
    - MiniMax Token Plan (`https://api.minimaxi.com/anthropic/v1/messages` & `api.minimax.chat`)
    - OpenAI GPT GO (`https://api.openai.com/v1/chat/completions`)
    - Zhipu GLM Coding Plan (`https://open.bigmodel.cn/api/paas/v4/chat/completions`)
@@ -24,46 +25,61 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+from core.agent_skills import execute_skill
+
 _TOOL_PROTOCOL_INSTRUCTION = """
-【自主執行工具協定 (Autonomous Agentic Tool Execution Protocol)】
-你不僅是問答助手，更是部署在雲端主機上具備**真實命令列與檔案系統執行權限**的自主 Agent！
-當使用者的指令涉及：檢查系統狀態（如 Tailscale、SSH 通道、網路連線、程序、磁碟）、安裝/設定環境、讀寫專案檔案、或執行程式時，**請務必直接呼叫工具代為執行，不要只叫使用者自己去跑指令！**
+【自主執行工具與 Skills 協定 (Autonomous Agentic Skills & Execution Protocol)】
+你絕對不是只會給意見的諮詢顧問，而是具備**真實命令列、Git 管理、程式碼讀寫與自動化測試權限**的實作型 Agent！
+**最高鐵則：嚴禁只提出建議或列出待辦事項而不親自動手！**
+當你檢查專案或系統發現缺少設定（如缺 Git remote、README 過於簡略、缺測試/範例/腳本/LICENSE/CI）或使用者要求修改時，**你必須當場連續呼叫工具把檔案寫好、設定補齊、測試跑通**，最後才回報「已完成實作與驗證」的結果！
 
-若要執行工具，請在回覆中輸出 `<tool_call>` 標籤包裹的標準 JSON（請保持指令簡潔，避免在 JSON 內嵌多層轉義雙引號）：
-1. 執行主機 Shell 指令：
-<tool_call>{"tool": "run_shell", "command": "tailscale status && ss -tnlp"}</tool_call>
-2. 寫入或建立檔案（相對路徑預設位於當前共用專案工作區）：
-<tool_call>{"tool": "write_file", "path": "example.py", "content": "print('hello')\\n"}</tool_call>
-3. 讀取檔案內容：
+若要呼叫 Skill 工具，請在回覆中輸出 `<tool_call>` 標籤包裹的標準 JSON（可同時輸出多個 `<tool_call>`，系統支援多輪連續執行）：
+1. 執行主機或工作區 Shell 指令 (`run_shell`)：
+<tool_call>{"tool": "run_shell", "command": "git status -sb && pytest -q"}</tool_call>
+2. 寫入或建立檔案 (`write_file`)：
+<tool_call>{"tool": "write_file", "path": "README.md", "content": "# 專案標題\\n完整說明...\\n"}</tool_call>
+3. 局部替換修改檔案 (`edit_file`)：
+<tool_call>{"tool": "edit_file", "path": "app.py", "target": "old_code", "replacement": "new_code"}</tool_call>
+4. 讀取檔案內容 (`read_file`)：
 <tool_call>{"tool": "read_file", "path": "README.md"}</tool_call>
+5. 列出專案目錄結構 (`list_dir`)：
+<tool_call>{"tool": "list_dir", "path": "."}</tool_call>
+6. 搜尋程式碼關鍵字 (`search_code`)：
+<tool_call>{"tool": "search_code", "pattern": "def "}</tool_call>
+7. Git 遠端與版本控制技能 (`git_ops`)：
+<tool_call>{"tool": "git_ops", "action": "ensure_remote", "remote_url": "https://github.com/kiddhsu5/KHAVIS.git"}</tool_call>
+8. 執行自動化測試套件 (`run_tests`)：
+<tool_call>{"tool": "run_tests", "target": "tests"}</tool_call>
+9. 一鍵補齊專案完整性 (`scaffold_project`：自動補齊 Git remote、完整開發者 README、LICENSE、CONTRIBUTING、執行腳本、範例、單元測試與 GitHub Actions CI)：
+<tool_call>{"tool": "scaffold_project", "remote_url": "https://github.com/kiddhsu5/KHAVIS.git"}</tool_call>
 
-當你輸出 `<tool_call>` 後，系統會立即在主機上真實執行該工具，並將真實的 `stdout` / `stderr` 結果回傳給你；一旦拿到足夠的檢查結果，請立即輸出最終繁體中文詳細報告（不要再輸出 `<tool_call>`）。
+當你輸出 `<tool_call>` 後，系統會立即真實執行並回傳輸出；你可以繼續下一輪 `<tool_call>` 進行修改與驗收，直到真正完成所有工作後，再輸出結構清楚的繁體中文交付成果報告（完成後請勿再輸出 `<tool_call>`）。
 """
 
 AGENT_SYSTEM_PROMPTS: dict[str, str] = {
     "antigravity": (
-        "你是 Google Antigravity (AGY)，部署於雲端主機、具備自主架構規劃、系統維運與全棧程式碼實作能力的 Agentic CLI 助手。"
-        "請預設使用繁體中文回答。" + _TOOL_PROTOCOL_INSTRUCTION
+        "你是 Google Antigravity (AGY)，部署於雲端主機、具備自主架構規劃、系統維運與全棧程式碼實作能力的 Action-First Agentic CLI 助手。"
+        "你發現任何問題都會立即呼叫工具動手修復與驗證，絕不只給空泛建議。請預設使用繁體中文回答。" + _TOOL_PROTOCOL_INSTRUCTION
     ),
     "codex": (
-        "你是 OpenAI Codex CLI 助手，專精於高精度系統架構、程式碼生成、重構與自動化測試。"
-        "請預設使用繁體中文回答。" + _TOOL_PROTOCOL_INSTRUCTION
+        "你是 OpenAI Codex CLI 實作型助手，專精於高精度系統架構、直接撰寫與重構程式碼、建立 GitHub Actions CI 與自動化測試。"
+        "你總是以實際寫出程式碼並跑通測試為準則，絕不只給建議。請預設使用繁體中文回答。" + _TOOL_PROTOCOL_INSTRUCTION
     ),
     "minimax": (
-        "你是 MiniMax Code (MiniMax-M3.1-Flash) 極速編碼 CLI 助手，擅長繁體中文技術分析與高性價比代碼生成。"
-        "請預設使用繁體中文回答。" + _TOOL_PROTOCOL_INSTRUCTION
+        "你是 MiniMax Code (MiniMax-M3.1-Flash) 極速編碼實作 CLI 助手，擅長繁體中文技術文件撰寫、腳本建立與高效率代碼落地。"
+        "你總是主動呼叫工具完成檔案建立與修改。請預設使用繁體中文回答。" + _TOOL_PROTOCOL_INSTRUCTION
     ),
-    "zcode": (
-        "你是 Zhipu zcode (GLM-5.3-FlashX) 專屬編碼 CLI 助手，擅長快速演算法實現與代碼審查。"
-        "請預設使用繁體中文回答。" + _TOOL_PROTOCOL_INSTRUCTION
+    "opencode": (
+        "你是 opencode (GLM-5.3-FlashX) 開源全能終端編碼 CLI 助手，擅長快速專案腳手架建立、Git 遠端設定、演算法實現與測試驗證。"
+        "你總是直接動手執行修改並驗收結果。請預設使用繁體中文回答。" + _TOOL_PROTOCOL_INSTRUCTION
     ),
     "claude": (
-        "你是 Claude Code CLI 助手，擅長深度程式碼理解、架構重構與嚴謹除錯。"
-        "請預設使用繁體中文回答。" + _TOOL_PROTOCOL_INSTRUCTION
+        "你是 Claude Code CLI 實作型助手，擅長深度程式碼理解、架構重構、撰寫完整開發者文件與嚴謹除錯驗證。"
+        "你總是親自動手修改檔案並驗證通過。請預設使用繁體中文回答。" + _TOOL_PROTOCOL_INSTRUCTION
     ),
     "khavis": (
-        "你是 K.H.A.V.I.S. 7 角色多 Agent 協同團隊 (Planner / Coder A / Coder B / Debater / Critic / Verifier / Learner)。"
-        "請整合規劃、工具實測與最終驗證，以繁體中文輸出最完整的綜合解答。" + _TOOL_PROTOCOL_INSTRUCTION
+        "你是 K.H.A.V.I.S. 7 角色多 Agent 協同實作團隊 (Planner / Coder A / Coder B / Debater / Critic / Verifier / Learner)。"
+        "請整合規劃、親自動手呼叫工具實作與最終驗證，以繁體中文輸出最完整的綜合交付成果。" + _TOOL_PROTOCOL_INSTRUCTION
     ),
 }
 
@@ -119,68 +135,8 @@ def _parse_tool_call(raw_json: str) -> dict[str, Any] | None:
 
 
 def _execute_agent_tool(call_obj: dict[str, Any], cwd: str | None = None) -> str:
-    """Execute `run_shell`, `write_file`, or `read_file` safely on the host."""
-    tool = str(call_obj.get("tool") or "").strip().lower()
-    work_dir = Path(cwd).resolve() if cwd and os.path.isdir(cwd) else Path.cwd()
-
-    if tool == "run_shell":
-        cmd = str(call_obj.get("command") or "").strip()
-        if not cmd:
-            return "[Error] Empty command"
-        if _DANGEROUS_CMD_RE.search(cmd):
-            return f"[Blocked] Destructive command rejected by safety guard: {cmd}"
-        try:
-            proc = subprocess.run(
-                cmd,
-                shell=True,
-                cwd=str(work_dir),
-                capture_output=True,
-                text=True,
-                timeout=25,
-                check=False,
-            )
-            out = (proc.stdout or "").strip()
-            err = (proc.stderr or "").strip()
-            combined = "\n".join(part for part in [out, err] if part).strip()
-            if len(combined) > 3500:
-                combined = combined[:3500] + "\n...[truncated]"
-            return f"$ {cmd}\n[exit_code={proc.returncode}]\n{combined or '(no output)'}"
-        except subprocess.TimeoutExpired:
-            return f"$ {cmd}\n[Error] Command timed out after 25s"
-        except Exception as exc:  # noqa: BLE001
-            return f"$ {cmd}\n[Error] {exc}"
-
-    if tool == "write_file":
-        rel_path = str(call_obj.get("path") or "").strip()
-        content = str(call_obj.get("content") or "")
-        if not rel_path:
-            return "[Error] Missing file path"
-        target = (work_dir / rel_path).resolve() if not os.path.isabs(rel_path) else Path(rel_path).resolve()
-        if not str(target).startswith(str(work_dir)) and not str(target).startswith("/tmp"):
-            return f"[Blocked] Write path must be inside workspace ({work_dir}) or /tmp: {target}"
-        try:
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(content, encoding="utf-8")
-            return f"[OK] Wrote {len(content)} chars to {target}"
-        except Exception as exc:  # noqa: BLE001
-            return f"[Error] Failed to write {target}: {exc}"
-
-    if tool == "read_file":
-        rel_path = str(call_obj.get("path") or "").strip()
-        if not rel_path:
-            return "[Error] Missing file path"
-        target = (work_dir / rel_path).resolve() if not os.path.isabs(rel_path) else Path(rel_path).resolve()
-        if target.name.startswith(".env") or target.suffix in {".pem", ".key"}:
-            return "[Blocked] Cannot read secret key/env files"
-        try:
-            if not target.is_file():
-                return f"[Error] File not found: {target}"
-            content = target.read_text(encoding="utf-8", errors="replace")[:3500]
-            return f"[File: {target}]\n{content}"
-        except Exception as exc:  # noqa: BLE001
-            return f"[Error] Failed to read {target}: {exc}"
-
-    return f"[Error] Unknown tool: {tool!r}"
+    """Execute any registered K.H.A.V.I.S. Agent Skill safely on the host / workspace."""
+    return execute_skill(call_obj, cwd=cwd)
 
 
 def _format_with_logs(executed_logs: list[str], body_text: str) -> str:
@@ -213,7 +169,7 @@ def call_upstream_llm_fallback(
     used_model = model
     reply_text = ""
 
-    max_tool_rounds = 1 if enable_tools else 0
+    max_tool_rounds = 5 if enable_tools else 0
     for round_idx in range(max_tool_rounds + 1):
         res = _single_turn_upstream(
             messages=messages,
@@ -260,9 +216,9 @@ def call_upstream_llm_fallback(
                 "error": "",
             }
 
-        # Execute each requested tool call
+        # Execute each requested tool call (up to 6 skills per round)
         round_outputs: list[str] = []
-        for raw_json in matches[:3]:
+        for raw_json in matches[:6]:
             call_obj = _parse_tool_call(raw_json)
             if isinstance(call_obj, dict):
                 tool_out = _execute_agent_tool(call_obj, cwd=cwd)
@@ -281,9 +237,9 @@ def call_upstream_llm_fallback(
 
         is_last_tool_round = round_idx >= max_tool_rounds - 1
         followup_instruction = (
-            "請立即根據以上雲端主機真實執行結果，輸出完整、清楚的繁體中文總結報告（請勿再輸出任何 <tool_call> 標籤）。"
+            "請立即根據以上雲端主機與專案工作區真實執行結果，輸出完整、清楚的繁體中文總結報告（請勿再輸出任何 <tool_call> 標籤）。"
             if is_last_tool_round
-            else "請根據以上真實執行結果決定是否還需要最後一次補充檢查；若資訊已充足，請直接輸出最終繁體中文總結報告（不要再包含 <tool_call> 標籤）。"
+            else "若剛才只是檢查或讀取，請務必現在立即輸出 `<tool_call>`（如 `write_file`、`edit_file`、`git_ops`、`scaffold_project`、`run_tests`）動手完成檔案修改、補齊缺少的設定與測試驗證！若所有修改與測試皆已實機執行完畢，請直接輸出最終繁體中文成果報告（不要再包含 <tool_call> 標籤）。"
         )
         messages.append({"role": "assistant", "content": reply_text})
         messages.append(
@@ -323,7 +279,7 @@ def _single_turn_upstream(
     errors: list[str] = []
 
     # 1. If GLM key is configured and model explicitly asks for glm, try GLM first
-    if glm_key and not glm_key.startswith("your_") and ("glm" in model.lower() or agent_name == "zcode"):
+    if glm_key and not glm_key.startswith("your_") and ("glm" in model.lower() or agent_name == "opencode"):
         for glm_url in (
             "https://open.bigmodel.cn/api/coding/paas/v4/chat/completions",
             "https://open.bigmodel.cn/api/paas/v4/chat/completions",

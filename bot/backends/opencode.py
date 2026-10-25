@@ -1,4 +1,4 @@
-"""Subprocess wrapper for zcode CLI (Zhipu GLM Coding Plan).
+"""Subprocess wrapper for opencode CLI (OpenCode multi-model coding agent).
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,27 +27,25 @@ from ..models import BackendResult, DispatchEnvelope
 from .base import Backend, HealthResult
 
 
-class ZcodeBackend(Backend):
-    """Subprocess adapter for zcode CLI backed by Zhipu GLM Coding Plan."""
+class OpencodeBackend(Backend):
+    """Subprocess adapter for opencode CLI backed by GLM / multi-model Coding Plan."""
 
-    name = "zcode"
+    name = "opencode"
 
     def __init__(
         self,
-        binary: str = "zcode",
+        binary: str = "opencode",
         timeout_s: int = 20,
         model: str = "",
         cwd: str | None = None,
     ) -> None:
         self._binary = binary
         self._timeout = timeout_s
-        self._model = model or os.environ.get("ZCODE_DISPATCH_MODEL", "glm-5.3")
+        self._model = model or os.environ.get("OPENCODE_DISPATCH_MODEL", "glm-5.3-flashx")
         self._cwd = cwd
 
     async def health(self) -> HealthResult:
-        binary = shutil.which(self._binary) or (
-            shutil.which("opencode") if self._binary == "zcode" else None
-        )
+        binary = shutil.which(self._binary)
         if not binary:
             return HealthResult(False, f"{self._binary} not in PATH")
         try:
@@ -65,21 +63,17 @@ class ZcodeBackend(Backend):
             if proc.returncode != 0:
                 return HealthResult(False, f"exit={proc.returncode}")
             version = (stdout.decode(errors="replace").strip().splitlines() or ["?"])[-1]
-            return HealthResult(True, f"zcode {version}")
+            return HealthResult(True, f"opencode {version}")
         except FileNotFoundError as exc:
             return HealthResult(False, str(exc))
         except Exception as exc:  # noqa: BLE001
             return HealthResult(False, repr(exc))
 
     async def run(self, envelope: DispatchEnvelope) -> BackendResult:
-        exe = (
-            shutil.which(self._binary)
-            or (shutil.which("opencode") if self._binary == "zcode" else None)
-            or self._binary
-        )
-        args: list[str] = [exe, "exec"]
+        exe = shutil.which(self._binary) or self._binary
+        args: list[str] = [exe, "run"]
         if self._model:
-            args += ["-m", self._model]
+            args += ["--model", self._model]
         args += ["--", envelope.prompt]
 
         env = {
@@ -138,13 +132,13 @@ class ZcodeBackend(Backend):
                         call_upstream_llm_fallback,
                         envelope.prompt,
                         self._model,
-                        "zcode",
+                        "opencode",
                         30,
                         run_cwd,
                     )
                     if fb.get("ok"):
                         return BackendResult(
-                            backend="zcode",
+                            backend="opencode",
                             ok=True,
                             text=str(fb["text"]),
                             latency_ms=int((time.perf_counter() - t0) * 1000),
@@ -153,7 +147,7 @@ class ZcodeBackend(Backend):
                             tokens_out=int(fb.get("tokens_out") or 0),
                         )
             return BackendResult(
-                backend="zcode",
+                backend="opencode",
                 ok=False,
                 error=err_msg,
                 latency_ms=latency_ms,
@@ -171,7 +165,7 @@ class ZcodeBackend(Backend):
                 tokens_out = int(usage.get("completion_tokens") or 0)
 
         return BackendResult(
-            backend="zcode",
+            backend="opencode",
             ok=True,
             text=text,
             latency_ms=latency_ms,

@@ -318,7 +318,7 @@ html:not(.dark) #live-results-container > div{
 #btn-dispatch i{color:currentColor !important}
 
 /* ══════════════════════════════════════════════════════════════════
-   中央對話串檢視（你的指令 → Agent 協同結果）
+   中央對話串檢視（左右雙邊對話：右邊用戶提問 / 左邊 Agent 回覆 + 可折疊交叉審查）
    ══════════════════════════════════════════════════════════════════ */
 .c-conv-header{
   display:flex;align-items:center;gap:.625rem;flex-wrap:wrap;
@@ -326,22 +326,75 @@ html:not(.dark) #live-results-container > div{
   background:var(--m-panel-2);border:1px solid var(--m-line);
 }
 .c-conv-title{font-size:15px;font-weight:600;color:var(--m-bone)}
-.c-turn{margin-top:.875rem}
+.c-turn{
+  margin-top:1.1rem;padding:1rem;border-radius:16px;
+  background:linear-gradient(180deg,rgba(35,38,47,.42),rgba(22,24,29,.55));
+  border:1px solid var(--m-line);
+  box-shadow:0 6px 20px -12px rgba(0,0,0,.45);
+  display:flex;flex-direction:column;gap:.9rem;
+}
+.c-turn-divider{
+  display:flex;align-items:center;gap:.5rem;
+  font-size:11px;font-family:ui-monospace,monospace;color:var(--m-faint);
+  padding-bottom:.4rem;border-bottom:1px dashed var(--m-line);
+}
 .c-turn-label{
-  font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
-  color:var(--m-faint);margin-bottom:.375rem;display:flex;align-items:center;gap:.5rem;
+  font-size:12px;font-weight:600;letter-spacing:.04em;
+  color:var(--m-faint);margin-bottom:.375rem;display:flex;align-items:center;gap:.45rem;
   flex-wrap:wrap;
 }
 .c-turn-label .c-conn-badge{text-transform:none;white-space:nowrap}
+
+/* 右側：用戶提問 (User Prompt on RIGHT) */
+.c-turn-user{
+  align-self:flex-end;width:fit-content;max-width:84%;
+  display:flex;flex-direction:column;align-items:flex-end;
+}
+.c-turn-user .c-turn-label{justify-content:flex-end}
 .c-turn-user .c-turn-bubble{
-  border-left:2px solid var(--m-mist);padding:.6rem .85rem;border-radius:0 10px 10px 0;
-  background:var(--m-mist-soft);color:var(--m-bone);font-size:15px;line-height:1.7;
-  white-space:pre-wrap;word-break:break-word;
+  border:1px solid rgba(124,155,181,.38);
+  border-right:3px solid var(--m-mist);
+  padding:.7rem 1rem;border-radius:16px 4px 16px 16px;
+  background:var(--m-mist-soft);color:var(--m-bone);font-size:14.5px;line-height:1.7;
+  white-space:pre-wrap;word-break:break-word;text-align:left;
+}
+
+/* 左側：Agent 回覆 (Agent Result on LEFT) */
+.c-turn-agent{
+  align-self:flex-start;width:100%;max-width:92%;
+  display:flex;flex-direction:column;align-items:flex-start;
 }
 .c-turn-agent .c-turn-bubble{
-  border:1px solid var(--m-line);border-radius:12px;padding:.85rem 1rem;
+  width:100%;
+  border:1px solid var(--m-line);
+  border-left:3px solid var(--m-sage);
+  border-radius:4px 16px 16px 16px;padding:.9rem 1.05rem;
   background:var(--m-panel-2);color:var(--m-bone);font-size:14.5px;line-height:1.75;
-  white-space:pre-wrap;word-break:break-word;max-height:28rem;overflow-y:auto;
+  white-space:pre-wrap;word-break:break-word;max-height:30rem;overflow-y:auto;
+}
+
+/* Agent 交叉審查與比較（預設收起，點擊展開） */
+.c-review-collapse{
+  width:100%;margin-top:.55rem;border-radius:12px;
+  border:1px solid rgba(201,161,126,.28);
+  background:rgba(201,161,126,.06);overflow:hidden;
+}
+.c-review-collapse > summary{
+  list-style:none;cursor:pointer;padding:.5rem .8rem;
+  display:flex;align-items:center;justify-content:space-between;gap:.5rem;
+  font-size:12px;font-weight:600;color:var(--m-apricot);
+  user-select:none;transition:background .15s;
+}
+.c-review-collapse > summary::-webkit-details-marker{display:none}
+.c-review-collapse > summary:hover{background:rgba(201,161,126,.12)}
+.c-review-body{
+  padding:.75rem .9rem;border-top:1px solid rgba(201,161,126,.2);
+  font-size:12.5px;font-family:ui-monospace,monospace;line-height:1.65;
+  color:var(--m-dim);white-space:pre-wrap;word-break:break-word;
+  max-height:20rem;overflow-y:auto;background:var(--m-panel-3);
+}
+html:not(.dark) .c-turn{
+  background:linear-gradient(180deg,rgba(255,255,255,.95),rgba(242,245,249,.92));
 }
 .c-turn-actions{display:flex;flex-wrap:wrap;gap:.375rem;margin-top:.5rem}
 .c-live-slot:empty{display:none}
@@ -757,7 +810,6 @@ const C_AGENT_COLORS = {
   codex:       ['--m-lilac', '#A99AB5'],
   antigravity: ['--m-sage', '#8FA894'],
   minimax:     ['--m-apricot','#C9A17E'],
-  zcode:       ['--m-rose',  '#BC8B8B'],
   opencode:    ['--m-rose',  '#BC8B8B'],
   khavis:      ['--m-butter','#D9C89E']
 };
@@ -797,7 +849,9 @@ if (_nativeFetch) {
     if (url.indexOf('/api/workbench/') !== -1) {
       let tok = '';
       try {
-        tok = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('khavis_console_token')) || '';
+        tok = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('khavis_console_token'))
+           || (typeof localStorage !== 'undefined' && localStorage.getItem('khavis_console_token'))
+           || '';
       } catch (e) {}
       if (!tok) {
         const inp = document.getElementById('manus-console-token');
@@ -1101,10 +1155,53 @@ function cNewTask() {
   focusComposer();
 }
 
-// ── 中央對話串 ─────────────────────────────────────────────────────────
+// ── 中央對話串（右：用戶提問 / 左：Agent 結果優先 + 預設收合的交叉審查） ─────────
+function cSplitResultAndReview(t) {
+  let raw = String(t.consensus || '').trim();
+  let review = String(t.review_details || '').trim();
+
+  if (raw) {
+    // 若舊紀錄或合流文本中含有「多 Agent 交叉審查」段落與「最終完成交付成果」段落，自動分離並確保「結果優先」
+    const idxReview = raw.indexOf('【🔍 多 Agent 交叉審查');
+    const idxFinal = raw.indexOf('【🏆 最終完成交付成果】');
+    if (idxReview !== -1 && idxFinal !== -1) {
+      if (idxReview < idxFinal) {
+        const extracted = raw.slice(idxReview, idxFinal).trim();
+        raw = raw.slice(idxFinal).replace(/^1?\\.\\s*\\*\\*【🏆 最終完成交付成果】\\*\\*[:：]?\\s*/, '【🏆 最終完成交付成果】\\n').trim();
+        if (!review) review = extracted;
+      } else {
+        const extracted = raw.slice(idxReview).trim();
+        raw = raw.slice(0, idxReview).trim();
+        if (!review) review = extracted;
+      }
+    } else if (idxReview !== -1) {
+      const extracted = raw.slice(idxReview).trim();
+      const head = raw.slice(0, idxReview).trim();
+      if (head) {
+        raw = head;
+        if (!review) review = extracted;
+      }
+    }
+  }
+  if (!review && Array.isArray(t.agents) && t.agents.length > 0 && t.status === 'done') {
+    review = `參與協同與交叉審查節點：${t.agents.map(a => C_AGENT_LABELS[a] || a).join(' + ')}` +
+             (t.source ? `\n收斂來源：${t.source}` : '') +
+             (t.duration ? `\n總耗時：${t.duration}` : '');
+  }
+  return { mainResult: raw, reviewText: review };
+}
+
+function cToggleAllReviews() {
+  const blocks = document.querySelectorAll('#c-conv-turns details.c-review-collapse');
+  if (!blocks.length) return;
+  const anyClosed = Array.from(blocks).some(d => !d.open);
+  blocks.forEach(d => { d.open = anyClosed; });
+}
+
 function cTurnHtml(t, idx) {
   const st = cStatusMeta(t.status);
   const id = escapeHtml(t.id || '');
+  const roundNum = t.step || (idx + 1);
   const agents = (t.agents || []).map(a => {
     const hex = (C_AGENT_COLORS[a] || [])[1] || '#7C9BB5';
     return `<span class="c-conn-badge" style="background:${hex}26;color:${hex}">${escapeHtml(C_AGENT_LABELS[a] || a)}</span>`;
@@ -1127,9 +1224,11 @@ function cTurnHtml(t, idx) {
               <button type="button" onclick="cShowDiff()" class="c-action m-btn-ghost">專案檔案 Diff</button>`;
   }
 
+  const { mainResult, reviewText } = cSplitResultAndReview(t);
+
   let result = '';
-  if (t.consensus) {
-    result = `<div class="c-turn-bubble">${escapeHtml(t.consensus)}</div>`;
+  if (mainResult) {
+    result = `<div class="c-turn-bubble">${escapeHtml(mainResult)}</div>`;
   } else if (t.status === 'running') {
     result = `<div class="c-turn-bubble" style="color:var(--m-mist)"><span class="inline-flex items-center gap-1 mr-1.5" aria-hidden="true"><span class="m-dot"></span><span class="m-dot"></span><span class="m-dot"></span></span>⏳ Agent 團隊正在雲端主機與專案工作區執行任務中，完成後將自動顯示結果…</div>`;
   } else if (t.body) {
@@ -1138,23 +1237,44 @@ function cTurnHtml(t, idx) {
     result = `<div class="c-turn-bubble" style="color:var(--m-faint)">（此輪沒有產出成果）</div>`;
   }
 
-  return `<div class="c-turn">
+  const reviewDrawer = reviewText ? `
+    <details class="c-review-collapse m-collapse">
+      <summary>
+        <span class="inline-flex items-center gap-1.5">
+          <svg class="m-caret" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>🔍 點選展開 / 隱藏 Agent 交叉審查與比較明細</span>
+        </span>
+        <span class="text-[10px] font-mono" style="color:var(--m-faint)">預設收起 · 點擊展開</span>
+      </summary>
+      <div class="c-review-body">${escapeHtml(reviewText)}</div>
+    </details>` : '';
+
+  return `<div class="c-turn" data-round="${roundNum}">
+    <div class="c-turn-divider">
+      <span class="px-2 py-0.5 rounded font-bold" style="background:var(--m-mist-soft);color:var(--m-mist)">第 ${roundNum} 輪問答</span>
+      <span>${escapeHtml(t.day || '')} ${escapeHtml(t.time || '')}</span>
+      <span class="flex-1"></span>
+      <span style="color:${st.color}">${st.label}</span>
+    </div>
+
+    <!-- 右邊：用戶提問 -->
     <div class="c-turn-user">
       <div class="c-turn-label">
-        <span>你的指令</span>
-        <span class="c-conn-badge" style="background:var(--m-mist-soft);color:var(--m-mist)">第 ${t.step || (idx + 1)} 輪</span>
         <span class="c-conn-badge" style="background:transparent;color:var(--m-faint)">${escapeHtml(t.time || '')}</span>
+        <span class="c-conn-badge" style="background:var(--m-mist-soft);color:var(--m-mist)">👤 你的提問</span>
       </div>
       <div class="c-turn-bubble">${escapeHtml(t.prompt || '')}</div>
     </div>
+
+    <!-- 左邊：Agent 回覆（先呈現最終結果，下方收合 Agent 交叉審查） -->
     <div class="c-turn-agent">
       <div class="c-turn-label">
-        <span>Agent 協同結果</span>
+        <span class="c-conn-badge" style="background:var(--m-sage-soft);color:var(--m-sage)">🤖 Agent 執行結果</span>
         ${agents}
         ${meta.map(m => `<span class="c-conn-badge" style="background:transparent;color:var(--m-faint)">${m}</span>`).join('')}
-        <span class="c-conn-badge" style="background:${st.color}22;color:${st.color}">${st.label}</span>
       </div>
       ${result}
+      ${reviewDrawer}
       <div class="c-turn-actions">${actions}</div>
     </div>
   </div>`;
@@ -1201,6 +1321,7 @@ function cRenderConversation() {
     ${th.project ? `<span class="c-conn-badge" style="background:transparent;color:var(--m-faint)">${escapeHtml(th.project)}</span>` : ''}
     ${th.mode ? `<span class="c-conn-badge" style="background:var(--m-mist-soft);color:var(--m-mist)">${escapeHtml(th.mode)}</span>` : ''}
     <span class="flex-1"></span>
+    <button type="button" onclick="cToggleAllReviews()" class="c-action m-btn-ghost" title="一鍵展開或收合所有 Agent 交叉審查明細">🔍 展開/收合審查</button>
     <button type="button" onclick="cSetCenterMode('overview')" class="c-action m-btn-ghost">任務總覽</button>`;
 
   turns.innerHTML = th.tasks.map((t, i) => cTurnHtml(t, i)).join('');
@@ -1287,7 +1408,7 @@ function cSyncAgentChips() {
 
 const C_AGENT_LABELS = {
   claude:'Claude', codex:'Codex', antigravity:'AGY',
-  minimax:'minimax', zcode:'opencode', opencode:'opencode', khavis:'K.H.A.V.I.S.'
+  minimax:'minimax', opencode:'opencode', khavis:'K.H.A.V.I.S.'
 };
 
 function cRenderAgentChips() {
@@ -1666,6 +1787,7 @@ async function cLoadTasks() {
         mode: h.collab_mode || '',
         summary: (h.consensus_source || (ok ? '成功' : '失敗')).slice(0, 28),
         consensus: h.consensus || '',
+        review_details: h.review_details || '',
         expanded: false,
         body: `<div class="rounded-xl p-3 space-y-2 m-line" style="background:var(--m-panel-2)">
                  <div class="text-[11px] font-mono leading-[1.7]" style="color:var(--m-dim)">
@@ -1806,6 +1928,7 @@ async function submitDispatch() {
   const consensus = (typeof latestFinalDeliverableText !== 'undefined' && latestFinalDeliverableText)
     ? latestFinalDeliverableText : '';
 
+  const isServerReject = statusText.indexOf('執行失敗:') === 0;
   let body = '';
   if (consensus) {
     body = `<div class="rounded-xl p-3 space-y-2 m-line" style="background:var(--m-panel-2)">
@@ -1817,9 +1940,10 @@ async function submitDispatch() {
       .replace(/^執行失敗[:：]\\s*/, '')
       .replace(/^網路或伺服器通訊錯誤[:：]\\s*/, '')
       .trim();
+    const errTitle = cAborted ? '已中止等待' : (isServerReject ? '執行未完成' : '連線逾時或執行未完成（正在背景自動同步伺服器成果…）');
     body = `<div class="rounded-xl p-3 m-line" style="background:var(--m-rose-soft);border-color:rgba(188,139,139,.35)">
               <div class="text-[11px] leading-[1.7]" style="color:var(--m-rose-text)">
-                <b>${cAborted ? '已中止等待' : '連線逾時或執行未完成（正在背景自動同步伺服器成果…）'}</b><br>${escapeHtml(reason || '後端未回報詳細原因')}
+                <b>${errTitle}</b><br>${escapeHtml(reason || '後端未回報詳細原因')}
               </div>
             </div>`;
   }
@@ -1832,13 +1956,17 @@ async function submitDispatch() {
   cFinishTask(ok && !dispatchError, body, consensus);
   cRenderConversation();
 
-  if (!ok && !cAborted) {
+  if (!ok && !cAborted && !isServerReject) {
     cPollRecoverTask(taskId, prompt, cThreadId);
   }
 
   if (dispatchError) { cToast('派工失敗：' + (dispatchError.message || '未知錯誤'), 'err'); }
   if (dispatchError) throw dispatchError;
-  if (!ok) { cToast('等待回應逾時，系統將在後端完成後自動回填結果', 'err'); return; }
+  if (!ok) {
+    const shortReason = String(statusText || '').replace(/^執行失敗[:：]\\s*/, '').trim();
+    cToast(isServerReject ? ('執行失敗：' + (shortReason || '請檢查設定或稍後再試')) : '等待回應逾時，系統將在後端完成後自動回填結果', 'err');
+    return;
+  }
 
   cSetDrawerDot(true);  // 抽屜按鈕亮紅點，成果在右側等使用者展開
   cToast('任務完成，成果已產出（右上角可展開執行明細）', 'ok');
@@ -1882,6 +2010,7 @@ function cFinishTask(ok, summaryHtml, consensus) {
     card.summary = ok ? '成功' : (cAborted ? '已中止' : '失敗');
     card.body = summaryHtml || '';
     card.consensus = consensus || '';
+    card.review_details = (typeof latestReviewDetailsText !== 'undefined' && latestReviewDetailsText) ? latestReviewDetailsText : '';
     card.expanded = true;
   }
   cRunningTask = null;
@@ -1921,7 +2050,6 @@ const C_AGENT_ROLES = {
   codex:       'OpenAI Codex · 高速代碼生成',
   antigravity: 'Antigravity · 自主 Agentic CLI',
   minimax:     'MiniMax Code · 中文與長上下文',
-  zcode:       'OpenCode · 跨模型開源編碼 CLI',
   opencode:    'OpenCode · 跨模型開源編碼 CLI',
   khavis:      'LangGraph 7-Role 協同流水線'
 };
@@ -2181,13 +2309,16 @@ _MANUS_CONSOLE_JS: Final[str] = """
   const safe = value => String(value == null ? '' : value).slice(0, 4000);
   let tokenFallback = '';
   const readSessionToken = () => {
-    try { return typeof sessionStorage === 'undefined' ? tokenFallback : (sessionStorage.getItem(tokenKey) || tokenFallback); }
-    catch (_) { return tokenFallback; }
+    try {
+      const s = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(tokenKey) : '';
+      const l = typeof localStorage !== 'undefined' ? localStorage.getItem(tokenKey) : '';
+      return s || l || tokenFallback;
+    } catch (_) { return tokenFallback; }
   };
   const saveSessionToken = value => {
     tokenFallback = value;
-    try { if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(tokenKey, value); }
-    catch (_) { /* private browsing can disable storage; use the input for this request */ }
+    try { if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(tokenKey, value); } catch (_) {}
+    try { if (typeof localStorage !== 'undefined') localStorage.setItem(tokenKey, value); } catch (_) {}
   };
 
   function setState(text, ok = null) {

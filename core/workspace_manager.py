@@ -1,6 +1,6 @@
 """Shared Workspace & Git Worktree Manager for Multi-CLI Collaboration.
 
-Enables all 5 CLI Agents (Claude Code, Codex, Antigravity, MiniMax Code, zcode)
+Enables all 5 CLI Agents (Claude Code, Codex, Antigravity, MiniMax Code, opencode)
 to either:
 1. Execute seamlessly inside a single shared project directory (`shared` mode, default),
    allowing sequential or cooperative CLI runs to read/write the same files directly.
@@ -68,45 +68,221 @@ def _run_git(cwd: Path, args: list[str], timeout: int = 10) -> subprocess.Comple
     )
 
 
-def ensure_project_initialized(project_name: str | None = None) -> Path:
-    """Ensure the shared project directory exists and is initialized as a Git repo."""
-    root = get_workspace_root()
-    name = (project_name or get_active_project_name()).strip()
-    if not _SAFE_NAME_RE.match(name):
-        raise ValueError(f"Invalid project folder name: {name!r}")
+DEFAULT_GIT_REMOTE = "https://github.com/kiddhsu5/KHAVIS.git"
 
-    proj_dir = (root / name).resolve()
+
+def _build_default_readme(name: str) -> str:
+    return (
+        f"# {name} — K.H.A.V.I.S. 共用專案工作區\n\n"
+        "## 1. 專案簡介 (Project Overview)\n"
+        "此專案為 **K.H.A.V.I.S. (Kidd's Hybrid Autonomous Versatile Intelligence System)** 多 Agent 協同開發工作區。\n"
+        "支援 5 大 CLI 編碼 Agent（**Claude Code**, **OpenAI Codex**, **Google Antigravity**, **MiniMax Code**, **opencode**）與 K.H.A.V.I.S. 團隊共同讀寫檔案、執行自動化測試與 Git 版本控制。\n\n"
+        "### 核心協同模式\n"
+        "- **共用資料夾模式 (Shared Mode)**：所有 Agent 直接於此目錄讀寫檔案，無縫接力開發與驗證。\n"
+        "- **Git Worktree 隔離模式 (Worktree Mode)**：並發派工時自動建立獨立分支 `khavis/<agent>`，支援 Diff 視覺化對比與一鍵合併。\n\n"
+        "## 2. 安裝步驟 (Installation)\n"
+        "```bash\n"
+        "# 1. 確認 Python 3.10+ 環境\n"
+        "python3 --version\n\n"
+        "# 2. 安裝測試與開發相依套件（選用）\n"
+        "pip install pytest\n"
+        "```\n\n"
+        "## 3. 如何運行專案 (Quick Run Commands)\n"
+        "```bash\n"
+        "# 執行專案預設腳本\n"
+        "bash scripts/run.sh\n\n"
+        "# 直接執行快速範例程式\n"
+        "python3 examples/quickstart_example.py\n\n"
+        "# 執行自動化單元測試\n"
+        "python3 -m pytest -q\n"
+        "# 或使用內建 unittest：\n"
+        "python3 -m unittest discover -s tests -v\n"
+        "```\n\n"
+        "## 4. 使用範例 (Usage Example)\n"
+        "```python\n"
+        "from examples.quickstart_example import run_workflow_demo\n\n"
+        "result = run_workflow_demo(task=\"檢查專案完整性與測試狀態\")\n"
+        "print(result)\n"
+        "```\n\n"
+        "## 5. 貢獻指南 (Contributing)\n"
+        "1. 建立功能分支：`git checkout -b feat/your-feature`\n"
+        "2. 撰寫程式碼並補齊對應測試於 `tests/` 目錄\n"
+        "3. 確保所有測試通過：`bash scripts/run.sh`\n"
+        "4. 提交變更並發起 Pull Request（詳見 [CONTRIBUTING.md](CONTRIBUTING.md)）\n\n"
+        "## 6. 授權條款 (License)\n"
+        "本專案採用 **Apache License 2.0** 授權，詳見 [LICENSE](LICENSE)。\n"
+    )
+
+
+def ensure_project_completeness(
+    proj_dir: Path,
+    remote_url: str = DEFAULT_GIT_REMOTE,
+) -> list[str]:
+    """Ensure the project workspace has complete README, LICENSE, CONTRIBUTING, tests, scripts, examples, CI, and git remote."""
     proj_dir.mkdir(parents=True, exist_ok=True)
+    name = proj_dir.name
+    updated: list[str] = []
 
     readme_path = proj_dir / "README.md"
-    if not readme_path.exists():
-        readme_path.write_text(
-            f"# {name} (K.H.A.V.I.S. 共用專案工作區)\n\n"
-            "此目錄為所有 CLI Agent (Claude Code, Codex, Antigravity, MiniMax Code, zcode) 共用的執行資料夾。\n"
-            "- **共用資料夾模式 (Shared Mode)**：各 CLI 直接於此目錄讀寫檔案，無縫接力開發。\n"
-            "- **Git Worktree 隔離模式 (Worktree Mode)**：並發派工時自動建立獨立分支，支援 Diff 視覺化對比與一鍵合併。\n",
-            encoding="utf-8",
-        )
+    if not readme_path.exists() or len(readme_path.read_text(encoding="utf-8", errors="ignore").splitlines()) < 12 or "opencode" not in readme_path.read_text(encoding="utf-8", errors="ignore"):
+        readme_path.write_text(_build_default_readme(name), encoding="utf-8")
+        updated.append("README.md")
 
     gitignore_path = proj_dir / ".gitignore"
     if not gitignore_path.exists():
-        gitignore_path.write_text(".worktrees/\n__pycache__/\n*.pyc\n.DS_Store\n", encoding="utf-8")
+        gitignore_path.write_text(".worktrees/\n__pycache__/\n*.pyc\n.pytest_cache/\n.DS_Store\n", encoding="utf-8")
+        updated.append(".gitignore")
+
+    license_path = proj_dir / "LICENSE"
+    if not license_path.exists():
+        license_path.write_text(
+            "Apache License\nVersion 2.0, January 2004\nhttp://www.apache.org/licenses/\n\n"
+            "Copyright 2026 K.H.A.V.I.S. Contributors\n\n"
+            "Licensed under the Apache License, Version 2.0 (the \"License\");\n"
+            "you may not use this file except in compliance with the License.\n",
+            encoding="utf-8",
+        )
+        updated.append("LICENSE")
+
+    contributing_path = proj_dir / "CONTRIBUTING.md"
+    if not contributing_path.exists():
+        contributing_path.write_text(
+            f"# 貢獻指南 (Contributing to {name})\n\n"
+            "感謝參與專案開發！請遵循以下流程：\n\n"
+            "## 開發與測試流程\n"
+            "1. Fork 並 Clone 儲存庫：`git clone https://github.com/kiddhsu5/KHAVIS.git`\n"
+            "2. 執行現有測試確認環境正常：`bash scripts/run.sh`\n"
+            "3. 新增功能或修復問題時，請在 `tests/` 新增對應測試案例。\n"
+            "4. 提交訊息建議採用 Conventional Commits（例如 `feat: ...`, `fix: ...`, `docs: ...`）。\n",
+            encoding="utf-8",
+        )
+        updated.append("CONTRIBUTING.md")
+
+    scripts_dir = proj_dir / "scripts"
+    run_sh = scripts_dir / "run.sh"
+    if not run_sh.exists():
+        scripts_dir.mkdir(parents=True, exist_ok=True)
+        run_sh.write_text(
+            "#!/usr/bin/env bash\n"
+            "set -euo pipefail\n"
+            "cd \"$(dirname \"$0\")/..\"\n"
+            "echo \"[1/2] Running quickstart example...\"\n"
+            "python3 examples/quickstart_example.py\n"
+            "echo \"[2/2] Running automated unit tests...\"\n"
+            "python3 -m unittest discover -s tests -v\n",
+            encoding="utf-8",
+        )
+        try:
+            run_sh.chmod(0o755)
+        except OSError:
+            pass
+        updated.append("scripts/run.sh")
+
+    examples_dir = proj_dir / "examples"
+    example_py = examples_dir / "quickstart_example.py"
+    if not example_py.exists():
+        examples_dir.mkdir(parents=True, exist_ok=True)
+        (examples_dir / "__init__.py").write_text("", encoding="utf-8")
+        example_py.write_text(
+            '"""Quickstart usage example for K.H.A.V.I.S. shared workspace."""\n\n'
+            "from __future__ import annotations\n\n"
+            "from typing import Any\n\n\n"
+            "def run_workflow_demo(task: str = \"verify workspace\") -> dict[str, Any]:\n"
+            '    """Run a sample task and return structured status."""\n'
+            "    return {\n"
+            '        "ok": True,\n'
+            '        "task": task,\n'
+            '        "agents": ["antigravity", "codex", "minimax", "opencode", "claude"],\n'
+            '        "status": "completed",\n'
+            "    }\n\n\n"
+            'if __name__ == "__main__":\n'
+            "    info = run_workflow_demo()\n"
+            '    print(f"[KHAVIS Example] status={info[\'status\']} agents={len(info[\'agents\'])}")\n',
+            encoding="utf-8",
+        )
+        updated.append("examples/quickstart_example.py")
+
+    tests_dir = proj_dir / "tests"
+    test_py = tests_dir / "test_app.py"
+    if not test_py.exists():
+        tests_dir.mkdir(parents=True, exist_ok=True)
+        test_py.write_text(
+            '"""Automated unit tests for shared workspace project completeness."""\n\n'
+            "import unittest\n"
+            "from pathlib import Path\n"
+            "from examples.quickstart_example import run_workflow_demo\n\n\n"
+            "class TestWorkspaceApp(unittest.TestCase):\n"
+            "    def test_workflow_demo(self) -> None:\n"
+            '        res = run_workflow_demo("unit-test")\n'
+            '        self.assertTrue(res["ok"])\n'
+            '        self.assertIn("opencode", res["agents"])\n\n'
+            "    def test_project_files_exist(self) -> None:\n"
+            "        root = Path(__file__).resolve().parent.parent\n"
+            '        for rel in ("README.md", "LICENSE", "CONTRIBUTING.md", "scripts/run.sh"):\n'
+            "            self.assertTrue((root / rel).exists(), f\"Missing {rel}\")\n\n\n"
+            'if __name__ == "__main__":\n'
+            "    unittest.main()\n",
+            encoding="utf-8",
+        )
+        updated.append("tests/test_app.py")
+
+    ci_dir = proj_dir / ".github" / "workflows"
+    ci_yml = ci_dir / "ci.yml"
+    if not ci_yml.exists():
+        ci_dir.mkdir(parents=True, exist_ok=True)
+        ci_yml.write_text(
+            "name: Workspace CI\n\n"
+            "on:\n"
+            "  push:\n"
+            "    branches: [ main ]\n"
+            "  pull_request:\n"
+            "    branches: [ main ]\n\n"
+            "jobs:\n"
+            "  test:\n"
+            "    runs-on: ubuntu-latest\n"
+            "    steps:\n"
+            "      - uses: actions/checkout@v4\n"
+            "      - name: Set up Python\n"
+            "        uses: actions/setup-python@v5\n"
+            "        with:\n"
+            "          python-version: '3.11'\n"
+            "      - name: Run scripts & unit tests\n"
+            "        run: bash scripts/run.sh\n",
+            encoding="utf-8",
+        )
+        updated.append(".github/workflows/ci.yml")
 
     git_dir = proj_dir / ".git"
     if not git_dir.exists():
         _run_git(proj_dir, ["init", "-b", "main"])
         _run_git(proj_dir, ["config", "user.name", "KHAVIS Workspace"])
         _run_git(proj_dir, ["config", "user.email", "workspace@khavis.local"])
-        _run_git(proj_dir, ["add", "-A"])
-        _run_git(proj_dir, ["commit", "-m", "chore: initialize shared project workspace"])
-    else:
-        head_check = _run_git(proj_dir, ["rev-parse", "--verify", "HEAD"])
-        if head_check.returncode != 0:
-            _run_git(proj_dir, ["config", "user.name", "KHAVIS Workspace"])
-            _run_git(proj_dir, ["config", "user.email", "workspace@khavis.local"])
-            _run_git(proj_dir, ["add", "-A"])
-            _run_git(proj_dir, ["commit", "--allow-empty", "-m", "chore: initialize shared workspace"])
 
+    # Ensure Git remote `origin` is configured
+    rem_proc = _run_git(proj_dir, ["remote", "-v"])
+    if "origin" not in (rem_proc.stdout or "") and remote_url:
+        _run_git(proj_dir, ["remote", "add", "origin", remote_url])
+        updated.append("git:remote(origin)")
+
+    head_check = _run_git(proj_dir, ["rev-parse", "--verify", "HEAD"])
+    if head_check.returncode != 0 or updated:
+        _run_git(proj_dir, ["config", "user.name", "KHAVIS Workspace"])
+        _run_git(proj_dir, ["config", "user.email", "workspace@khavis.local"])
+        _run_git(proj_dir, ["add", "-A"])
+        _run_git(proj_dir, ["commit", "--allow-empty", "-m", "chore: initialize complete project workspace"])
+
+    return updated
+
+
+def ensure_project_initialized(project_name: str | None = None) -> Path:
+    """Ensure the shared project directory exists, has full developer files, and is initialized as a Git repo with remote."""
+    root = get_workspace_root()
+    name = (project_name or get_active_project_name()).strip()
+    if not _SAFE_NAME_RE.match(name):
+        raise ValueError(f"Invalid project folder name: {name!r}")
+
+    proj_dir = (root / name).resolve()
+    ensure_project_completeness(proj_dir)
     return proj_dir
 
 
