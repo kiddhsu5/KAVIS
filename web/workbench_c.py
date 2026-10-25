@@ -758,6 +758,7 @@ const C_AGENT_COLORS = {
   antigravity: ['--m-sage', '#8FA894'],
   minimax:     ['--m-apricot','#C9A17E'],
   zcode:       ['--m-rose',  '#BC8B8B'],
+  opencode:    ['--m-rose',  '#BC8B8B'],
   khavis:      ['--m-butter','#D9C89E']
 };
 
@@ -1083,6 +1084,7 @@ function cSelectThread(id) {
     cThreadId = id;
     cThreadStep = th.tasks.length;
   }
+  switchTab('command');
   cUpdateComposerHint();
   cRenderConversation();
   cRenderItemList();
@@ -1213,6 +1215,7 @@ function cRenderConversation() {
 
 function cSetCenterMode(mode) {
   cCenterMode = mode === 'overview' ? 'overview' : 'thread';
+  switchTab('command');
   cRenderConversation();
   cRenderStream();
 }
@@ -1284,7 +1287,7 @@ function cSyncAgentChips() {
 
 const C_AGENT_LABELS = {
   claude:'Claude', codex:'Codex', antigravity:'AGY',
-  minimax:'minimax', zcode:'zcode', khavis:'K.H.A.V.I.S.'
+  minimax:'minimax', zcode:'opencode', opencode:'opencode', khavis:'K.H.A.V.I.S.'
 };
 
 function cRenderAgentChips() {
@@ -1918,7 +1921,8 @@ const C_AGENT_ROLES = {
   codex:       'OpenAI Codex · 高速代碼生成',
   antigravity: 'Antigravity · 自主 Agentic CLI',
   minimax:     'MiniMax Code · 中文與長上下文',
-  zcode:       'Zhipu zcode · GLM 專屬代碼',
+  zcode:       'OpenCode · 跨模型開源編碼 CLI',
+  opencode:    'OpenCode · 跨模型開源編碼 CLI',
   khavis:      'LangGraph 7-Role 協同流水線'
 };
 

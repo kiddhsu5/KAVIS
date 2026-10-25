@@ -977,8 +977,12 @@ class Handler(BaseHTTPRequestHandler):
                     cwd=str(agent_cwds.get("minimax", shared_dir)),
                 ),
                 "zcode": ZcodeBackend(
-                    model=str(agent_models.get("zcode") or "").strip(),
+                    model=str(agent_models.get("zcode") or agent_models.get("opencode") or "").strip(),
                     cwd=str(agent_cwds.get("zcode", shared_dir)),
+                ),
+                "opencode": ZcodeBackend(
+                    model=str(agent_models.get("opencode") or agent_models.get("zcode") or "").strip(),
+                    cwd=str(agent_cwds.get("opencode", agent_cwds.get("zcode", shared_dir))),
                 ),
                 "khavis": KhavisBackend(),
             }

@@ -4,8 +4,14 @@
 # and never passed as process arguments.
 set -euo pipefail
 
-REMOTE_HOST="${REMOTE_HOST:-ubuntu@43.156.115.110}"
-SSH_KEY="${SSH_KEY:-$HOME/Documents/kiddhsu.pem}"
+REMOTE_HOST="${REMOTE_HOST:-ubuntu@100.87.6.82}"
+if [[ -z "${SSH_KEY:-}" ]]; then
+  if [[ -r "/Users/kiddhsu/data/.work/kiddhsu.pem" ]]; then
+    SSH_KEY="/Users/kiddhsu/data/.work/kiddhsu.pem"
+  else
+    SSH_KEY="$HOME/Documents/kiddhsu.pem"
+  fi
+fi
 REMOTE_ENV="/home/ubuntu/.config/khavis/manus.env"
 REMOTE_DROPIN_DIR="/etc/systemd/system/khavis-workbench.service.d"
 REMOTE_DROPIN="${REMOTE_DROPIN_DIR}/10-manus-env.conf"
@@ -13,6 +19,12 @@ REMOTE_DROPIN="${REMOTE_DROPIN_DIR}/10-manus-env.conf"
 if [[ ! -r "$SSH_KEY" ]]; then
   echo "SSH key is not readable: $SSH_KEY" >&2
   exit 1
+fi
+
+if [[ "${1:-}" == "--show" ]]; then
+  ssh -q -o BatchMode=yes -o ConnectTimeout=6 -o StrictHostKeyChecking=accept-new -i "$SSH_KEY" "$REMOTE_HOST" \
+    "sudo grep '^KHAVIS_CONSOLE_TOKEN=' '$REMOTE_ENV'"
+  exit 0
 fi
 
 read -r -s -p "Manus API Key: " MANUS_API_KEY

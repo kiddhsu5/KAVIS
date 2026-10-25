@@ -73,7 +73,7 @@ AGENT_MODEL_SPECS: dict[str, dict[str, Any]] = {
     "zcode": {
         "env": "ZCODE_DISPATCH_MODEL",
         "default": "glm-5.3-flashx",
-        "label": "Zhipu zcode",
+        "label": "OpenCode",
         "options": [
             "glm-5.3-flashx",
             "glm-5.3",
@@ -249,7 +249,7 @@ BYOK_PROVIDER_SPECS = [
     {
         "env": "ZHIPUAI_API_KEY",
         "label": "智譜 GLM Coding Plan API Key",
-        "agents": "OpenAI Codex (預設 glm-5.3-flashx) / Zhipu zcode",
+        "agents": "OpenAI Codex (預設 glm-5.3-flashx) / OpenCode (opencode)",
         "base_url_env": "OPENAI_BASE_URL",
         "default_base_url": "https://open.bigmodel.cn/api/coding/paas/v4",
     },
@@ -457,15 +457,15 @@ def get_agent_fleet_status() -> list[dict[str, Any]]:
         },
         {
             "id": "zcode",
-            "name": "Zhipu zcode",
-            "binary": "zcode",
+            "name": "OpenCode",
+            "binary": "opencode",
             "model": active_models["zcode"],
             "default_model": default_models["zcode"],
             "options": model_options["zcode"],
             "adjustable": True,
             "custom": False,
             "plan": f"GLM Coding Plan ({active_models['zcode']})",
-            "desc": f"智譜 GLM 專屬代碼 CLI (當前綁定 {active_models['zcode']})",
+            "desc": f"OpenCode 跨模型編碼 CLI (當前綁定 {active_models['zcode']})",
             "tier": "Tier-2",
             "icon": "fa-bolt",
             "color": "#F59E0B",
@@ -495,7 +495,7 @@ def get_agent_fleet_status() -> list[dict[str, Any]]:
             a["status"] = "ready"
             continue
 
-        binary_path = shutil.which(a["binary"])
+        binary_path = shutil.which(a["binary"]) or (shutil.which("zcode") if a["id"] == "zcode" else None)
         if not binary_path and a["id"] == "antigravity":
             binary_path = shutil.which("agy")
         if not binary_path and a["id"] == "minimax":
@@ -851,7 +851,7 @@ _WORKBENCH_PAGE_HEAD = """<!DOCTYPE html>
             <div class="flex justify-between gap-1"><span>Codex:</span><span id="side-model-codex" class="text-indigo-400 truncate">glm-5.3-flashx</span></div>
             <div class="flex justify-between gap-1"><span>Antigravity:</span><span id="side-model-antigravity" class="text-sky-400 truncate">antigravity-pro</span></div>
             <div class="flex justify-between gap-1"><span>MiniMax:</span><span id="side-model-minimax" class="text-teal-400 truncate">MiniMax-M3.1</span></div>
-            <div class="flex justify-between gap-1"><span>zcode:</span><span id="side-model-zcode" class="text-amber-400 truncate">glm-5.3-flashx</span></div>
+            <div class="flex justify-between gap-1"><span>opencode:</span><span id="side-model-zcode" class="text-amber-400 truncate">glm-5.3-flashx</span></div>
           </div>
         </div>
       </div>
@@ -1105,7 +1105,7 @@ _WORKBENCH_PAGE_HEAD = """<!DOCTYPE html>
                 <div class="text-[10px] text-slate-400 font-mono">預設: MiniMax-M3.1</div>
               </div>
               <div class="p-2.5 rounded-lg bg-black/40 border border-white/5 space-y-1.5">
-                <label class="text-amber-400 font-bold block">Zhipu zcode 模型</label>
+                <label class="text-amber-400 font-bold block">OpenCode (opencode) 模型</label>
                 <input id="custom-input-zcode" type="text" value="glm-5.3-flashx" oninput="onCustomModelInput('zcode', this.value)" class="w-full bg-[#050811] border border-white/15 rounded px-2 py-1 text-xs font-mono text-white focus:outline-none focus:border-amber-400" placeholder="輸入或選擇模型..." />
                 <div class="text-[10px] text-slate-400 font-mono">預設: glm-5.3-flashx</div>
               </div>
@@ -1252,7 +1252,7 @@ _WORKBENCH_PAGE_HEAD = """<!DOCTYPE html>
                 </div>
               </div>
 
-              <!-- Node 5: Zhipu zcode -->
+              <!-- Node 5: OpenCode -->
               <div id="node-card-zcode" onclick="toggleAgentNode('zcode')" class="agent-node-card cursor-pointer rounded-xl p-3 bg-[#0E1525] border border-white/10 flex flex-col justify-between space-y-2.5 select-none">
                 <input type="checkbox" name="agent_target" value="zcode" class="hidden" onchange="syncTopologyBeams()">
                 <div class="flex items-center justify-between">
@@ -1262,9 +1262,9 @@ _WORKBENCH_PAGE_HEAD = """<!DOCTYPE html>
                   <span id="badge-node-zcode" class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-slate-400">待命</span>
                 </div>
                 <div class="space-y-1">
-                  <div class="font-bold text-white text-xs">Zhipu zcode</div>
+                  <div class="font-bold text-white text-xs">OpenCode</div>
                   <div onclick="event.stopPropagation()">
-                    <select id="model-select-zcode" onchange="onAgentModelChange('zcode', this.value)" class="w-full bg-[#070B14] border border-amber-500/30 rounded px-1.5 py-1 text-[10px] font-mono text-amber-300 focus:outline-none focus:border-amber-400 cursor-pointer" title="調整 zcode 綁定模型">
+                    <select id="model-select-zcode" onchange="onAgentModelChange('zcode', this.value)" class="w-full bg-[#070B14] border border-amber-500/30 rounded px-1.5 py-1 text-[10px] font-mono text-amber-300 focus:outline-none focus:border-amber-400 cursor-pointer" title="調整 opencode 綁定模型">
                       <option value="glm-5.3-flashx" selected>glm-5.3-flashx</option>
                       <option value="glm-5.3">glm-5.3</option>
                       <option value="codegeex-4">codegeex-4</option>
@@ -1529,7 +1529,7 @@ _WORKBENCH_PAGE_HEAD = """<!DOCTYPE html>
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 class="text-xl font-bold text-white">雲端主機主機 Agent 集群與用戶自訂 Agent 拓撲</h2>
-            <p class="text-xs text-slate-400">包含 Claude Code (MiniMax-M3.1-Flash), Codex, Antigravity (AGY), MiniMax Code, zcode, K.H.A.V.I.S. 團隊以及您自訂掛載的 Agent</p>
+            <p class="text-xs text-slate-400">包含 Claude Code (MiniMax-M3.1-Flash), Codex, Antigravity (AGY), MiniMax Code, OpenCode (opencode), K.H.A.V.I.S. 團隊以及您自訂掛載的 Agent</p>
           </div>
           <button type="button" onclick="switchTab('command'); document.getElementById('custom-agent-panel').classList.remove('hidden');" class="px-3.5 py-2 rounded-xl bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 border border-pink-500/30 text-xs font-bold transition">
             <i class="fas fa-plug mr-1"></i>➕ 新增自訂 Agent

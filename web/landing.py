@@ -189,7 +189,7 @@ def render_landing_html(
               <i class="fas fa-bolt mr-1.5 opacity-75"></i>MiniMax M3.1
             </span>
             <span class="px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/10 text-xs font-mono text-rose-300">
-              <i class="fas fa-microchip mr-1.5 opacity-75"></i>Zhipu GLM-5.3
+              <i class="fas fa-microchip mr-1.5 opacity-75"></i>OpenCode (GLM-5.3)
             </span>
             <span class="px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/10 text-xs font-mono text-slate-300">
               <i class="fas fa-satellite-dish mr-1.5 opacity-75"></i>Manus API v2

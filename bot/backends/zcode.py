@@ -45,7 +45,9 @@ class ZcodeBackend(Backend):
         self._cwd = cwd
 
     async def health(self) -> HealthResult:
-        binary = shutil.which(self._binary)
+        binary = shutil.which(self._binary) or (
+            shutil.which("opencode") if self._binary == "zcode" else None
+        )
         if not binary:
             return HealthResult(False, f"{self._binary} not in PATH")
         try:
@@ -70,7 +72,12 @@ class ZcodeBackend(Backend):
             return HealthResult(False, repr(exc))
 
     async def run(self, envelope: DispatchEnvelope) -> BackendResult:
-        args: list[str] = [self._binary, "exec"]
+        exe = (
+            shutil.which(self._binary)
+            or (shutil.which("opencode") if self._binary == "zcode" else None)
+            or self._binary
+        )
+        args: list[str] = [exe, "exec"]
         if self._model:
             args += ["-m", self._model]
         args += ["--", envelope.prompt]
