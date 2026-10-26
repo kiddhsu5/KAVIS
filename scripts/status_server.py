@@ -644,8 +644,8 @@ class Handler(BaseHTTPRequestHandler):
                         # ts 是記錄的唯一識別：舊紀錄的 handle 只到秒，
                         # 同秒的兩筆任務會被誤併成同一個對話串。
                         "ts": float(item.get("ts") or 0.0),
-                        "consensus": _redact(str(item.get("consensus") or "").replace(_legacy_cli, "opencode"))[:2000],
-                        "review_details": _redact(str(item.get("review_details") or "").replace(_legacy_cli, "opencode"))[:2000],
+                        "consensus": _redact(str(item.get("consensus") or "").replace(_legacy_cli, "opencode"))[:12000],
+                        "review_details": _redact(str(item.get("review_details") or "").replace(_legacy_cli, "opencode"))[:12000],
                     }
                 )
             self._send(

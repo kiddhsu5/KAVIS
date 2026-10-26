@@ -766,6 +766,9 @@ _COMPOSER_CHROME_TOP: Final[str] = """
           <button type="button" class="c-collab-btn m-btn-ghost px-2.5 py-1 rounded-md transition" data-mode="parallel" onclick="setCollabMode('parallel')">並發</button>
         </div>
         <span id="c-collab-desc" class="text-[11px] truncate hidden sm:inline" style="color:var(--m-faint)"></span>
+        <button type="button" onclick="cNewTask()" class="px-2 py-0.5 rounded-md text-[11px] m-btn-ghost transition inline-flex items-center gap-1" title="開啟全新的第 1 輪對話（不帶入舊對話上下文）">
+          <span>＋ 新對話</span>
+        </button>
         <div class="flex-1"></div>
         <div id="c-agent-chips" class="flex items-center gap-1.5 flex-wrap"></div>
       </div>
@@ -955,6 +958,7 @@ let cThreadStep = 0;          // 該對話串已完成的輪數
 let cSelectedThread = null;   // 中央正在顯示的對話串
 let cLiveThreadId = null;     // 本次頁面生命週期內最後派工的對話串
 let cCenterMode = 'thread';   // 'thread' | 'overview'
+let cIsNewDraft = false;      // 使用者主動點選「＋ 新對話」時保持空白新對話狀態，不被舊歷史覆蓋
 
 const C_VIEWS = {
   timeline: { label:'時間線' },
@@ -1031,6 +1035,8 @@ function cBuildThreads() {
   });
   map.forEach(th => {
     th.tasks.sort((a, b) => ((a.step || 0) - (b.step || 0)));
+    const first = th.tasks[0];
+    if (first && first.prompt) th.title = first.prompt;
     const last = th.tasks[th.tasks.length - 1];
     if (last) {
       th.status = last.status;
@@ -1041,8 +1047,8 @@ function cBuildThreads() {
     th.turns = th.tasks.length;
   });
   cThreads = map;
-  // 預設顯示最近的一串（依最後一輪的 ts 判斷，不能靠 Map 插入順序）
-  if (!cSelectedThread || !cThreads.has(cSelectedThread)) {
+  // 預設顯示最近的一串（但若使用者主動點了「＋ 新對話」即 cIsNewDraft=true，則保持空白新對話）
+  if (!cIsNewDraft && (!cSelectedThread || !cThreads.has(cSelectedThread))) {
     let newest = null, newestTs = -1;
     cThreads.forEach(th => {
       const last = th.tasks[th.tasks.length - 1];
@@ -1130,13 +1136,24 @@ function cRenderItemList() {
 }
 
 function cSelectThread(id) {
+  cIsNewDraft = false;
   cSelectedThread = id;
   cCenterMode = 'thread';
   const th = cThreads.get(id);
   if (th) {
-    // 進入對話串時把該串設為後續派工的接續對象
+    // 進入對話串時把該串設為後續派工的接續對象，並同步最後一輪記憶
     cThreadId = id;
     cThreadStep = th.tasks.length;
+    const last = th.tasks[th.tasks.length - 1];
+    if (last && typeof previousTurnContext !== 'undefined') {
+      previousTurnContext = {
+        prompt: last.prompt || '',
+        consensus: last.consensus || '',
+        thread: id,
+        step: th.tasks.length
+      };
+      if (typeof syncContinuationBanner === 'function') syncContinuationBanner();
+    }
   }
   switchTab('command');
   cUpdateComposerHint();
@@ -1144,21 +1161,76 @@ function cSelectThread(id) {
   cRenderItemList();
 }
 
-// 「新任務」= 開一串全新的對話（對應 MiniMax Code 的「新 session」）
+// 「新任務」= 開一串全新的對話（完全清除舊對話記憶與輪數，從第 1 輪獨立開始）
 function cNewTask() {
+  cIsNewDraft = true;
   cThreadId = null;
   cThreadStep = 0;
   cSelectedThread = null;
+  cLiveThreadId = null;
   cCenterMode = 'thread';
+  if (typeof clearContinuationContext === 'function') {
+    clearContinuationContext();
+  } else if (typeof previousTurnContext !== 'undefined') {
+    previousTurnContext = null;
+  }
+  const lrc = document.getElementById('live-results-container');
+  if (lrc) lrc.innerHTML = '';
+  const pi = document.getElementById('prompt-input');
+  if (pi) { pi.value = ''; pi.style.height = 'auto'; }
   cUpdateComposerHint();
+  cRenderItemList();
   cRenderConversation();
   focusComposer();
+  cToast('已開啟全新對話（第 1 輪），不會帶入先前對話紀錄', 'ok');
 }
 
 // ── 中央對話串（右：用戶提問 / 左：Agent 結果優先 + 預設收合的交叉審查） ─────────
 function cSplitResultAndReview(t) {
   let raw = String(t.consensus || '').trim();
   let review = String(t.review_details || '').trim();
+
+  // 1. 移除模型偶發殘留的 <tool_call> / <//tool_call> 或裸工具 JSON，將其歸入可收合的執行明細
+  const rawToolMatch = raw.match(/(?:<+\\/?tool_call>\\s*)?\\{\\s*"tool"\\s*:\\s*"[^"]+"[\\s\\S]*?\\}\\s*(?:<+\\/+?tool_call>|$)/g);
+  if (rawToolMatch && rawToolMatch.length) {
+    const toolDump = rawToolMatch.join('\\n');
+    raw = raw.replace(/(?:<+\\/?tool_call>\\s*)?\\{\\s*"tool"\\s*:\\s*"[^"]+"[\\s\\S]*?\\}\\s*(?:<+\\/+?tool_call>|$)/g, '')
+             .replace(/<+\\/+?tool_call>/g, '').trim();
+    if (!review) review = '⚡ 【工具呼叫紀錄】\\n' + toolDump;
+    else if (review.indexOf(toolDump.slice(0, 60)) === -1) review += '\\n\\n⚡ 【工具呼叫紀錄】\\n' + toolDump;
+  }
+
+  // 2. 分離 <!-- KHAVIS_REVIEW_SPLIT --> 標記
+  if (raw.indexOf('<!-- KHAVIS_REVIEW_SPLIT -->') !== -1) {
+    const parts = raw.split('<!-- KHAVIS_REVIEW_SPLIT -->');
+    raw = (parts[0] || '').trim();
+    const tail = parts.slice(1).join('\\n').trim();
+    if (tail) review = review ? (review + '\\n\\n' + tail) : tail;
+  }
+
+  // 3. 若含有「⚡ **【自主工具執行紀錄」區塊，自動移入下方收合的審查與執行明細，避免主對話氣泡出現滿滿的指令碼
+  const logMarker = '⚡ **【自主工具執行紀錄';
+  if (raw.indexOf(logMarker) !== -1) {
+    const idxLog = raw.indexOf(logMarker);
+    const beforeLog = raw.slice(0, idxLog).trim();
+    const afterLog = raw.slice(idxLog).trim();
+    if (beforeLog) {
+      raw = beforeLog;
+      review = review ? (review + '\\n\\n' + afterLog) : afterLog;
+    } else {
+      // 舊紀錄把 log 放在最前面：尋找 ``` 結尾後的人類文字
+      const fenceParts = afterLog.split('```');
+      if (fenceParts.length >= 3) {
+        const logOnly = fenceParts.slice(0, 2).join('```') + '```';
+        const humanAfter = fenceParts.slice(2).join('```').trim();
+        raw = humanAfter || '';
+        review = review ? (review + '\\n\\n' + logOnly) : logOnly;
+      } else {
+        raw = '';
+        review = review ? (review + '\\n\\n' + afterLog) : afterLog;
+      }
+    }
+  }
 
   if (raw) {
     // 若舊紀錄或合流文本中含有「多 Agent 交叉審查」段落與「最終完成交付成果」段落，自動分離並確保「結果優先」
@@ -1183,6 +1255,11 @@ function cSplitResultAndReview(t) {
       }
     }
   }
+
+  if (!raw && review && t.status === 'done') {
+    raw = '✅ 已完成雲端主機與工作區指令檢測（舊紀錄之終端機原始輸出已收納於下方「🔍 點選展開 / 隱藏 Agent 交叉審查與比較明細」中；若需重新產生完整中文報告，可點擊下方「以此任務接續」或開啟新對話）。';
+  }
+
   if (!review && Array.isArray(t.agents) && t.agents.length > 0 && t.status === 'done') {
     review = `參與協同與交叉審查節點：${t.agents.map(a => C_AGENT_LABELS[a] || a).join(' + ')}` +
              (t.source ? `\n收斂來源：${t.source}` : '') +
@@ -1302,11 +1379,15 @@ function cRenderConversation() {
 
   const th = cSelectedThread ? cThreads.get(cSelectedThread) : null;
   if (!th) {
-    head.innerHTML = `<span class="c-conv-title">尚無對話</span>
+    head.innerHTML = `<span class="c-conv-title">✨ 新對話（第 1 輪）</span>
+      <span class="c-conn-badge" style="background:var(--m-sage-soft);color:var(--m-sage)">獨立新任務 · 不帶舊對話記憶</span>
       <span class="flex-1"></span>
       <button type="button" onclick="cSetCenterMode('overview')" class="c-action m-btn-ghost">任務總覽</button>`;
-    turns.innerHTML = '';
-    if (slot) slot.classList.remove('hidden');
+    turns.innerHTML = `<div class="rounded-2xl p-6 text-center m-line" style="background:var(--m-panel-2);color:var(--m-dim)">
+      <div class="text-sm font-semibold mb-1" style="color:var(--m-bone)">✨ 已準備好開始全新的第 1 輪對話</div>
+      <div class="text-xs" style="color:var(--m-faint)">請直接在下方輸入框輸入您的問題或目標，Agent 團隊將獨立執行並呈現結果（不會混入先前的舊對話）。</div>
+    </div>`;
+    if (slot) slot.classList.add('hidden');
     return;
   }
 
@@ -1462,10 +1543,24 @@ function focusComposer() {
 
 function cUpdateComposerHint() {
   const h = document.getElementById('c-composer-hint');
-  if (!h) return;
+  const badge = document.getElementById('c-context-badge');
   const proj = (typeof currentProjectName !== 'undefined' && currentProjectName) ? currentProjectName : 'shared-app';
-  const ctx = cThreadId ? ' · 接續 ' + cThreadId.slice(0, 8) + ' 第 ' + ((cThreadStep || 0) + 1) + ' 輪' : '';
-  h.textContent = proj + ctx + ' · ⌘/Ctrl+⏎ 執行 · ⏎ 換行';
+  const isContinuing = Boolean(cThreadId && (cThreadStep || 0) > 0);
+  if (h) {
+    const ctx = isContinuing
+      ? ' · 接續 ' + cThreadId.slice(0, 8) + ' 第 ' + ((cThreadStep || 0) + 1) + ' 輪'
+      : ' · ✨ 全新對話（第 1 輪）';
+    h.textContent = proj + ctx + ' · ⌘/Ctrl+⏎ 執行 · ⏎ 換行';
+  }
+  if (badge) {
+    if (isContinuing) {
+      badge.classList.remove('hidden');
+      badge.innerHTML = `<button type="button" onclick="cNewTask()" class="px-2 py-0.5 rounded bg-amber-500/20 hover:bg-rose-500/30 text-amber-200 border border-amber-500/40 text-[10.5px] font-mono transition">🔗 正在接續第 ${(cThreadStep || 0) + 1} 輪 · ✕ 點此改開新對話</button>`;
+    } else {
+      badge.classList.add('hidden');
+      badge.innerHTML = '';
+    }
+  }
 }
 
 // ── 任務卡片流 ──────────────────────────────────────────────────────
@@ -1811,7 +1906,16 @@ async function cLoadTasks() {
 // build_contextual_prompt 對空的 prompt/consensus 會直接略過，
 // 所以第一輪帶一個只有 thread 的 context 不會改變模型收到的 prompt。
 function cPrepareThreadContext() {
-  if (!cThreadId) cThreadId = 't' + Date.now().toString(36);
+  cIsNewDraft = false;
+  if (!cThreadId || !cThreadStep) {
+    cThreadId = 't' + Date.now().toString(36);
+    cThreadStep = 0;
+    if (typeof previousTurnContext !== 'undefined') {
+      previousTurnContext = { prompt:'', consensus:'', thread: cThreadId, step: 0 };
+    }
+    if (typeof syncContinuationBanner === 'function') syncContinuationBanner();
+    return;
+  }
   if (typeof previousTurnContext === 'undefined') return;
   if (!previousTurnContext) previousTurnContext = { prompt:'', consensus:'', step:0 };
   previousTurnContext.thread = cThreadId;
@@ -1837,9 +1941,10 @@ function cBeginTask(prompt, agents, mode) {
   cFilter('all');
   cRenderConversation();
   cRenderStream();
+  cUpdateComposerHint();
   if (typeof cRenderAgentStatusPanel === 'function') cRenderAgentStatusPanel();
   const main = document.getElementById('c-main');
-  if (main) main.scrollTop = 0;   // 新任務在最上方，直接看得到
+  if (main) main.scrollTop = task.step > 1 ? main.scrollHeight : 0;
   return id;
 }
 
@@ -1954,6 +2059,7 @@ async function submitDispatch() {
     previousTurnContext.thread = cThreadId;
   }
   cFinishTask(ok && !dispatchError, body, consensus);
+  cUpdateComposerHint();
   cRenderConversation();
 
   if (!ok && !cAborted && !isServerReject) {

@@ -21,23 +21,46 @@ import time
 from pathlib import Path
 from typing import Any
 
-from bot.backends._http_fallback import call_upstream_llm_fallback, has_any_upstream_key
+from bot.backends._http_fallback import (
+    _strip_tool_calls,
+    call_upstream_llm_fallback,
+    has_any_upstream_key,
+)
 from bot.dispatch import DispatchRouter
 from bot.models import BackendResult, DispatchEnvelope
 from core.workspace_manager import collect_directory_diff, list_project_files
 
 _ACTION_MANDATE = (
-    "\n\n【最高行動準則 (Autonomous Action-First Execution Mandate)】\n"
-    "你擁有完整的雲端主機指令執行與專案資料夾讀寫 Skills（`write_file`, `edit_file`, `git_ops`, `scaffold_project`, `run_tests`, `run_shell`, `read_file`, `list_dir`）！\n"
-    "⚠️ **嚴禁只給意見或只列出建議清單！**\n"
-    "當你發現專案缺少 Git 遠端設定、README 不足、缺少測試/腳本/範例/LICENSE/CI，或需要修改程式碼時，"
-    "**請立即在回覆中輸出 `<tool_call>` 親自動手建立與修改檔案並執行測試驗證**，直接交付已經執行完成的真實成果！"
+    "\n\n【執行與回覆準則 (Action & Deliverable Guideline)】\n"
+    "1. 你擁有雲端主機指令與工作區讀寫 Skills（`write_file`, `edit_file`, `git_ops`, `scaffold_project`, `run_tests`, `run_shell`, `read_file`, `list_dir`）。當使用者要求修改專案、安裝套件或執行檢測時，請主動呼叫 `<tool_call>` 實機完成。\n"
+    "2. 當使用者詢問設定建議、私人助理配置（如 openclaw / hermes）或 Skills 推薦清單時，請針對問題給出結構清晰、完整易讀的繁體中文建議、設定檔範例與安裝指令，切勿被無關的工作區檔案干擾。\n"
+    "3. 最終回覆必須是乾淨、人類易讀的繁體中文內容，嚴禁直接把原始終端機指令或 `<tool_call>` JSON 當成最終回答！"
 )
+
+
+def _clean_execution_log_out_of_main(text: str) -> tuple[str, str]:
+    """Separate any `⚡ **【自主工具執行紀錄...` block out of main result so main bubble stays clean."""
+    raw = _strip_tool_calls(text or "")
+    marker = "⚡ **【自主工具執行紀錄"
+    if marker not in raw:
+        return raw.strip(), ""
+    idx = raw.find(marker)
+    before = raw[:idx].strip()
+    after = raw[idx:].strip()
+    # If the log block is at the start (legacy format), check if there is human text after the closing ```
+    if not before and "```" in after:
+        fence_parts = after.split("```")
+        if len(fence_parts) >= 3:
+            log_only = "```".join(fence_parts[:2]) + "```"
+            human_after = "```".join(fence_parts[2:]).strip()
+            if human_after:
+                return human_after, log_only
+    return before, after
 
 
 def _split_result_and_review(raw_text: str, results: list[BackendResult], critique_summary: str) -> tuple[str, str]:
     """Split synthesized text into (clean_final_result, collapsible_review_details)."""
-    text = (raw_text or "").strip()
+    text = _strip_tool_calls(raw_text or "").strip()
     review_parts: list[str] = []
 
     # Check explicit split marker or section heading for cross-review
@@ -63,17 +86,29 @@ def _split_result_and_review(raw_text: str, results: list[BackendResult], critiq
             extracted_review = text[idx_review:idx_final].strip()
             main_result = text[idx_final:].strip()
 
+    main_result, extracted_log = _clean_execution_log_out_of_main(main_result)
+    if not main_result:
+        for r in results:
+            if r.ok and r.text:
+                cand_main, _ = _clean_execution_log_out_of_main(r.text.split("<!-- KHAVIS_REVIEW_SPLIT -->")[0])
+                if cand_main:
+                    main_result = cand_main
+                    break
+
     if critique_summary:
         review_parts.append(f"📌 **協同審查結論**：{critique_summary}")
     if extracted_review:
         review_parts.append(extracted_review)
+    if extracted_log:
+        review_parts.append(extracted_log)
 
     # Append concise per-agent execution comparison for the collapsible drawer
     if results:
         agent_lines = ["### 🤖 各 Agent 節點執行與審查明細"]
         for r in results:
             status_icon = "✅" if r.ok else "❌"
-            snip = re.sub(r"\s+", " ", (r.text or r.error or "").strip())[:260]
+            clean_r, _ = _clean_execution_log_out_of_main((r.text or r.error or "").split("<!-- KHAVIS_REVIEW_SPLIT -->")[0])
+            snip = re.sub(r"\s+", " ", (clean_r or r.text or r.error or "").strip())[:260]
             agent_lines.append(f"- {status_icon} **`{r.backend}`** (`{r.model or 'auto'}` · `{r.latency_ms}ms`): {snip}")
         review_parts.append("\n".join(agent_lines))
 
@@ -290,14 +325,13 @@ async def run_collaborative_workflow(
             review_prompt = (
                 "你是 K.H.A.V.I.S. 總指揮官與交叉審查裁判（Master Critic, Verifier & Integrator）。\n"
                 f"使用者的原始任務為：\n「{prompt}」\n\n"
-                "剛才各個 Agent 已經在雲端主機與共用專案資料夾中執行了第一階段實作，結果如下：\n\n"
+                "剛才各個 Agent 已經完成第一階段執行與分析，結果如下：\n\n"
                 + "\n\n".join(candidates_dump)
                 + (f"\n\n目前共用專案資料夾的 Git Diff 變更：\n{diff_snippet}\n" if diff_snippet else "")
-                + "\n\n若上述 Agent 有任何還沒真正動手完成的檔案或設定（例如缺 Git remote、README 不足、缺測試/CI），請你先呼叫 `<tool_call>`（如 `scaffold_project`, `write_file`, `git_ops`, `run_tests`）當場補齊！\n"
-                "完成後，請嚴格依照以下順序輸出繁體中文報告（**務必先呈現最終交付成果，再放交叉審查比較**）：\n"
-                "1. **【🏆 最終完成交付成果】**：直接呈現已完成實作、修改與實測驗證的最終成果、執行指令與重點摘要（讓使用者第一眼就能看到乾淨的結果）。\n"
+                + "\n\n請嚴格依照以下順序輸出乾淨、人類易讀的繁體中文報告（**嚴禁輸出任何 `<tool_call>` 或工具 JSON，務必先呈現最終交付成果，再放交叉審查比較**）：\n"
+                "1. **【🏆 最終完成交付成果】**：直接針對使用者的問題，呈現最完整、結構清晰、可立即閱讀與使用的最終解答、設定建議、執行指令或實作成果摘要。\n"
                 "<!-- KHAVIS_REVIEW_SPLIT -->\n"
-                "2. **【🔍 多 Agent 交叉審查與互評摘要】**：比對各 Agent 的實作結果，指出各節點優缺點與補強細節。"
+                "2. **【🔍 多 Agent 交叉審查與互評摘要】**：簡要比對各 Agent 的輸出優缺點與整合細節。"
             )
 
             loop = asyncio.get_running_loop()
@@ -309,11 +343,11 @@ async def run_collaborative_workflow(
                 "khavis",
                 35,
                 str(shared_dir),
-                True,
+                False,
             )
             stage2_ms = int((time.perf_counter() - t_stage2) * 1000)
 
-            synth_text = re.sub(r"<tool_call>.*?(?:</?tool_call>|$)", "", str(synth_res.get("text") or ""), flags=re.S).strip()
+            synth_text = _strip_tool_calls(str(synth_res.get("text") or "")).strip()
             if synth_res.get("ok") and synth_text:
                 consensus_text = synth_text
                 consensus_source = (
