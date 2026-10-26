@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 _LOCK = threading.Lock()
-_MAX_LINE_CHARS = 2_000
+_MAX_LINE_CHARS = 12_000
 
 
 def history_path() -> Path:
