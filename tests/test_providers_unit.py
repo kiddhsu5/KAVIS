@@ -93,6 +93,18 @@ def _sdk_response(payload: dict[str, Any]) -> MagicMock:
     return mock
 
 
+def _plain_openai_client(client_getter: MagicMock) -> MagicMock:
+    """Use the ordinary SDK response path unless a test opts into headers."""
+    client_getter.return_value.chat.completions.with_raw_response = None
+    return client_getter.return_value
+
+
+def _plain_anthropic_client(client_getter: MagicMock) -> MagicMock:
+    """Use the ordinary Anthropic response path unless a test opts into headers."""
+    client_getter.return_value.messages.with_raw_response = None
+    return client_getter.return_value
+
+
 def _quota_ok(plugin: ProviderPlugin) -> None:
     quota = plugin.check_quota()
     assert isinstance(quota, dict)
@@ -117,7 +129,7 @@ class TestMiniMaxPlugin:
         assert p.name == "MiniMax-M3"
         assert p.provider_id == "MiniMax"
         assert p.api_key is None
-        assert p.model == "MiniMax-M3"
+        assert p.model == "MiniMax-M3.1-Flash"
         assert "中文" in p.capabilities
 
     def test_env_key_loaded(self, monkeypatch):
@@ -139,7 +151,7 @@ class TestMiniMaxPlugin:
         p = MiniMaxPlugin(api_key="key")
         fake = _sdk_response({"choices": [{"message": {"content": "pong", "role": "assistant"}}]})
         with patch.object(p, "_get_client") as gc:
-            gc.return_value.chat.completions.create.return_value = fake
+            _plain_openai_client(gc).chat.completions.create.return_value = fake
             out = p.chat(PING, max_tokens=5)
         assert "choices" in out and out["choices"][0]["message"]["content"] == "pong"
 
@@ -147,7 +159,7 @@ class TestMiniMaxPlugin:
         p = MiniMaxPlugin(api_key="key")
         fake = _sdk_response({})
         with patch.object(p, "_get_client") as gc:
-            gc.return_value.chat.completions.create.return_value = fake
+            _plain_openai_client(gc).chat.completions.create.return_value = fake
             out = p.chat(PING)
         assert out["choices"] == []
 
@@ -174,7 +186,7 @@ class TestMiniMaxPlugin:
         d = MiniMaxPlugin(api_key="x").describes()
         assert d["name"] == "MiniMax-M3"
         assert d["provider_id"] == "MiniMax"
-        assert d["model"] == "MiniMax-M3"
+        assert d["model"] == "MiniMax-M3.1-Flash"
 
 
 # ---------------------------------------------------------------------------
@@ -196,7 +208,7 @@ class TestGLMPlugin:
         p = GLMPlugin(api_key="x")
         fake = _sdk_response({"choices": [{"message": {"content": "ok", "role": "assistant"}}]})
         with patch.object(p, "_get_client") as gc:
-            gc.return_value.chat.completions.create.return_value = fake
+            _plain_openai_client(gc).chat.completions.create.return_value = fake
             out = p.chat(PING, max_tokens=5)
         assert out["choices"][0]["message"]["content"] == "ok"
 
@@ -204,7 +216,7 @@ class TestGLMPlugin:
         _quota_ok(GLMPlugin(api_key="x"))
 
     def test_list_models(self):
-        assert GLMPlugin(api_key="x").list_models() == ["glm-5.3"]
+        assert GLMPlugin(api_key="x").list_models() == ["glm-5.3", "glm-5.3-flashx", "codegeex-4"]
 
     def test_health(self):
         _health_ok(GLMPlugin(api_key="x"))
@@ -219,7 +231,7 @@ class TestGeminiPlugin:
         p = GeminiPlugin()
         assert p.name == "Google-Gemini"
         assert p.provider_id == "gemini"
-        assert p.model == "gemini-flash-latest"
+        assert p.model == "gemini-4-argon"
         assert "gemini-pro-latest" in p.list_models()
 
     def test_explicit_model(self):
@@ -256,7 +268,7 @@ class TestGeminiPlugin:
             out = p.chat(PING)
         assert out["choices"][0]["message"]["content"] == "pong"
         assert out["choices"][0]["message"]["role"] == "assistant"
-        assert out["model"] == "gemini-flash-latest"
+        assert out["model"] == "gemini-4-argon"
         assert out["usage"]["prompt_tokens"] == 3
         assert out["usage"]["completion_tokens"] == 2
 
@@ -398,7 +410,7 @@ class TestVolcanoPlugin:
         )
         fake = _sdk_response({"choices": [{"message": {"content": "ok", "role": "assistant"}}]})
         with patch.object(sp, "_get_client") as gc:
-            gc.return_value.chat.completions.create.return_value = fake
+            _plain_openai_client(gc).chat.completions.create.return_value = fake
             out = sp.chat(PING)
         assert out["choices"][0]["message"]["content"] == "ok"
 
@@ -406,7 +418,7 @@ class TestVolcanoPlugin:
         sp = VolcanoSubPool(pool_name="x", model="m", capabilities=[], api_key="x")
         fake = _sdk_response({})
         with patch.object(sp, "_get_client") as gc:
-            gc.return_value.chat.completions.create.return_value = fake
+            _plain_openai_client(gc).chat.completions.create.return_value = fake
             assert sp.chat(PING)["choices"] == []
 
     def test_sub_pool_check_quota(self):
@@ -446,7 +458,7 @@ class TestOpenRouterPlugin:
         p = OpenRouterPlugin(api_key="x")
         fake = _sdk_response({"choices": [{"message": {"content": "ok", "role": "assistant"}}]})
         with patch.object(p, "_get_client") as gc:
-            gc.return_value.chat.completions.create.return_value = fake
+            _plain_openai_client(gc).chat.completions.create.return_value = fake
             out = p.chat(PING)
         assert out["choices"][0]["message"]["content"] == "ok"
 
@@ -494,7 +506,7 @@ class TestOpenAIPlugin:
         p = OpenAIPlugin(api_key="x")
         fake = _sdk_response({"choices": [{"message": {"content": "ok", "role": "assistant"}}]})
         with patch.object(p, "_get_client") as gc:
-            gc.return_value.chat.completions.create.return_value = fake
+            _plain_openai_client(gc).chat.completions.create.return_value = fake
             out = p.chat(PING, max_tokens=5)
         assert out["choices"][0]["message"]["content"] == "ok"
 
@@ -502,7 +514,7 @@ class TestOpenAIPlugin:
         p = OpenAIPlugin(api_key="x")
         fake = _sdk_response({})
         with patch.object(p, "_get_client") as gc:
-            gc.return_value.chat.completions.create.return_value = fake
+            _plain_openai_client(gc).chat.completions.create.return_value = fake
             out = p.chat(PING)
         assert out["choices"] == []
 
@@ -582,7 +594,7 @@ class TestAnthropicPlugin:
     def test_chat_happy_path(self):
         p = AnthropicPlugin(api_key="x")
         with patch.object(p, "_get_client") as gc:
-            gc.return_value.messages.create.return_value = _anthropic_response()
+            _plain_anthropic_client(gc).messages.create.return_value = _anthropic_response()
             out = p.chat(PING, max_tokens=10)
         assert out["choices"][0]["message"]["content"] == "pong"
         assert out["choices"][0]["message"]["role"] == "assistant"
@@ -593,7 +605,7 @@ class TestAnthropicPlugin:
     def test_chat_splits_system_message(self):
         p = AnthropicPlugin(api_key="x")
         with patch.object(p, "_get_client") as gc:
-            gc.return_value.messages.create.return_value = _anthropic_response()
+            _plain_anthropic_client(gc).messages.create.return_value = _anthropic_response()
             p.chat(
                 [
                     {"role": "system", "content": "be brief"},
@@ -609,7 +621,7 @@ class TestAnthropicPlugin:
     def test_chat_concatenates_multiple_system_messages(self):
         p = AnthropicPlugin(api_key="x")
         with patch.object(p, "_get_client") as gc:
-            gc.return_value.messages.create.return_value = _anthropic_response()
+            _plain_anthropic_client(gc).messages.create.return_value = _anthropic_response()
             p.chat(
                 [
                     {"role": "system", "content": "first"},
@@ -1043,7 +1055,7 @@ class TestOpenAICompatFactory:
             pool_name="X", endpoint="https://e", model="m", env_key="NOPE", api_key="k"
         )
         with patch.object(p, "_get_client") as gc:
-            gc.return_value.chat.completions.create.return_value = _sdk_response(
+            _plain_openai_client(gc).chat.completions.create.return_value = _sdk_response(
                 {"choices": [{"message": {"content": "hi"}}], "model": "m"}
             )
             out = p.chat(PING)

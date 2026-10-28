@@ -162,8 +162,9 @@ class OpenAIChatPlugin(ProviderPlugin):
             _adapt_reasoning_kwargs(kwargs)
         raw_headers = None
         try:
-            if hasattr(client.chat.completions, "with_raw_response"):
-                raw = client.chat.completions.with_raw_response.create(model=model, messages=messages, **kwargs)
+            raw_response = getattr(client.chat.completions, "with_raw_response", None)
+            if raw_response is not None:
+                raw = raw_response.create(model=model, messages=messages, **kwargs)
                 raw_headers = getattr(raw, "headers", None)
                 response = raw.parse()
             else:
@@ -181,8 +182,9 @@ class OpenAIChatPlugin(ProviderPlugin):
             fixed = _retry_kwargs_for_error(exc, kwargs)
             if fixed is None:
                 raise
-            if hasattr(client.chat.completions, "with_raw_response"):
-                raw = client.chat.completions.with_raw_response.create(model=model, messages=messages, **fixed)
+            raw_response = getattr(client.chat.completions, "with_raw_response", None)
+            if raw_response is not None:
+                raw = raw_response.create(model=model, messages=messages, **fixed)
                 raw_headers = getattr(raw, "headers", None)
                 response = raw.parse()
             else:

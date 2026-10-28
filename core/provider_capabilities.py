@@ -366,11 +366,12 @@ def build_model_catalog(
         if requested_provider:
             active_ref = format_model_ref(requested_provider, model_id)
         else:
+            allowed = (agent_provider_envs or {}).get(agent_id)
             matching_refs = [
                 ref
                 for ref, item in catalog.items()
                 if item.get("model") == model_id
-                and (agent_id not in (agent_provider_envs or {}) or item.get("provider_env") in agent_provider_envs[agent_id])
+                and (allowed is None or item.get("provider_env") in allowed)
             ]
             if len(matching_refs) == 1:
                 active_ref = matching_refs[0]

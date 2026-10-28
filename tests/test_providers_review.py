@@ -52,6 +52,18 @@ def _sdk(payload: dict[str, Any]) -> MagicMock:
     return m
 
 
+def _plain_openai_client(client_getter: MagicMock) -> MagicMock:
+    """Use the ordinary SDK response path unless a test opts into headers."""
+    client_getter.return_value.chat.completions.with_raw_response = None
+    return client_getter.return_value
+
+
+def _plain_anthropic_client(client_getter: MagicMock) -> MagicMock:
+    """Use the ordinary Anthropic response path unless a test opts into headers."""
+    client_getter.return_value.messages.with_raw_response = None
+    return client_getter.return_value
+
+
 def _ok(content: Any = "ok", **msg: Any) -> MagicMock:
     return _sdk({"choices": [{"message": {"role": "assistant", "content": content, **msg}}]})
 
@@ -112,7 +124,7 @@ class TestOpenAIBase:
         p = GLMPlugin(api_key="k")
         call = {"id": "c1", "type": "function", "function": {"name": "f", "arguments": "{}"}}
         with patch.object(p, "_get_client") as gc:
-            gc.return_value.chat.completions.create.return_value = _ok(None, tool_calls=[call])
+            _plain_openai_client(gc).chat.completions.create.return_value = _ok(None, tool_calls=[call])
             out = p.chat(PING)
         assert out["choices"][0]["message"]["content"] == ""
         assert out["choices"][0]["message"]["tool_calls"] == [call]
@@ -120,7 +132,7 @@ class TestOpenAIBase:
     def test_empty_content_raises_for_failover(self):
         p = MiniMaxPlugin(api_key="k")
         with patch.object(p, "_get_client") as gc:
-            gc.return_value.chat.completions.create.return_value = _ok(None)
+            _plain_openai_client(gc).chat.completions.create.return_value = _ok(None)
             with pytest.raises(RuntimeError, match="empty response"):
                 p.chat(PING)
 
@@ -134,7 +146,7 @@ class TestOpenAIBase:
     def test_kwargs_model_none_uses_default(self):
         p = GLMPlugin(api_key="k")
         with patch.object(p, "_get_client") as gc:
-            gc.return_value.chat.completions.create.return_value = _ok()
+            _plain_openai_client(gc).chat.completions.create.return_value = _ok()
             p.chat(PING, model=None)
         assert gc.return_value.chat.completions.create.call_args.kwargs["model"] == "glm-5.3"
 
@@ -163,7 +175,7 @@ class TestReasoningParams:
     def test_reasoning_model_params_adapted_up_front(self):
         p = OpenAIPlugin(api_key="k")  # gpt-5-mini
         with patch.object(p, "_get_client") as gc:
-            create = gc.return_value.chat.completions.create
+            create = _plain_openai_client(gc).chat.completions.create
             create.return_value = _ok()
             p.chat(PING, max_tokens=5, temperature=0.2)
         assert create.call_count == 1
@@ -175,7 +187,7 @@ class TestReasoningParams:
     def test_non_reasoning_model_keeps_params(self):
         p = OpenAIPlugin(api_key="k", model="gpt-4o")
         with patch.object(p, "_get_client") as gc:
-            create = gc.return_value.chat.completions.create
+            create = _plain_openai_client(gc).chat.completions.create
             create.return_value = _ok()
             p.chat(PING, max_tokens=5, temperature=0.2)
         kw = create.call_args.kwargs
@@ -191,7 +203,7 @@ class TestReasoningParams:
             "with this model. Only the default (1) value is supported."
         )
         with patch.object(p, "_get_client") as gc:
-            create = gc.return_value.chat.completions.create
+            create = _plain_openai_client(gc).chat.completions.create
             create.side_effect = [err, _ok()]
             p.chat(PING, max_tokens=5, temperature=0.2)
         assert create.call_count == 2
@@ -202,7 +214,7 @@ class TestReasoningParams:
     def test_unrelated_error_is_raised(self):
         p = OpenAIPlugin(api_key="k", model="gpt-4o")
         with patch.object(p, "_get_client") as gc:
-            gc.return_value.chat.completions.create.side_effect = ValueError("boom")
+            _plain_openai_client(gc).chat.completions.create.side_effect = ValueError("boom")
             with pytest.raises(ValueError):
                 p.chat(PING, temperature=0.2)
 
@@ -348,7 +360,7 @@ class TestAnthropicFormat:
         p = AnthropicPlugin(api_key="k")
         resp = MagicMock(content=[], stop_reason="end_turn", model="m", usage=None)
         with patch.object(p, "_get_client") as gc:
-            gc.return_value.messages.create.return_value = resp
+            _plain_anthropic_client(gc).messages.create.return_value = resp
             with pytest.raises(RuntimeError, match="empty response"):
                 p.chat(PING)
 
@@ -357,7 +369,7 @@ class TestAnthropicFormat:
         block = MagicMock(spec=["type", "id", "name", "input"], type="tool_use")
         resp = MagicMock(content=[block], stop_reason="tool_use", model="m", usage=None)
         with patch.object(p, "_get_client") as gc:
-            gc.return_value.messages.create.return_value = resp
+            _plain_anthropic_client(gc).messages.create.return_value = resp
             out = p.chat(PING)
         assert out["choices"][0]["message"]["content"] == ""
 

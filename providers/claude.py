@@ -102,8 +102,9 @@ class AnthropicPlugin(ProviderPlugin):
 
         raw_headers = None
         try:
-            if hasattr(client.messages, "with_raw_response"):
-                raw = client.messages.with_raw_response.create(**create_kwargs)
+            raw_response = getattr(client.messages, "with_raw_response", None)
+            if raw_response is not None:
+                raw = raw_response.create(**create_kwargs)
                 raw_headers = getattr(raw, "headers", None)
                 response = raw.parse()
             else:
