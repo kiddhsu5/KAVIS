@@ -4,7 +4,7 @@
 # and never passed as process arguments.
 set -euo pipefail
 
-REMOTE_HOST="${REMOTE_HOST:-ubuntu@100.87.6.82}"
+REMOTE_HOST="${REMOTE_HOST:-ubuntu@43.156.115.110}"
 if [[ -z "${SSH_KEY:-}" ]]; then
   if [[ -r "/Users/kiddhsu/data/.work/kiddhsu.pem" ]]; then
     SSH_KEY="/Users/kiddhsu/data/.work/kiddhsu.pem"

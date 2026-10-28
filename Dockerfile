@@ -22,7 +22,7 @@ FROM python:3.12-slim AS runtime
 LABEL org.opencontainers.image.title="khavis" \
       org.opencontainers.image.description="A plugin-based router for multiple LLM providers" \
       org.opencontainers.image.licenses="Apache-2.0" \
-      org.opencontainers.image.source="https://github.com/kiddhsu5/K.H.A.V.I.S."
+      org.opencontainers.image.source="https://github.com/kiddhsu5/KHAVIS"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -31,8 +31,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
-    && groupadd --system --gid 1000 K.H.A.V.I.S. \
-    && useradd  --system --uid 1000 --gid K.H.A.V.I.S. --create-home K.H.A.V.I.S.
+    && groupadd --system --gid 1000 khavis \
+    && useradd  --system --uid 1000 --gid khavis --create-home khavis
 
 WORKDIR /app
 
@@ -45,7 +45,7 @@ COPY config/      ./config/
 
 RUN chmod +x ./scripts/start.sh && chown -R khavis:khavis /app
 
-USER K.H.A.V.I.S.
+USER khavis
 
 EXPOSE 8080
 
