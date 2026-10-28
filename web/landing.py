@@ -123,7 +123,7 @@ def render_landing_html(
              style="background:linear-gradient(135deg,#7C9BB5,#8FA894);color:#0B0D12">K</div>
         <div>
           <span class="font-extrabold tracking-tight text-base text-white">KHAVIS</span>
-          <span class="hidden sm:inline-block ml-2 text-[11px] font-mono px-2 py-0.5 rounded-full bg-white/5 text-slate-300 border border-white/10">v0.4.0 Open Core</span>
+          <span class="hidden sm:inline-block ml-2 text-[11px] font-mono px-2 py-0.5 rounded-full bg-white/5 text-slate-300 border border-white/10">v0.5.0 Open Core</span>
         </div>
       </a>
 

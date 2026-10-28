@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-10-28
+
+### Added
+
+- Provider-qualified model references and live provider capability discovery keep
+  model IDs and thinking options aligned with the connected provider.
+- Workbench attachments and dynamic thinking controls, including safe attachment
+  validation and shared-workspace storage.
+- A zero-quota, no-key demo that reproduces 429 handling, quota exhaustion,
+  webhook alerting, and local Ollama-style fallback without external services.
+
+### Changed
+
+- Claude Code and Codex routing now preserve provider identity through CLI and
+  HTTP-compatible fallback paths, including the JUAPI TokenRouter presets.
+- Long execution-history fields retain substantially more context while keeping
+  the existing safety bounds and dashboard rendering behavior.
+- Workbench C page fragments, model catalog labels, and public documentation now
+  use the current provider model IDs.
+
+### Fixed
+
+- Prevented stale model aliases and legacy page-slice boundaries from producing
+  misleading UI selections or unbalanced Workbench markup.
+- Preserved the executable mode of the Tencent Cloud agent setup helper.
+
+### Security
+
+- Release documentation and examples continue to use placeholders only; provider
+  keys, Manus keys, cookies, and private deployment credentials remain outside
+  the repository.
+
 ### Added
 - **`khavis chat "<prompt>"`** — send one prompt through the router without
   starting a daemon. Before this the only ways in were a Python script or
