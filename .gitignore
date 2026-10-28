@@ -65,6 +65,7 @@ docs/superpowers/
 blog/
 
 # Shared workspace & runtime outputs
+.work/
 workspace/
 outputs/
 config/custom_agents.json
