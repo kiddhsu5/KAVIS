@@ -44,7 +44,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from core.alerting import AlertManager  # noqa: E402
 from core.failover import call_with_failover  # noqa: E402
-from core.health import HealthPolicy  # noqa: E402
+from core.health import HealthPolicy, reset_tracker  # noqa: E402
 from core.quota_tracker import get_quota_tracker  # noqa: E402
 
 logging.basicConfig(
@@ -240,10 +240,7 @@ def run_e2e_stress_test(
     qt.clear()
 
     # Configure HealthTracker with quota respect
-    from core.health import get_tracker
-
-    tracker = get_tracker()
-    tracker.policy = HealthPolicy(respect_quota=True, failure_threshold=2)
+    reset_tracker(HealthPolicy(respect_quota=True, failure_threshold=2))
 
     # 2. Build Mock Pools
     # Cloud A fails after 2 calls with 429
