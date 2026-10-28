@@ -18,9 +18,20 @@ pools:
     model: "MiniMax-M3.1-Flash"
     models:
       - "MiniMax-M3.1-Flash"
-      - "MiniMax-M3.1"
       - "MiniMax-M3"
     env_key: "MINIMAX_API_KEY"
+
+  - name: "JUAPI-TokenRouter"
+    provider_id: "openai_compat"
+    # JUAPI exposes OpenAI-compatible /v1 endpoints; exact model access is
+    # account/token-group dependent and can be edited from /agents.
+    endpoint: "https://www.juapi.net/v1"
+    model: "kimi-k3.1-pro"
+    models:
+      - "kimi-k3.1-pro"
+      - "gemini-4-argon"
+    env_key: "JUAPI_API_KEY"
+    notes: "Claude Code uses the Anthropic root URL; Codex uses this /v1 URL."
 
   - name: "MiMo-Code"
     provider_id: "mimo"
@@ -46,7 +57,6 @@ pools:
     endpoint: "https://generativelanguage.googleapis.com"
     models:
       - "gemini-4-argon"
-      - "gemini-4"
       - "gemini-flash-latest"
       - "gemini-pro-latest"
     env_key: "GOOGLE_API_KEY"

@@ -28,6 +28,9 @@ class DispatchEnvelope(BaseModel):
     only: list[BackendName] | None = None  # None = fan out to all
     capability: str | None = None  # hint for K.H.A.V.I.S.'s CapabilityRouter
     workspace_dir: str | None = None  # shared project directory or isolated worktree path
+    thinking_mode: str | None = None  # provider-reported effort/reasoning mode; None = auto
+    thinking_parameter: str | None = None  # provider metadata field used by HTTP fallbacks
+    attachments: list[dict[str, str]] = Field(default_factory=list)
 
 
 class BackendResult(BaseModel):

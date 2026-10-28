@@ -23,6 +23,8 @@ import shutil
 import time
 from typing import Any
 
+from core.provider_capabilities import parse_model_ref
+
 from ..models import BackendResult, DispatchEnvelope
 from .base import Backend, HealthResult
 
@@ -70,10 +72,11 @@ class OpencodeBackend(Backend):
             return HealthResult(False, repr(exc))
 
     async def run(self, envelope: DispatchEnvelope) -> BackendResult:
+        _, model_id = parse_model_ref(self._model)
         exe = shutil.which(self._binary) or self._binary
         args: list[str] = [exe, "run"]
-        if self._model:
-            args += ["--model", self._model]
+        if model_id:
+            args += ["--model", model_id]
         args += ["--", envelope.prompt]
 
         env = {
@@ -81,6 +84,9 @@ class OpencodeBackend(Backend):
             "CI": "1",
             "NONINTERACTIVE": "1",
         }
+        if envelope.thinking_mode and envelope.thinking_mode.lower() != "auto":
+            env["KHAVIS_THINKING_MODE"] = envelope.thinking_mode
+            env["OPENCODE_THINKING_MODE"] = envelope.thinking_mode
         api_key = os.environ.get("ZHIPUAI_API_KEY") or os.environ.get("GLM_API_KEY")
         if api_key:
             env["ZHIPUAI_API_KEY"] = api_key
@@ -123,7 +129,10 @@ class OpencodeBackend(Backend):
         if rc != 0 or err_detail:
             err_msg = err_detail or stderr or stdout or f"process exited with {rc}"
             if run_cwd or (rc != 0 and not err_detail):
-                from ._http_fallback import call_upstream_llm_fallback, has_any_upstream_key  # noqa: PLC0415
+                from ._http_fallback import (  # noqa: PLC0415
+                    call_upstream_llm_fallback,
+                    has_any_upstream_key,
+                )
 
                 if has_any_upstream_key():
                     loop = asyncio.get_running_loop()
@@ -135,6 +144,9 @@ class OpencodeBackend(Backend):
                         "opencode",
                         30,
                         run_cwd,
+                        True,
+                        envelope.thinking_mode,
+                        envelope.thinking_parameter,
                     )
                     if fb.get("ok"):
                         return BackendResult(

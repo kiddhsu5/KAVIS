@@ -1,7 +1,7 @@
 """K.H.A.V.I.S. Unified Graphical Web Workbench (全域圖形化智慧指揮工作台).
 
 Provides a graphical, interactive, single-page command console to:
-1. Visually orchestrate 5 Tencent Cloud CLI Agents (Claude Code [MiniMax-M3.1-Flash], Codex [GLM 5.3 FlashX], Antigravity [AGY], MiniMax Code [MiniMax-M3.1], opencode [GLM 5.3 FlashX]) + K.H.A.V.I.S. Multi-Agent Team via an interactive SVG Topology Canvas.
+1. Visually orchestrate 5 Tencent Cloud CLI Agents (Claude Code [gemini-4-argon], Codex [kimi-k3.1-pro], Antigravity [AGY], MiniMax Code [MiniMax-M3.1-Flash], opencode [GLM 5.3 FlashX]) + K.H.A.V.I.S. Multi-Agent Team via an interactive SVG Topology Canvas.
 2. Monitor real-time quotas, 429 breakers & dynamic reset timers with SVG radial gauges.
 3. Track execution progress via a graphical 7-Role LangGraph DAG visualizer and latency bar charts.
 4. Safely browse, preview, copy, and download whitelisted deliverables and artifacts.
@@ -11,10 +11,12 @@ Licensed under the Apache License, Version 2.0.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
 import time
+from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
@@ -23,27 +25,25 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 AGENT_MODEL_SPECS: dict[str, dict[str, Any]] = {
     "claude": {
         "env": "CLAUDE_DISPATCH_MODEL",
-        "default": "MiniMax-M3.1-Flash",
+        "default": "gemini-4-argon",
         "label": "Claude Code",
         "options": [
+            "gemini-4-argon",
             "MiniMax-M3.1-Flash",
-            "MiniMax-M3.1",
             "glm-5.3-flashx",
-            "glm-5.3",
             "claude-sonnet-5",
             "claude-haiku-4-5-20251001",
         ],
     },
     "codex": {
         "env": "CODEX_DISPATCH_MODEL",
-        "default": "glm-5.3-flashx",
+        "default": "kimi-k3.1-pro",
         "label": "OpenAI Codex",
         "options": [
+            "kimi-k3.1-pro",
             "glm-5.3-flashx",
-            "glm-5.3",
             "codegeex-4",
             "MiniMax-M3.1-Flash",
-            "MiniMax-M3.1",
             "gpt-5-mini",
             "gpt-5-codex",
         ],
@@ -56,16 +56,13 @@ AGENT_MODEL_SPECS: dict[str, dict[str, Any]] = {
             "antigravity-pro",
             "antigravity-flash",
             "antigravity-ultra",
-            "MiniMax-M3.1-Flash",
-            "glm-5.3-flashx",
         ],
     },
     "minimax": {
         "env": "MINIMAX_DISPATCH_MODEL",
-        "default": "MiniMax-M3.1",
+        "default": "MiniMax-M3.1-Flash",
         "label": "MiniMax Code",
         "options": [
-            "MiniMax-M3.1",
             "MiniMax-M3.1-Flash",
             "MiniMax-Text-01",
         ],
@@ -84,6 +81,54 @@ AGENT_MODEL_SPECS: dict[str, dict[str, Any]] = {
 }
 
 _MODEL_NAME_RE = re.compile(r"^[A-Za-z0-9._:\-/]{1,80}$")
+_ENV_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{2,63}$")
+_CATALOG_PATH = PROJECT_ROOT / "config" / "workbench_catalog.json"
+_MODEL_ALIASES = {
+    "gemini4": "gemini-4-argon",
+    "gemini-4": "gemini-4-argon",
+    "MiniMax-M3.1": "MiniMax-M3.1-Flash",
+}
+_AGENT_PROVIDER_ENVS: dict[str, set[str]] = {
+    "claude": {"JUAPI_API_KEY", "MINIMAX_API_KEY", "ZHIPUAI_API_KEY", "ANTHROPIC_API_KEY"},
+    "codex": {"JUAPI_API_KEY", "MINIMAX_API_KEY", "ZHIPUAI_API_KEY", "OPENAI_API_KEY"},
+    "antigravity": {"ANTIGRAVITY_API_KEY"},
+    "minimax": {"MINIMAX_API_KEY"},
+    "opencode": {"ZHIPUAI_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY"},
+}
+
+
+def _canonical_model_setting(value: str, default: str) -> str:
+    from core.provider_capabilities import format_model_ref, parse_model_ref  # noqa: PLC0415
+
+    provider_env, model_id = parse_model_ref(value or default)
+    if provider_env:
+        return format_model_ref(provider_env, model_id)
+    return _MODEL_ALIASES.get(model_id, model_id or default)
+
+
+def _load_workbench_catalog() -> dict[str, Any]:
+    """Load persisted model option overrides and custom providers from config/workbench_catalog.json."""
+    if not _CATALOG_PATH.is_file():
+        return {"model_options": {}, "custom_providers": [], "deleted_providers": []}
+    try:
+        data = json.loads(_CATALOG_PATH.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            return {"model_options": {}, "custom_providers": [], "deleted_providers": []}
+        return {
+            "model_options": data.get("model_options") if isinstance(data.get("model_options"), dict) else {},
+            "custom_providers": data.get("custom_providers") if isinstance(data.get("custom_providers"), list) else [],
+            "deleted_providers": data.get("deleted_providers") if isinstance(data.get("deleted_providers"), list) else [],
+        }
+    except Exception:  # noqa: BLE001
+        return {"model_options": {}, "custom_providers": [], "deleted_providers": []}
+
+
+def _save_workbench_catalog(catalog: dict[str, Any]) -> None:
+    try:
+        _CATALOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        _CATALOG_PATH.write_text(json.dumps(catalog, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    except OSError:
+        pass
 
 
 def _read_env_file_vars(env_path: Path) -> dict[str, str]:
@@ -117,6 +162,9 @@ def get_workbench_models_config() -> dict[str, Any]:
     from core.custom_agents import load_custom_agents  # noqa: PLC0415
 
     env_file_vars = _read_env_file_vars(PROJECT_ROOT / ".env")
+    catalog = _load_workbench_catalog()
+    custom_opts_map: dict[str, list[str]] = catalog.get("model_options", {})
+
     models: dict[str, str] = {}
     defaults: dict[str, str] = {}
     options: dict[str, list[str]] = {}
@@ -124,15 +172,22 @@ def get_workbench_models_config() -> dict[str, Any]:
     for agent_id, spec in AGENT_MODEL_SPECS.items():
         env_key = spec["env"]
         default_val = spec["default"]
-        current = (
+        current = _canonical_model_setting(
+            (
             os.environ.get(env_key, "").strip()
             or env_file_vars.get(env_key, "").strip()
             or default_val
+            ),
+            default_val,
         )
         os.environ[env_key] = current
         models[agent_id] = current
         defaults[agent_id] = default_val
-        opts = list(spec["options"])
+        saved_opts = custom_opts_map.get(agent_id)
+        if isinstance(saved_opts, list) and len(saved_opts) > 0:
+            opts = [str(x).strip() for x in saved_opts if str(x).strip()]
+        else:
+            opts = list(spec["options"])
         if current not in opts:
             opts.insert(0, current)
         options[agent_id] = opts
@@ -141,7 +196,7 @@ def get_workbench_models_config() -> dict[str, Any]:
         cid = str(ca.get("id") or "")
         if not cid:
             continue
-        cmodel = str(ca.get("model") or "MiniMax-M3.1-Flash")
+        cmodel = _canonical_model_setting(str(ca.get("model") or ""), "MiniMax-M3.1-Flash")
         models[cid] = cmodel
         defaults[cid] = str(ca.get("default_model") or cmodel)
         copts = list(ca.get("options") or [cmodel])
@@ -185,27 +240,139 @@ def _persist_env_updates(updates_by_env: dict[str, str]) -> None:
         if k not in seen_keys:
             new_lines.append(f"{k}={v}")
 
-    try:
+    with suppress(OSError):
         env_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
-    except OSError:
-        pass
 
 
 def update_workbench_models_config(payload: dict[str, Any]) -> dict[str, Any]:
-    """Update active Agent models in os.environ / custom_agents.json and persist to '.env'."""
+    """Update active Agent models or add/delete/rename model options in os.environ / catalog / .env."""
     from core.custom_agents import load_custom_agents, save_custom_agents  # noqa: PLC0415
 
+    action = str(payload.get("action") or "").strip().lower()
     reset = bool(payload.get("reset"))
-    incoming = payload.get("models") if isinstance(payload.get("models"), dict) else payload
-
+    catalog = _load_workbench_catalog()
+    model_options_map: dict[str, list[str]] = dict(catalog.get("model_options") or {})
     updates_by_env: dict[str, str] = {}
+
     if reset:
         for spec in AGENT_MODEL_SPECS.values():
             env_key = spec["env"]
             default_val = spec["default"]
             os.environ[env_key] = default_val
             updates_by_env[env_key] = default_val
-    elif isinstance(incoming, dict):
+        catalog["model_options"] = {}
+        _save_workbench_catalog(catalog)
+        _persist_env_updates(updates_by_env)
+        return get_workbench_models_config()
+
+    if action in ("add_model", "delete_model", "rename_model"):
+        target_agent = str(payload.get("agent_id") or payload.get("agent") or "all").strip()
+        cur_cfg = get_workbench_models_config()
+        cur_options = cur_cfg["options"]
+        cur_models = cur_cfg["models"]
+        custom_list = load_custom_agents()
+        custom_changed = False
+
+        if action == "add_model":
+            model_name = str(payload.get("model") or "").strip()
+            if not model_name or not _MODEL_NAME_RE.match(model_name):
+                raise ValueError(f"Invalid model name: {model_name!r}")
+            set_active = bool(payload.get("set_active", True))
+            target_ids = list(AGENT_MODEL_SPECS.keys()) if target_agent == "all" else [target_agent]
+            for aid in target_ids:
+                if aid in AGENT_MODEL_SPECS:
+                    opts = list(cur_options.get(aid) or AGENT_MODEL_SPECS[aid]["options"])
+                    if model_name not in opts:
+                        opts.insert(0, model_name)
+                    model_options_map[aid] = opts
+                    if set_active and target_agent != "all":
+                        env_key = AGENT_MODEL_SPECS[aid]["env"]
+                        os.environ[env_key] = model_name
+                        updates_by_env[env_key] = model_name
+                else:
+                    for ca in custom_list:
+                        if str(ca.get("id") or "") == aid:
+                            opts = list(ca.get("options") or [])
+                            if model_name not in opts:
+                                opts.insert(0, model_name)
+                            ca["options"] = opts
+                            if set_active:
+                                ca["model"] = model_name
+                            custom_changed = True
+
+        elif action == "delete_model":
+            model_name = str(payload.get("model") or "").strip()
+            if not model_name:
+                raise ValueError("Model name is required for delete_model")
+            target_ids = list(AGENT_MODEL_SPECS.keys()) if target_agent == "all" else [target_agent]
+            for aid in target_ids:
+                if aid in AGENT_MODEL_SPECS:
+                    opts = [m for m in list(cur_options.get(aid) or AGENT_MODEL_SPECS[aid]["options"]) if m != model_name]
+                    if not opts:
+                        opts = [AGENT_MODEL_SPECS[aid]["default"]]
+                    model_options_map[aid] = opts
+                    if cur_models.get(aid) == model_name:
+                        new_active = opts[0]
+                        env_key = AGENT_MODEL_SPECS[aid]["env"]
+                        os.environ[env_key] = new_active
+                        updates_by_env[env_key] = new_active
+                else:
+                    for ca in custom_list:
+                        if str(ca.get("id") or "") == aid:
+                            opts = [m for m in list(ca.get("options") or []) if m != model_name]
+                            if not opts:
+                                opts = [str(ca.get("default_model") or "MiniMax-M3.1-Flash")]
+                            ca["options"] = opts
+                            if ca.get("model") == model_name:
+                                ca["model"] = opts[0]
+                            custom_changed = True
+
+        elif action == "rename_model":
+            old_model = str(payload.get("old_model") or "").strip()
+            new_model = str(payload.get("new_model") or "").strip()
+            if not old_model or not new_model or not _MODEL_NAME_RE.match(new_model):
+                raise ValueError(f"Invalid model rename: {old_model!r} -> {new_model!r}")
+            target_ids = list(AGENT_MODEL_SPECS.keys()) if target_agent == "all" else [target_agent]
+            for aid in target_ids:
+                if aid in AGENT_MODEL_SPECS:
+                    opts = [new_model if m == old_model else m for m in list(cur_options.get(aid) or AGENT_MODEL_SPECS[aid]["options"])]
+                    if new_model not in opts:
+                        opts.insert(0, new_model)
+                    # deduplicate preserving order
+                    seen_m: set[str] = set()
+                    dedup_opts: list[str] = []
+                    for m in opts:
+                        if m not in seen_m:
+                            seen_m.add(m)
+                            dedup_opts.append(m)
+                    model_options_map[aid] = dedup_opts
+                    if cur_models.get(aid) == old_model or bool(payload.get("set_active", True)):
+                        env_key = AGENT_MODEL_SPECS[aid]["env"]
+                        os.environ[env_key] = new_model
+                        updates_by_env[env_key] = new_model
+                else:
+                    for ca in custom_list:
+                        if str(ca.get("id") or "") == aid:
+                            opts = [new_model if m == old_model else m for m in list(ca.get("options") or [])]
+                            if new_model not in opts:
+                                opts.insert(0, new_model)
+                            ca["options"] = opts
+                            if ca.get("model") == old_model or bool(payload.get("set_active", True)):
+                                ca["model"] = new_model
+                            custom_changed = True
+
+        catalog["model_options"] = model_options_map
+        _save_workbench_catalog(catalog)
+        if custom_changed:
+            save_custom_agents(custom_list)
+        _persist_env_updates(updates_by_env)
+        return get_workbench_models_config()
+
+    incoming = payload.get("models") if isinstance(payload.get("models"), dict) else payload
+    if isinstance(incoming, dict):
+        cur_cfg = get_workbench_models_config()
+        cur_options = cur_cfg["options"]
+        catalog_changed = False
         for agent_id, spec in AGENT_MODEL_SPECS.items():
             if agent_id not in incoming:
                 continue
@@ -217,6 +384,15 @@ def update_workbench_models_config(payload: dict[str, Any]) -> dict[str, Any]:
             env_key = spec["env"]
             os.environ[env_key] = raw_val
             updates_by_env[env_key] = raw_val
+            opts = list(cur_options.get(agent_id) or spec["options"])
+            if raw_val not in opts:
+                opts.insert(0, raw_val)
+                model_options_map[agent_id] = opts
+                catalog_changed = True
+
+        if catalog_changed:
+            catalog["model_options"] = model_options_map
+            _save_workbench_catalog(catalog)
 
         custom_list = load_custom_agents()
         custom_changed = False
@@ -240,11 +416,21 @@ def update_workbench_models_config(payload: dict[str, Any]) -> dict[str, Any]:
 
 BYOK_PROVIDER_SPECS = [
     {
+        "env": "JUAPI_API_KEY",
+        "label": "JUAPI TokenRouter API Key",
+        "agents": "Claude Code (gemini-4-argon) / Codex (kimi-k3.1-pro)",
+        "base_url_env": "JUAPI_BASE_URL",
+        "default_base_url": "https://www.juapi.net/v1",
+        "models": ["gemini-4-argon", "kimi-k3.1-pro"],
+        "builtin": True,
+    },
+    {
         "env": "MINIMAX_API_KEY",
         "label": "MiniMax Token Plan API Key",
-        "agents": "Claude Code (預設 MiniMax-M3.1-Flash) / MiniMax Code",
+        "agents": "Claude Code / MiniMax Code",
         "base_url_env": "ANTHROPIC_BASE_URL",
         "default_base_url": "https://api.minimax.cn/anthropic",
+        "builtin": True,
     },
     {
         "env": "ZHIPUAI_API_KEY",
@@ -252,13 +438,15 @@ BYOK_PROVIDER_SPECS = [
         "agents": "OpenAI Codex (預設 glm-5.3-flashx) / OpenCode (opencode)",
         "base_url_env": "OPENAI_BASE_URL",
         "default_base_url": "https://open.bigmodel.cn/api/coding/paas/v4",
+        "builtin": True,
     },
     {
         "env": "OPENAI_API_KEY",
         "label": "OpenAI GPT GO Platform API Key",
         "agents": "K.H.A.V.I.S. Planner / Judge / GPT-5-Codex",
-        "base_url_env": "",
+        "base_url_env": "OPENAI_API_BASE",
         "default_base_url": "https://api.openai.com/v1",
+        "builtin": True,
     },
     {
         "env": "ANTIGRAVITY_API_KEY",
@@ -266,6 +454,7 @@ BYOK_PROVIDER_SPECS = [
         "agents": "Antigravity CLI (agy / antigravity-pro)",
         "base_url_env": "",
         "default_base_url": "https://generativelanguage.googleapis.com",
+        "builtin": True,
     },
     {
         "env": "TELEGRAM_BOT_TOKEN",
@@ -273,8 +462,47 @@ BYOK_PROVIDER_SPECS = [
         "agents": "Telegram 遠端雙向派工通知",
         "base_url_env": "",
         "default_base_url": "",
+        "builtin": True,
     },
 ]
+
+
+def _get_all_provider_specs() -> list[dict[str, Any]]:
+    catalog = _load_workbench_catalog()
+    deleted = set(str(x) for x in (catalog.get("deleted_providers") or []))
+    specs: list[dict[str, Any]] = []
+    seen_envs: set[str] = set()
+    for s in BYOK_PROVIDER_SPECS:
+        if s["env"] in deleted:
+            continue
+        specs.append({**s, "custom": False})
+        seen_envs.add(s["env"])
+    for cp in catalog.get("custom_providers") or []:
+        if not isinstance(cp, dict):
+            continue
+        env_k = str(cp.get("env") or "").strip()
+        if not env_k or env_k in deleted:
+            continue
+        if env_k in seen_envs:
+            # Override built-in metadata if customized
+            specs = [
+                {**s, **cp, "env": env_k} if s["env"] == env_k else s
+                for s in specs
+            ]
+        else:
+            specs.append(
+                {
+                    "env": env_k,
+                    "label": str(cp.get("label") or env_k),
+                    "agents": str(cp.get("agents") or "通用 / 自訂服務商"),
+                    "base_url_env": str(cp.get("base_url_env") or f"{env_k.replace('_API_KEY', '')}_BASE_URL"),
+                    "default_base_url": str(cp.get("default_base_url") or cp.get("base_url") or ""),
+                    "models": list(cp.get("models") or []),
+                    "custom": True,
+                }
+            )
+            seen_envs.add(env_k)
+    return specs
 
 
 def _mask_secret(val: str) -> str:
@@ -292,13 +520,20 @@ def get_setup_wizard_status() -> dict[str, Any]:
 
     env_vars = _read_env_file_vars(PROJECT_ROOT / ".env")
     providers: list[dict[str, Any]] = []
-    for spec in BYOK_PROVIDER_SPECS:
+    for spec in _get_all_provider_specs():
         k = spec["env"]
         raw_val = os.environ.get(k, "").strip() or env_vars.get(k, "").strip()
         if not raw_val and k == "ANTIGRAVITY_API_KEY":
             raw_val = os.environ.get("GOOGLE_API_KEY", "").strip() or env_vars.get("GOOGLE_API_KEY", "").strip()
         if not raw_val and k == "ZHIPUAI_API_KEY":
             raw_val = os.environ.get("GLM_API_KEY", "").strip() or env_vars.get("GLM_API_KEY", "").strip()
+
+        base_url_env = str(spec.get("base_url_env") or "").strip()
+        active_base_url = (
+            (os.environ.get(base_url_env, "").strip() or env_vars.get(base_url_env, "").strip())
+            if base_url_env
+            else ""
+        ) or str(spec.get("default_base_url") or "")
 
         providers.append(
             {
@@ -307,7 +542,10 @@ def get_setup_wizard_status() -> dict[str, Any]:
                 "agents": spec["agents"],
                 "configured": bool(raw_val),
                 "masked": _mask_secret(raw_val) if raw_val else "未設定 (點此輸入)",
-                "default_base_url": spec["default_base_url"],
+                "base_url_env": base_url_env,
+                "default_base_url": active_base_url,
+                "models": list(spec.get("models") or []),
+                "custom": bool(spec.get("custom", False)),
             }
         )
 
@@ -315,21 +553,18 @@ def get_setup_wizard_status() -> dict[str, Any]:
     models_cfg = get_workbench_models_config()
     env_template_lines = [
         "# K.H.A.V.I.S. 快速部署與 BYOK 環境變數配置 (.env)",
-        f"CLAUDE_DISPATCH_MODEL={models_cfg['models'].get('claude', 'MiniMax-M3.1-Flash')}",
-        f"CODEX_DISPATCH_MODEL={models_cfg['models'].get('codex', 'glm-5.3-flashx')}",
+        f"CLAUDE_DISPATCH_MODEL={models_cfg['models'].get('claude', 'gemini-4-argon')}",
+        f"CODEX_DISPATCH_MODEL={models_cfg['models'].get('codex', 'kimi-k3.1-pro')}",
         f"ANTIGRAVITY_DISPATCH_MODEL={models_cfg['models'].get('antigravity', 'antigravity-pro')}",
-        f"MINIMAX_DISPATCH_MODEL={models_cfg['models'].get('minimax', 'MiniMax-M3.1')}",
+        f"MINIMAX_DISPATCH_MODEL={models_cfg['models'].get('minimax', 'MiniMax-M3.1-Flash')}",
         f"OPENCODE_DISPATCH_MODEL={models_cfg['models'].get('opencode', 'glm-5.3-flashx')}",
         f"KHAVIS_ACTIVE_PROJECT={ws['active_project']}",
         f"KHAVIS_ISOLATION_MODE={ws['isolation_mode']}",
         "",
         "# 填入您的訂閱方案金鑰 (BYOK):",
-        "MINIMAX_API_KEY=your_minimax_token_plan_key",
-        "ZHIPUAI_API_KEY=your_glm_coding_plan_key",
-        "OPENAI_API_KEY=your_openai_api_key",
-        "ANTIGRAVITY_API_KEY=your_antigravity_key",
-        "TELEGRAM_BOT_TOKEN=your_telegram_bot_token",
     ]
+    for p in providers:
+        env_template_lines.append(f"{p['env']}=your_{p['env'].lower()}")
     return {
         "ok": True,
         "providers": providers,
@@ -340,6 +575,8 @@ def get_setup_wizard_status() -> dict[str, Any]:
             "isolation_mode": ws["isolation_mode"],
         },
         "models": models_cfg["models"],
+        "model_options": models_cfg["options"],
+        "model_defaults": models_cfg["defaults"],
         "quick_commands": {
             "local_wizard": "bash scripts/quick_setup_wizard.sh",
             "agent_wrappers": "sudo bash scripts/setup_tencent_agents.sh",
@@ -354,18 +591,165 @@ def get_setup_wizard_status() -> dict[str, Any]:
     }
 
 
-def update_setup_wizard_config(payload: dict[str, Any]) -> dict[str, Any]:
-    """Save non-empty BYOK keys or workspace defaults from the Setup Wizard into os.environ & .env."""
-    allowed_env_keys = {spec["env"] for spec in BYOK_PROVIDER_SPECS} | {
-        "KHAVIS_ACTIVE_PROJECT",
-        "KHAVIS_ISOLATION_MODE",
-        "OLLAMA_BASE_URL",
+def get_workbench_capabilities() -> dict[str, Any]:
+    """Discover model IDs and thinking modes from connected provider catalogues."""
+    from core.provider_capabilities import (  # noqa: PLC0415
+        build_agent_capabilities,
+        build_model_catalog,
+        discover_provider_capabilities,
+    )
+
+    env_values = _read_env_file_vars(PROJECT_ROOT / ".env")
+    provider_results = discover_provider_capabilities(_get_all_provider_specs(), env_values)
+    models_cfg = get_workbench_models_config()
+    agents = build_agent_capabilities(models_cfg["models"], provider_results)
+    model_catalog = build_model_catalog(
+        models_cfg["models"],
+        provider_results,
+        models_cfg["options"],
+        _AGENT_PROVIDER_ENVS,
+    )
+    for agent_id, capability in agents.items():
+        capability["model_ref"] = model_catalog["active_model_refs"].get(agent_id, capability.get("model_ref", ""))
+    return {
+        "ok": True,
+        "agents": agents,
+        "providers": provider_results,
+        "model_options": model_catalog["options"],
+        "model_catalog": model_catalog["catalog"],
+        "active_model_refs": model_catalog["active_model_refs"],
     }
-    incoming = payload.get("keys") if isinstance(payload.get("keys"), dict) else payload
+
+
+def update_setup_wizard_config(payload: dict[str, Any]) -> dict[str, Any]:
+    """Save BYOK keys, add/edit/delete providers, or update workspace defaults in os.environ, catalog & .env."""
+    action = str(payload.get("action") or "").strip().lower()
+    catalog = _load_workbench_catalog()
     updates: dict[str, str] = {}
+
+    if action in ("add_provider", "upsert_provider"):
+        label = str(payload.get("label") or payload.get("name") or "").strip()
+        raw_env = str(payload.get("env") or "").strip().upper()
+        if not raw_env and label:
+            slug = re.sub(r"[^A-Za-z0-9]+", "_", label).strip("_").upper() or "CUSTOM"
+            raw_env = f"{slug}_API_KEY" if not slug.endswith("_KEY") and not slug.endswith("_TOKEN") else slug
+        if not raw_env or not _ENV_KEY_RE.match(raw_env):
+            raise ValueError(f"Invalid provider env key: {raw_env!r}")
+        if not label:
+            label = raw_env
+
+        base_url = str(payload.get("base_url") or payload.get("default_base_url") or "").strip()
+        base_url_env = str(payload.get("base_url_env") or f"{raw_env.replace('_API_KEY', '')}_BASE_URL").strip().upper()
+        agents_desc = str(payload.get("agents") or "所有 CLI / HTTP Agent 節點").strip()
+        api_key_val = str(payload.get("api_key") or "").strip()
+
+        raw_models = payload.get("models")
+        if isinstance(raw_models, str):
+            provider_models = [m.strip() for m in raw_models.split(",") if m.strip() and _MODEL_NAME_RE.match(m.strip())]
+        elif isinstance(raw_models, list):
+            provider_models = [str(m).strip() for m in raw_models if str(m).strip() and _MODEL_NAME_RE.match(str(m).strip())]
+        else:
+            provider_models = []
+
+        custom_providers: list[dict[str, Any]] = [
+            cp for cp in (catalog.get("custom_providers") or [])
+            if isinstance(cp, dict) and str(cp.get("env") or "") != raw_env
+        ]
+        custom_providers.append(
+            {
+                "env": raw_env,
+                "label": label,
+                "agents": agents_desc,
+                "base_url_env": base_url_env,
+                "default_base_url": base_url,
+                "models": provider_models,
+                "custom": True,
+            }
+        )
+        catalog["custom_providers"] = custom_providers
+        deleted_set = [x for x in (catalog.get("deleted_providers") or []) if x != raw_env]
+        catalog["deleted_providers"] = deleted_set
+
+        # If provider models were specified, automatically add them into Agent model option lists!
+        if provider_models:
+            target_agent = str(payload.get("target_agent") or "all").strip()
+            cur_opts = get_workbench_models_config()["options"]
+            model_options_map = dict(catalog.get("model_options") or {})
+            t_ids = list(AGENT_MODEL_SPECS.keys()) if target_agent == "all" else [target_agent]
+            for aid in t_ids:
+                if aid in AGENT_MODEL_SPECS:
+                    opts = list(model_options_map.get(aid) or cur_opts.get(aid) or AGENT_MODEL_SPECS[aid]["options"])
+                    for pm in reversed(provider_models):
+                        if pm not in opts:
+                            opts.insert(0, pm)
+                    model_options_map[aid] = opts
+            catalog["model_options"] = model_options_map
+
+        if raw_env == "JUAPI_API_KEY" and provider_models:
+            # Keep provider selection explicit for future JUAPI model IDs;
+            # backends use this list instead of guessing from arbitrary names.
+            juapi_models = ",".join(provider_models)
+            os.environ["JUAPI_MODELS"] = juapi_models
+            updates["JUAPI_MODELS"] = juapi_models
+
+        _save_workbench_catalog(catalog)
+
+        if api_key_val and "••••" not in api_key_val and "\n" not in api_key_val:
+            os.environ[raw_env] = api_key_val
+            updates[raw_env] = api_key_val
+        if base_url and base_url_env and _ENV_KEY_RE.match(base_url_env) and "\n" not in base_url:
+            os.environ[base_url_env] = base_url
+            updates[base_url_env] = base_url
+
+        _persist_env_updates(updates)
+        return get_setup_wizard_status()
+
+    if action in ("delete_provider", "clear_provider"):
+        env_key = str(payload.get("env") or "").strip()
+        if env_key:
+            os.environ.pop(env_key, None)
+            updates[env_key] = ""
+            if action == "delete_provider":
+                # 刪除自訂服務商時，一併清除它的 Base URL 環境變數，避免 .env 殘留
+                for cp in (catalog.get("custom_providers") or []):
+                    if isinstance(cp, dict) and str(cp.get("env") or "") == env_key:
+                        stale_url_env = str(cp.get("base_url_env") or "").strip()
+                        if stale_url_env and _ENV_KEY_RE.match(stale_url_env):
+                            os.environ.pop(stale_url_env, None)
+                            updates[stale_url_env] = ""
+                custom_providers = [
+                    cp for cp in (catalog.get("custom_providers") or [])
+                    if isinstance(cp, dict) and str(cp.get("env") or "") != env_key
+                ]
+                catalog["custom_providers"] = custom_providers
+                if any(s["env"] == env_key for s in BYOK_PROVIDER_SPECS) and bool(payload.get("hide_builtin", False)):
+                    del_list = list(catalog.get("deleted_providers") or [])
+                    if env_key not in del_list:
+                        del_list.append(env_key)
+                    catalog["deleted_providers"] = del_list
+                _save_workbench_catalog(catalog)
+            _persist_env_updates(updates)
+        return get_setup_wizard_status()
+
+    if action == "restore_providers":
+        catalog["deleted_providers"] = []
+        _save_workbench_catalog(catalog)
+        return get_setup_wizard_status()
+
+    all_specs = _get_all_provider_specs()
+    allowed_env_keys = (
+        {spec["env"] for spec in all_specs}
+        | {str(spec.get("base_url_env") or "") for spec in all_specs if spec.get("base_url_env")}
+        | {
+            "KHAVIS_ACTIVE_PROJECT",
+            "KHAVIS_ISOLATION_MODE",
+            "OLLAMA_BASE_URL",
+        }
+    )
+    incoming = payload.get("keys") if isinstance(payload.get("keys"), dict) else payload
     if isinstance(incoming, dict):
         for k, v in incoming.items():
-            if k not in allowed_env_keys:
+            if k not in allowed_env_keys and not _ENV_KEY_RE.match(str(k)):
                 continue
             val = str(v or "").strip()
             if not val or "••••" in val:
@@ -380,6 +764,15 @@ def update_setup_wizard_config(payload: dict[str, Any]) -> dict[str, Any]:
             elif k == "ANTIGRAVITY_API_KEY":
                 os.environ["GOOGLE_API_KEY"] = val
                 updates["GOOGLE_API_KEY"] = val
+
+    base_urls = payload.get("base_urls")
+    if isinstance(base_urls, dict):
+        for k, v in base_urls.items():
+            k_str = str(k or "").strip()
+            v_str = str(v or "").strip()
+            if k_str and _ENV_KEY_RE.match(k_str) and v_str and "\n" not in v_str:
+                os.environ[k_str] = v_str
+                updates[k_str] = v_str
 
     _persist_env_updates(updates)
     return get_setup_wizard_status()
@@ -636,10 +1029,6 @@ def read_artifact_content(rel_or_abs_path: str) -> dict[str, Any]:
         return {"ok": False, "error": str(exc)}
 
 
-def render_workbench_html() -> str:
-    """Generate the graphical, interactive dark/light SPA Workbench."""
-
-
 _WORKBENCH_PAGE_HEAD = """<!DOCTYPE html>
 <html lang="zh-Hant" class="dark">
 <head>
@@ -778,7 +1167,7 @@ _WORKBENCH_PAGE_HEAD = """<!DOCTYPE html>
             TENCENT FLEET READY
           </span>
         </div>
-        <p class="text-xs text-slate-400">圖形化多 Agent 調度拓撲 · Claude Code (MiniMax-M3.1-Flash) · Antigravity (AGY) · 7 角色 DAG 流水線</p>
+        <p class="text-xs text-slate-400">圖形化多 Agent 調度拓撲 · Claude Code (gemini-4-argon) · Antigravity (AGY) · 7 角色 DAG 流水線</p>
       </div>
     </div>
 
@@ -847,10 +1236,10 @@ _WORKBENCH_PAGE_HEAD = """<!DOCTYPE html>
             </button>
           </div>
           <div id="sidebar-model-summary" class="text-[11px] text-slate-400 space-y-1 font-mono">
-            <div class="flex justify-between gap-1"><span>Claude:</span><span id="side-model-claude" class="text-emerald-400 truncate">MiniMax-M3.1-Flash</span></div>
+            <div class="flex justify-between gap-1"><span>Claude:</span><span id="side-model-claude" class="text-emerald-400 truncate">gemini-4-argon</span></div>
             <div class="flex justify-between gap-1"><span>Codex:</span><span id="side-model-codex" class="text-indigo-400 truncate">glm-5.3-flashx</span></div>
             <div class="flex justify-between gap-1"><span>Antigravity:</span><span id="side-model-antigravity" class="text-sky-400 truncate">antigravity-pro</span></div>
-            <div class="flex justify-between gap-1"><span>MiniMax:</span><span id="side-model-minimax" class="text-teal-400 truncate">MiniMax-M3.1</span></div>
+            <div class="flex justify-between gap-1"><span>MiniMax:</span><span id="side-model-minimax" class="text-teal-400 truncate">MiniMax-M3.1-Flash</span></div>
             <div class="flex justify-between gap-1"><span>opencode:</span><span id="side-model-opencode" class="text-amber-400 truncate">glm-5.3-flashx</span></div>
           </div>
         </div>
@@ -874,7 +1263,7 @@ _WORKBENCH_PAGE_HEAD = """<!DOCTYPE html>
             </span>
             <span class="hidden sm:inline text-slate-600">|</span>
             <span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 font-mono text-[11px]">
-              Claude: <strong id="card-title-claude">MiniMax-M3.1-Flash</strong> (<span id="stat-minimax">HEALTHY</span>)
+              Claude: <strong id="card-title-claude">gemini-4-argon</strong> (<span id="stat-minimax">HEALTHY</span>)
             </span>
             <span class="px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 font-mono text-[11px]">
               Codex: <strong id="card-title-codex">glm-5.3-flashx</strong> (<span id="stat-glm">HEALTHY</span>)
@@ -1038,7 +1427,7 @@ _WORKBENCH_PAGE_HEAD = """<!DOCTYPE html>
               </div>
               <div>
                 <label class="text-slate-300 block mb-1">預設綁定模型</label>
-                <input id="ca-model" type="text" value="MiniMax-M3.1-Flash" class="w-full bg-[#050811] border border-white/15 rounded px-2.5 py-1.5 font-mono text-emerald-300" />
+                <input id="ca-model" type="text" value="gemini-4-argon" class="w-full bg-[#050811] border border-white/15 rounded px-2.5 py-1.5 font-mono text-emerald-300" />
               </div>
               <div>
                 <label class="text-slate-300 block mb-1">CLI 執行檔名稱或路徑</label>
@@ -1086,13 +1475,13 @@ _WORKBENCH_PAGE_HEAD = """<!DOCTYPE html>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
               <div class="p-2.5 rounded-lg bg-black/40 border border-white/5 space-y-1.5">
                 <label class="text-emerald-400 font-bold block">Claude Code 模型</label>
-                <input id="custom-input-claude" type="text" value="MiniMax-M3.1-Flash" oninput="onCustomModelInput('claude', this.value)" class="w-full bg-[#050811] border border-white/15 rounded px-2 py-1 text-xs font-mono text-white focus:outline-none focus:border-emerald-400" placeholder="輸入或選擇模型..." />
-                <div class="text-[10px] text-slate-400 font-mono">預設: MiniMax-M3.1-Flash</div>
+                <input id="custom-input-claude" type="text" value="gemini-4-argon" oninput="onCustomModelInput('claude', this.value)" class="w-full bg-[#050811] border border-white/15 rounded px-2 py-1 text-xs font-mono text-white focus:outline-none focus:border-emerald-400" placeholder="輸入或選擇模型..." />
+                <div class="text-[10px] text-slate-400 font-mono">預設: gemini-4-argon</div>
               </div>
               <div class="p-2.5 rounded-lg bg-black/40 border border-white/5 space-y-1.5">
                 <label class="text-indigo-400 font-bold block">OpenAI Codex 模型</label>
-                <input id="custom-input-codex" type="text" value="glm-5.3-flashx" oninput="onCustomModelInput('codex', this.value)" class="w-full bg-[#050811] border border-white/15 rounded px-2 py-1 text-xs font-mono text-white focus:outline-none focus:border-indigo-400" placeholder="輸入或選擇模型..." />
-                <div class="text-[10px] text-slate-400 font-mono">預設: glm-5.3-flashx</div>
+                <input id="custom-input-codex" type="text" value="kimi-k3.1-pro" oninput="onCustomModelInput('codex', this.value)" class="w-full bg-[#050811] border border-white/15 rounded px-2 py-1 text-xs font-mono text-white focus:outline-none focus:border-indigo-400" placeholder="輸入或選擇模型..." />
+                <div class="text-[10px] text-slate-400 font-mono">預設: kimi-k3.1-pro</div>
               </div>
               <div class="p-2.5 rounded-lg bg-black/40 border border-white/5 space-y-1.5">
                 <label class="text-sky-400 font-bold block">Antigravity (AGY) 模型</label>
@@ -1101,8 +1490,8 @@ _WORKBENCH_PAGE_HEAD = """<!DOCTYPE html>
               </div>
               <div class="p-2.5 rounded-lg bg-black/40 border border-white/5 space-y-1.5">
                 <label class="text-teal-400 font-bold block">MiniMax Code 模型</label>
-                <input id="custom-input-minimax" type="text" value="MiniMax-M3.1" oninput="onCustomModelInput('minimax', this.value)" class="w-full bg-[#050811] border border-white/15 rounded px-2 py-1 text-xs font-mono text-white focus:outline-none focus:border-teal-400" placeholder="輸入或選擇模型..." />
-                <div class="text-[10px] text-slate-400 font-mono">預設: MiniMax-M3.1</div>
+                <input id="custom-input-minimax" type="text" value="MiniMax-M3.1-Flash" oninput="onCustomModelInput('minimax', this.value)" class="w-full bg-[#050811] border border-white/15 rounded px-2 py-1 text-xs font-mono text-white focus:outline-none focus:border-teal-400" placeholder="輸入或選擇模型..." />
+                <div class="text-[10px] text-slate-400 font-mono">預設: MiniMax-M3.1-Flash</div>
               </div>
               <div class="p-2.5 rounded-lg bg-black/40 border border-white/5 space-y-1.5">
                 <label class="text-amber-400 font-bold block">OpenCode (opencode) 模型</label>
@@ -1152,10 +1541,8 @@ _WORKBENCH_PAGE_HEAD = """<!DOCTYPE html>
                   <div class="font-bold text-white text-xs">Claude Code</div>
                   <div onclick="event.stopPropagation()">
                     <select id="model-select-claude" onchange="onAgentModelChange('claude', this.value)" class="w-full bg-[#070B14] border border-emerald-500/30 rounded px-1.5 py-1 text-[10px] font-mono text-emerald-300 focus:outline-none focus:border-emerald-400 cursor-pointer" title="調整 Claude Code 綁定模型">
-                      <option value="MiniMax-M3.1-Flash" selected>MiniMax-M3.1-Flash</option>
-                      <option value="MiniMax-M3.1">MiniMax-M3.1</option>
+                      <option value="gemini-4-argon" selected>gemini-4-argon</option>
                       <option value="glm-5.3-flashx">glm-5.3-flashx</option>
-                      <option value="glm-5.3">glm-5.3</option>
                       <option value="claude-sonnet-5">claude-sonnet-5</option>
                       <option value="claude-haiku-4-5-20251001">claude-haiku-4-5</option>
                       <option value="__custom__">✏️ 自訂模型...</option>
@@ -1181,11 +1568,10 @@ _WORKBENCH_PAGE_HEAD = """<!DOCTYPE html>
                   <div class="font-bold text-white text-xs">OpenAI Codex</div>
                   <div onclick="event.stopPropagation()">
                     <select id="model-select-codex" onchange="onAgentModelChange('codex', this.value)" class="w-full bg-[#070B14] border border-indigo-500/30 rounded px-1.5 py-1 text-[10px] font-mono text-indigo-300 focus:outline-none focus:border-indigo-400 cursor-pointer" title="調整 Codex 綁定模型">
-                      <option value="glm-5.3-flashx" selected>glm-5.3-flashx</option>
-                      <option value="glm-5.3">glm-5.3</option>
+                      <option value="kimi-k3.1-pro" selected>kimi-k3.1-pro</option>
+                      <option value="glm-5.3-flashx">glm-5.3-flashx</option>
                       <option value="codegeex-4">codegeex-4</option>
                       <option value="MiniMax-M3.1-Flash">MiniMax-M3.1-Flash</option>
-                      <option value="MiniMax-M3.1">MiniMax-M3.1</option>
                       <option value="gpt-5-mini">gpt-5-mini</option>
                       <option value="gpt-5-codex">gpt-5-codex</option>
                       <option value="__custom__">✏️ 自訂模型...</option>
@@ -1214,8 +1600,6 @@ _WORKBENCH_PAGE_HEAD = """<!DOCTYPE html>
                       <option value="antigravity-pro" selected>antigravity-pro</option>
                       <option value="antigravity-flash">antigravity-flash</option>
                       <option value="antigravity-ultra">antigravity-ultra</option>
-                      <option value="MiniMax-M3.1-Flash">MiniMax-M3.1-Flash</option>
-                      <option value="glm-5.3-flashx">glm-5.3-flashx</option>
                       <option value="__custom__">✏️ 自訂模型...</option>
                     </select>
                   </div>
@@ -1239,8 +1623,7 @@ _WORKBENCH_PAGE_HEAD = """<!DOCTYPE html>
                   <div class="font-bold text-white text-xs">MiniMax Code</div>
                   <div onclick="event.stopPropagation()">
                     <select id="model-select-minimax" onchange="onAgentModelChange('minimax', this.value)" class="w-full bg-[#070B14] border border-teal-500/30 rounded px-1.5 py-1 text-[10px] font-mono text-teal-300 focus:outline-none focus:border-teal-400 cursor-pointer" title="調整 MiniMax Code 綁定模型">
-                      <option value="MiniMax-M3.1" selected>MiniMax-M3.1</option>
-                      <option value="MiniMax-M3.1-Flash">MiniMax-M3.1-Flash</option>
+                      <option value="MiniMax-M3.1-Flash" selected>MiniMax-M3.1-Flash</option>
                       <option value="MiniMax-Text-01">MiniMax-Text-01</option>
                       <option value="__custom__">✏️ 自訂模型...</option>
                     </select>
@@ -1266,7 +1649,6 @@ _WORKBENCH_PAGE_HEAD = """<!DOCTYPE html>
                   <div onclick="event.stopPropagation()">
                     <select id="model-select-opencode" onchange="onAgentModelChange('opencode', this.value)" class="w-full bg-[#070B14] border border-amber-500/30 rounded px-1.5 py-1 text-[10px] font-mono text-amber-300 focus:outline-none focus:border-amber-400 cursor-pointer" title="調整 opencode 綁定模型">
                       <option value="glm-5.3-flashx" selected>glm-5.3-flashx</option>
-                      <option value="glm-5.3">glm-5.3</option>
                       <option value="codegeex-4">codegeex-4</option>
                       <option value="glm-4-plus">glm-4-plus</option>
                       <option value="__custom__">✏️ 自訂模型...</option>
@@ -1367,7 +1749,7 @@ _WORKBENCH_PAGE_HEAD = """<!DOCTYPE html>
             </div>
 
             <div class="flex flex-wrap items-center justify-between gap-3">
-              <div class="flex items-center gap-2 text-xs text-slate-400">
+              <div class="flex flex-wrap items-center gap-2 text-xs text-slate-400">
                 <span>能力路由偏好:</span>
                 <select id="capability-hint" class="bg-[#0B1120] border border-white/10 text-xs text-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-sky-500">
                   <option value="">🎯 能力自動識別 (Auto Capability)</option>
@@ -1376,9 +1758,27 @@ _WORKBENCH_PAGE_HEAD = """<!DOCTYPE html>
                   <option value="中文">🇨🇳 中文語境優化 (Chinese)</option>
                   <option value="長文">📜 超長上下文分析 (LongContext)</option>
                 </select>
+                <label class="inline-flex items-center gap-1.5" title="只顯示目前已連線供應商回傳的能力">
+                  <span>Thinking:</span>
+                  <select id="thinking-mode" onchange="thinkingModeChanged(this.value)" class="bg-[#0B1120] border border-emerald-500/30 text-xs text-emerald-200 rounded-lg px-3 py-2 focus:outline-none focus:border-emerald-400 min-w-[150px]">
+                    <option value="">⚙️ Auto · 供應商預設</option>
+                  </select>
+                </label>
+                <button type="button" onclick="loadThinkingCapabilities(true)" class="px-2 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 hover:text-white transition" title="重新查詢已連線供應商的模型能力">
+                  ↻
+                </button>
+                <span id="thinking-capability-source" class="text-[10px] font-mono text-slate-500">尚未查詢供應商能力</span>
               </div>
+              <div class="flex items-center gap-2">
+                <input id="attachment-input" type="file" multiple class="hidden" onchange="handleAttachmentInput(this.files)" />
+                <button type="button" onclick="document.getElementById('attachment-input').click()" class="px-3 py-2 rounded-lg bg-white/5 hover:bg-sky-500/15 text-slate-300 hover:text-sky-200 border border-white/10 hover:border-sky-500/35 text-xs transition" title="加入附件（單檔最多 10 MB，總量最多 25 MB）">
+                  📎 附件
+                </button>
+              </div>
+            </div>
+            <div id="attachment-list" class="hidden flex flex-wrap items-center gap-1.5 text-[11px] font-mono"></div>
 
-              <button id="btn-dispatch" onclick="submitDispatch()" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 via-cyan-500 to-teal-500 hover:from-sky-400 hover:to-teal-400 text-white font-bold text-sm shadow-lg shadow-sky-500/25 flex items-center gap-2 transition transform active:scale-95">
+            <button id="btn-dispatch" onclick="submitDispatch()" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 via-cyan-500 to-teal-500 hover:from-sky-400 hover:to-teal-400 text-white font-bold text-sm shadow-lg shadow-sky-500/25 flex items-center gap-2 transition transform active:scale-95">
                 <i class="fas fa-play"></i>
                 <span id="btn-dispatch-label">啟動多 Agent 自主協同執行</span>
               </button>
@@ -1650,15 +2050,109 @@ _WORKBENCH_CLIENT_JS = """    let currentTab = 'command';
     let AGENT_IDS = ['claude', 'codex', 'antigravity', 'minimax', 'opencode', 'khavis'];
     let ADJUSTABLE_AGENTS = ['claude', 'codex', 'antigravity', 'minimax', 'opencode'];
     let currentAgentModels = {
-      claude: 'MiniMax-M3.1-Flash',
-      codex: 'glm-5.3-flashx',
+      claude: 'gemini-4-argon',
+      codex: 'kimi-k3.1-pro',
       antigravity: 'antigravity-pro',
-      minimax: 'MiniMax-M3.1',
+      minimax: 'MiniMax-M3.1-Flash',
       opencode: 'glm-5.3-flashx'
     };
+    let currentThinkingCapabilities = {};
+    let currentModelCatalog = {};
+    let currentModelOptions = {};
+    let currentThinkingParameter = 'reasoning_effort';
+    let selectedAttachments = [];
     let currentIsolationMode = 'shared';
     let currentProjectName = 'shared-app';
     let latestWorkspaceData = null;
+
+    const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+    const MAX_ATTACHMENT_TOTAL_BYTES = 25 * 1024 * 1024;
+    const MAX_ATTACHMENT_COUNT = 8;
+
+    function clientNotice(message, kind) {
+      if (typeof cToast === 'function') cToast(message, kind || 'err');
+      else if (typeof alert === 'function') alert(message);
+    }
+
+    function formatAttachmentSize(bytes) {
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    }
+
+    function renderAttachmentList() {
+      const host = document.getElementById('attachment-list');
+      if (!host) return;
+      host.classList.toggle('hidden', selectedAttachments.length === 0);
+      host.innerHTML = selectedAttachments.map((item, idx) => `
+        <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-sky-500/10 border border-sky-500/25 text-sky-200">
+          <span class="truncate max-w-[220px]" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</span>
+          <span class="text-slate-500">${formatAttachmentSize(item.size)}</span>
+          <button type="button" onclick="removeAttachment(${idx})" class="text-slate-400 hover:text-rose-300 px-0.5" aria-label="移除 ${escapeHtml(item.name)}">×</button>
+        </span>`).join('');
+    }
+
+    function handleAttachmentInput(fileList) {
+      const files = Array.from(fileList || []);
+      if (!files.length) return;
+      const merged = [...selectedAttachments];
+      for (const file of files) {
+        if (merged.length >= MAX_ATTACHMENT_COUNT) {
+          clientNotice(`附件最多 ${MAX_ATTACHMENT_COUNT} 個`, 'err');
+          break;
+        }
+        if (file.size > MAX_ATTACHMENT_BYTES) {
+          clientNotice(`${file.name} 超過單檔 10 MB 限制`, 'err');
+          continue;
+        }
+        if (merged.some(item => item.name === file.name && item.size === file.size && item.lastModified === file.lastModified)) continue;
+        const total = merged.reduce((sum, item) => sum + item.size, 0) + file.size;
+        if (total > MAX_ATTACHMENT_TOTAL_BYTES) {
+          clientNotice('附件總量不能超過 25 MB', 'err');
+          break;
+        }
+        merged.push(file);
+      }
+      selectedAttachments = merged;
+      renderAttachmentList();
+      const input = document.getElementById('attachment-input');
+      if (input) input.value = '';
+    }
+
+    function removeAttachment(index) {
+      selectedAttachments.splice(index, 1);
+      renderAttachmentList();
+    }
+
+    function clearAttachments() {
+      selectedAttachments = [];
+      renderAttachmentList();
+      const input = document.getElementById('attachment-input');
+      if (input) input.value = '';
+    }
+
+    function readAttachmentAsBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = String(reader.result || '');
+          const comma = result.indexOf(',');
+          resolve({
+            name: file.name,
+            type: file.type || 'application/octet-stream',
+            size: file.size,
+            last_modified: file.lastModified,
+            data_base64: comma >= 0 ? result.slice(comma + 1) : result
+          });
+        };
+        reader.onerror = () => reject(new Error(`讀取附件失敗：${file.name}`));
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function collectAttachmentPayload() {
+      return Promise.all(selectedAttachments.map(readAttachmentAsBase64));
+    }
 
     function toggleModelSettingsPanel() {
       const panel = document.getElementById('model-settings-panel');
@@ -2129,6 +2623,86 @@ _WORKBENCH_CLIENT_JS = """    let currentTab = 'command';
       alert('已複製 .env 設定範本至剪貼簿！');
     }
 
+    function selectedThinkingAgent() {
+      const checked = Array.from(document.querySelectorAll('input[name="agent_target"]:checked'))
+        .map(el => el.value).filter(Boolean);
+      return checked[0] || 'claude';
+    }
+
+    function modelRefLabel(ref) {
+      const item = currentModelCatalog[ref];
+      return item && item.display_name ? item.display_name : String(ref || '');
+    }
+
+    function syncProviderModelOptions() {
+      ADJUSTABLE_AGENTS.forEach(id => {
+        const select = document.getElementById(`model-select-${id}`);
+        if (!select) return;
+        const current = currentAgentModels[id] || '';
+        const options = Array.isArray(currentModelOptions[id]) ? currentModelOptions[id].slice() : [];
+        if (current && !options.includes(current)) options.unshift(current);
+        if (!options.length) return;
+        select.innerHTML = options.map(ref =>
+          `<option value="${escapeHtml(ref)}">${escapeHtml(modelRefLabel(ref))}</option>`
+        ).join('') + '<option value="__custom__">✏️ 自訂模型...</option>';
+        select.value = current;
+      });
+    }
+
+    function renderThinkingModeOptions() {
+      const select = document.getElementById('thinking-mode');
+      if (!select) return;
+      const agentId = selectedThinkingAgent();
+      const capability = currentThinkingCapabilities[agentId] || {};
+      const modes = Array.isArray(capability.thinking_modes) ? capability.thinking_modes : [];
+      const current = select.value;
+      const source = document.getElementById('thinking-capability-source');
+      currentThinkingParameter = capability.thinking_parameter || 'reasoning_effort';
+      select.innerHTML = '<option value="">⚙️ Auto · 供應商預設</option>' + modes.map(mode =>
+        `<option value="${escapeHtml(mode)}">${escapeHtml(mode)}</option>`
+      ).join('');
+      select.value = modes.includes(current) ? current : '';
+      if (source) {
+        const provider = capability.provider_label || '目前選取模型';
+        const model = capability.model || currentAgentModels[agentId] || 'auto';
+        const status = capability.provider_status === 'ok'
+          ? (modes.length ? `${modes.length} 個模式` : '供應商未回傳模式')
+          : (capability.provider_status || '尚未連線');
+        source.textContent = `${provider} · ${model} · ${status}`;
+        source.title = capability.source || 'provider:/models';
+      }
+    }
+
+    function thinkingModeChanged(value) {
+      const select = document.getElementById('thinking-mode');
+      if (select && value && !Array.from(select.options).some(option => option.value === value)) {
+        select.value = '';
+      }
+    }
+
+    async function loadThinkingCapabilities(force = false) {
+      const source = document.getElementById('thinking-capability-source');
+      if (source && force) source.textContent = '正在查詢供應商模型能力…';
+      try {
+        const res = await fetch('/api/workbench/capabilities' + (force ? `?refresh=${Date.now()}` : ''));
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        currentThinkingCapabilities = data.agents || {};
+        currentModelCatalog = data.model_catalog || {};
+        currentModelOptions = data.model_options || {};
+        Object.entries(data.active_model_refs || {}).forEach(([agentId, modelRef]) => {
+          if (modelRef) currentAgentModels[agentId] = modelRef;
+        });
+        syncProviderModelOptions();
+        syncModelUIElements();
+        renderThinkingModeOptions();
+      } catch (err) {
+        currentThinkingCapabilities = {};
+        renderThinkingModeOptions();
+        if (source) source.textContent = '能力查詢失敗，僅保留 Auto';
+      }
+    }
+
     function syncModelUIElements() {
       ADJUSTABLE_AGENTS.forEach(id => {
         const val = currentAgentModels[id] || '';
@@ -2148,23 +2722,23 @@ _WORKBENCH_CLIENT_JS = """    let currentTab = 'command';
           inp.value = val;
         }
         const sideEl = document.getElementById(`side-model-${id}`);
-        if (sideEl) sideEl.textContent = val;
+        if (sideEl) sideEl.textContent = modelRefLabel(val);
       });
 
       const ctClaude = document.getElementById('card-title-claude');
-      if (ctClaude) ctClaude.textContent = currentAgentModels.claude;
+      if (ctClaude) ctClaude.textContent = modelRefLabel(currentAgentModels.claude);
       const ctCodex = document.getElementById('card-title-codex');
-      if (ctCodex) ctCodex.textContent = currentAgentModels.codex;
+      if (ctCodex) ctCodex.textContent = modelRefLabel(currentAgentModels.codex);
       const ctAg = document.getElementById('card-title-antigravity');
-      if (ctAg) ctAg.textContent = currentAgentModels.antigravity;
+      if (ctAg) ctAg.textContent = modelRefLabel(currentAgentModels.antigravity);
 
       const strip = document.getElementById('quota-capsule-strip');
       if (strip) {
         strip.innerHTML = `
-          <span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Claude: ${escapeHtml(currentAgentModels.claude)}</span>
-          <span class="px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">Codex: ${escapeHtml(currentAgentModels.codex)}</span>
-          <span class="px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20">AGY: ${escapeHtml(currentAgentModels.antigravity)}</span>
-          <span class="px-2 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20">MiniMax: ${escapeHtml(currentAgentModels.minimax)}</span>
+          <span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Claude: ${escapeHtml(modelRefLabel(currentAgentModels.claude))}</span>
+          <span class="px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">Codex: ${escapeHtml(modelRefLabel(currentAgentModels.codex))}</span>
+          <span class="px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20">AGY: ${escapeHtml(modelRefLabel(currentAgentModels.antigravity))}</span>
+          <span class="px-2 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20">MiniMax: ${escapeHtml(modelRefLabel(currentAgentModels.minimax))}</span>
         `;
       }
     }
@@ -2485,6 +3059,16 @@ _WORKBENCH_CLIENT_JS = """    let currentTab = 'command';
         return;
       }
 
+      const thinkingSelect = document.getElementById('thinking-mode');
+      const thinkingMode = thinkingSelect ? thinkingSelect.value : '';
+      let attachments = [];
+      try {
+        attachments = await collectAttachmentPayload();
+      } catch (err) {
+        clientNotice(err.message || '附件讀取失敗', 'err');
+        return;
+      }
+
       if (promptInputEl) {
         promptInputEl.value = '';
         promptInputEl.style.height = 'auto';
@@ -2543,7 +3127,10 @@ _WORKBENCH_CLIENT_JS = """    let currentTab = 'command';
             isolation_mode: currentIsolationMode,
             project: currentProjectName,
             collab_mode: currentCollabMode,
-            previous_context: previousTurnContext
+            previous_context: previousTurnContext,
+            thinking_mode: thinkingMode || null,
+            thinking_parameter: thinkingMode ? currentThinkingParameter : null,
+            attachments: attachments
           })
         });
 
@@ -2560,6 +3147,8 @@ _WORKBENCH_CLIENT_JS = """    let currentTab = 'command';
           resultsContainer.innerHTML = '';
           return;
         }
+
+        clearAttachments();
 
         setPipelineStepState(PIPELINE_STEPS.length, true);
         const modeLabels = {
@@ -3113,6 +3702,7 @@ _WORKBENCH_CLIENT_JS = """    let currentTab = 'command';
       syncTopologyBeams(false);
       syncModelUIElements();
       loadModelSettings();
+      loadThinkingCapabilities();
       loadWorkspaceStatus();
       refreshCustomAgentsTopology();
       loadArtifactsList();
@@ -3130,4 +3720,3 @@ _WORKBENCH_PAGE_TAIL = """  </script>
 def render_workbench_html() -> str:
     """Generate the graphical, interactive dark/light SPA Workbench."""
     return _WORKBENCH_PAGE_HEAD + _WORKBENCH_CLIENT_JS + _WORKBENCH_PAGE_TAIL
-

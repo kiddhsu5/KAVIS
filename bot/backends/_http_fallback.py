@@ -20,12 +20,11 @@ from __future__ import annotations
 import json
 import os
 import re
-import subprocess
 import urllib.request
-from pathlib import Path
 from typing import Any
 
 from core.agent_skills import execute_skill
+from core.provider_capabilities import parse_model_ref
 
 _TOOL_PROTOCOL_INSTRUCTION = """
 【自主執行工具與 Skills 協定 (Autonomous Agentic Skills & Execution Protocol)】
@@ -184,6 +183,8 @@ def call_upstream_llm_fallback(
     timeout_s: int = 45,
     cwd: str | None = None,
     enable_tools: bool = True,
+    thinking_mode: str | None = None,
+    thinking_parameter: str | None = None,
 ) -> dict[str, Any]:
     """Run an agentic multi-turn conversation (tool execution + synthesis) across active upstream pools."""
     base_sys_prompt = AGENT_SYSTEM_PROMPTS.get(agent_name, AGENT_SYSTEM_PROMPTS["antigravity"])
@@ -207,6 +208,8 @@ def call_upstream_llm_fallback(
             model=model,
             agent_name=agent_name,
             timeout_s=timeout_s,
+            thinking_mode=thinking_mode,
+            thinking_parameter=thinking_parameter,
         )
         if not res["ok"]:
             if executed_logs:
@@ -253,6 +256,8 @@ def call_upstream_llm_fallback(
                     model=model,
                     agent_name=agent_name,
                     timeout_s=min(timeout_s, 25),
+                    thinking_mode=thinking_mode,
+                    thinking_parameter=thinking_parameter,
                 )
                 if synth_res.get("ok") and _strip_tool_calls(str(synth_res.get("text") or "")):
                     reply_text = str(synth_res["text"])
@@ -319,7 +324,10 @@ def _single_turn_upstream(
     model: str,
     agent_name: str,
     timeout_s: int,
+    thinking_mode: str | None = None,
+    thinking_parameter: str | None = None,
 ) -> dict[str, Any]:
+    provider_env, model_id = parse_model_ref(model)
     minimax_key = os.environ.get("MINIMAX_API_KEY", "").strip()
     openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
     glm_key = (os.environ.get("ZHIPUAI_API_KEY") or os.environ.get("GLM_API_KEY") or "").strip()
@@ -328,7 +336,7 @@ def _single_turn_upstream(
     errors: list[str] = []
 
     # 1. If GLM key is configured and model explicitly asks for glm, try GLM first
-    if glm_key and not glm_key.startswith("your_") and ("glm" in model.lower() or agent_name == "opencode"):
+    if glm_key and not glm_key.startswith("your_") and (provider_env == "ZHIPUAI_API_KEY" or "glm" in model_id.lower() or agent_name == "opencode"):
         for glm_url in (
             "https://open.bigmodel.cn/api/coding/paas/v4/chat/completions",
             "https://open.bigmodel.cn/api/paas/v4/chat/completions",
@@ -336,10 +344,12 @@ def _single_turn_upstream(
             res = _try_openai_compat(
                 url=glm_url,
                 api_key=glm_key,
-                model="glm-4-flash" if "glm" not in model.lower() else model,
+                model="glm-4-flash" if "glm" not in model_id.lower() else model_id,
                 sys_prompt=sys_prompt,
                 messages=messages,
                 timeout_s=min(timeout_s, 20),
+                thinking_mode=thinking_mode,
+                thinking_parameter=thinking_parameter,
             )
             if res["ok"]:
                 res["model"] = model or res["model"]
@@ -348,13 +358,15 @@ def _single_turn_upstream(
 
     # 2. MiniMax Token Plan (Anthropic-compatible endpoint on minimaxi.com)
     if minimax_key and not minimax_key.startswith("your_"):
-        mm_model = model if "minimax" in model.lower() else "MiniMax-M2.7"
+        mm_model = model_id if provider_env == "MINIMAX_API_KEY" or "minimax" in model_id.lower() else "MiniMax-M2.7"
         res = _try_minimax_anthropic(
             api_key=minimax_key,
             model=mm_model,
             sys_prompt=sys_prompt,
             messages=messages,
             timeout_s=timeout_s,
+            thinking_mode=thinking_mode,
+            thinking_parameter=thinking_parameter,
         )
         if res["ok"]:
             res["model"] = model or mm_model
@@ -369,6 +381,8 @@ def _single_turn_upstream(
             sys_prompt=sys_prompt,
             messages=messages,
             timeout_s=timeout_s,
+            thinking_mode=thinking_mode,
+            thinking_parameter=thinking_parameter,
         )
         if res_v2["ok"]:
             res_v2["model"] = model or "MiniMax-M3.1-Flash"
@@ -377,7 +391,7 @@ def _single_turn_upstream(
 
     # 3. OpenAI GPT GO Platform API
     if openai_key and not openai_key.startswith("your_"):
-        oa_model = model if model.startswith("gpt-") else "gpt-4o-mini"
+        oa_model = model_id if provider_env == "OPENAI_API_KEY" or model_id.startswith("gpt-") else "gpt-4o-mini"
         res_oa = _try_openai_compat(
             url="https://api.openai.com/v1/chat/completions",
             api_key=openai_key,
@@ -385,6 +399,8 @@ def _single_turn_upstream(
             sys_prompt=sys_prompt,
             messages=messages,
             timeout_s=timeout_s,
+            thinking_mode=thinking_mode,
+            thinking_parameter=thinking_parameter,
         )
         if res_oa["ok"]:
             res_oa["model"] = model or oa_model
@@ -400,6 +416,8 @@ def _single_turn_upstream(
             sys_prompt=sys_prompt,
             messages=messages,
             timeout_s=timeout_s,
+            thinking_mode=thinking_mode,
+            thinking_parameter=thinking_parameter,
         )
         if res_or["ok"]:
             res_or["model"] = model or "openrouter/auto"
@@ -422,15 +440,18 @@ def _try_minimax_anthropic(
     sys_prompt: str,
     messages: list[dict[str, str]],
     timeout_s: int,
+    thinking_mode: str | None = None,
+    thinking_parameter: str | None = None,
 ) -> dict[str, Any]:
-    body = json.dumps(
-        {
-            "model": model,
-            "max_tokens": 2048,
-            "system": sys_prompt,
-            "messages": messages,
-        }
-    ).encode("utf-8")
+    request_body: dict[str, Any] = {
+        "model": model,
+        "max_tokens": 2048,
+        "system": sys_prompt,
+        "messages": messages,
+    }
+    if thinking_mode and thinking_mode.lower() != "auto":
+        request_body[thinking_parameter or "reasoning_effort"] = thinking_mode
+    body = json.dumps(request_body).encode("utf-8")
     req = urllib.request.Request(
         "https://api.minimaxi.com/anthropic/v1/messages",
         data=body,
@@ -475,17 +496,20 @@ def _try_openai_compat(
     sys_prompt: str,
     messages: list[dict[str, str]],
     timeout_s: int,
+    thinking_mode: str | None = None,
+    thinking_parameter: str | None = None,
 ) -> dict[str, Any]:
-    body = json.dumps(
-        {
-            "model": model,
-            "messages": [
-                {"role": "system", "content": sys_prompt},
-                *messages,
-            ],
-            "temperature": 0.25,
-        }
-    ).encode("utf-8")
+    request_body: dict[str, Any] = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": sys_prompt},
+            *messages,
+        ],
+        "temperature": 0.25,
+    }
+    if thinking_mode and thinking_mode.lower() != "auto":
+        request_body[thinking_parameter or "reasoning_effort"] = thinking_mode
+    body = json.dumps(request_body).encode("utf-8")
     req = urllib.request.Request(
         url,
         data=body,

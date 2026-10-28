@@ -40,7 +40,6 @@ except Exception:  # pragma: no cover - optional dep
 # that breakage every time Google retires a version.
 DEFAULT_MODELS: list[str] = [
     "gemini-4-argon",
-    "gemini-4",
     "gemini-3.8-flash",
     "gemini-flash-latest",
     "gemini-pro-latest",

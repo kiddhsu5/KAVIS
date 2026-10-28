@@ -3,7 +3,7 @@
 
 Verifies collaborative code production across:
 1. Claude Code (bound to gemini-4-argon / Gemini 4) -> Architecture & Interface Design
-2. OpenAI Codex (using glm-5.3-flashx / GLM 5.3 FlashX) -> Core Implementation & Defensive Logic
+2. OpenAI Codex (using kimi-k3.1-pro / Kimi K3.1 Pro) -> Core Implementation & Defensive Logic
 3. MiniMax Code (using MiniMax-M3.1-Flash) -> Comprehensive Unit Tests & Edge Cases
 
 Can target either the local router or remote workbench endpoint.
@@ -14,8 +14,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import json
-import os
 import sys
 import time
 from pathlib import Path
@@ -25,9 +23,9 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from bot.backends import ClaudeBackend, CodexBackend, MinimaxBackend
-from bot.dispatch import DispatchRouter
-from bot.models import BackendName, BackendResult, DispatchEnvelope, DispatchReport
+from bot.backends import ClaudeBackend, CodexBackend, MinimaxBackend  # noqa: E402
+from bot.dispatch import DispatchRouter  # noqa: E402
+from bot.models import BackendName, DispatchEnvelope, DispatchReport  # noqa: E402
 
 
 async def run_e2e_pipeline(
@@ -36,10 +34,10 @@ async def run_e2e_pipeline(
     timeout_s: int = 60,
 ) -> tuple[DispatchReport, str]:
     """Execute end-to-end multi-agent collaborative pipeline."""
-    print(f"\n[1/3] 初始化 Agent 集群與跨模型調度器...")
-    print(f"  • Claude Code : 綁定 GEMINI 4 (gemini-4-argon)")
-    print(f"  • Codex       : 使用 GLM 5.3 FlashX (glm-5.3-flashx)")
-    print(f"  • MiniMax Code: 使用 MiniMax-M3.1 (MiniMax-M3.1-Flash)")
+    print("\n[1/3] 初始化 Agent 集群與跨模型調度器...")
+    print("  • Claude Code : 綁定 GEMINI 4 (gemini-4-argon)")
+    print("  • Codex       : 使用 Kimi K3.1 Pro (kimi-k3.1-pro)")
+    print("  • MiniMax Code: 使用 MiniMax-M3.1-Flash")
 
     backends: dict[BackendName, Any] = {
         "claude": ClaudeBackend(timeout_s=timeout_s),
@@ -48,7 +46,7 @@ async def run_e2e_pipeline(
     }
 
     # Verify health of each target agent
-    print(f"\n[2/3] 探測各 CLI 後端健康狀態...")
+    print("\n[2/3] 探測各 CLI 後端健康狀態...")
     for agent_id in target_agents:
         if agent_id in backends:
             h = await backends[agent_id].health()
@@ -63,11 +61,12 @@ async def run_e2e_pipeline(
         capability="程式碼",
     )
 
-    print(f"\n[3/3] 發起並發多 Agent 派工 (Fan-Out Dispatch)...")
+    print("\n[3/3] 發起並發多 Agent 派工 (Fan-Out Dispatch)...")
     print(f"  • 任務目標: {task_prompt}")
     t0 = time.perf_counter()
     report = await router.dispatch(envelope)
     total_elapsed = time.perf_counter() - t0
+    print(f"  • 總耗時: {total_elapsed * 1000:.0f} ms")
 
     # Build synthesized collaborative deliverable
     synthesized_code = _synthesize_code_deliverable(report)
@@ -97,9 +96,9 @@ from typing import Any, Callable, Coroutine
     for res in report.results:
         backend_name = res.backend.upper()
         model_name = res.model or "default"
-        sections.append(f"\n# =============================================================================")
+        sections.append("\n# =============================================================================")
         sections.append(f"# [{backend_name}] Generated Section (Model: {model_name}, Latency: {res.latency_ms}ms)")
-        sections.append(f"# =============================================================================")
+        sections.append("# =============================================================================")
         if res.ok and res.text:
             sections.append(res.text.strip())
         else:
@@ -252,13 +251,13 @@ async def main() -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(code_content, encoding="utf-8")
 
-    print(f"\n======================================================================")
-    print(f"🎉 端到端跨模型協同測試完成！")
-    print(f"======================================================================")
+    print("\n======================================================================")
+    print("🎉 端到端跨模型協同測試完成！")
+    print("======================================================================")
     print(f"• 參與 Agent 數 : {len(report.results)}")
     print(f"• 共識決策來源   : {report.consensus_source}")
     print(f"• 交付成果產物   : {out_path} ({len(code_content)} bytes)")
-    print(f"======================================================================\n")
+    print("======================================================================\n")
 
     for res in report.results:
         status_flag = "✓ 成功" if res.ok else "! 需關注"

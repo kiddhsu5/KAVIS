@@ -43,10 +43,10 @@ set_env_default() {
   fi
 }
 
-set_env_default "CLAUDE_DISPATCH_MODEL" "MiniMax-M3.1-Flash"
-set_env_default "CODEX_DISPATCH_MODEL" "glm-5.3-flashx"
+set_env_default "CLAUDE_DISPATCH_MODEL" "gemini-4-argon"
+set_env_default "CODEX_DISPATCH_MODEL" "kimi-k3.1-pro"
 set_env_default "ANTIGRAVITY_DISPATCH_MODEL" "antigravity-pro"
-set_env_default "MINIMAX_DISPATCH_MODEL" "MiniMax-M3.1"
+set_env_default "MINIMAX_DISPATCH_MODEL" "MiniMax-M3.1-Flash"
 set_env_default "OPENCODE_DISPATCH_MODEL" "glm-5.3-flashx"
 set_env_default "KHAVIS_ACTIVE_PROJECT" "shared-app"
 set_env_default "KHAVIS_ISOLATION_MODE" "shared"

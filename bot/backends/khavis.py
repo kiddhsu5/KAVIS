@@ -53,7 +53,10 @@ class KhavisBackend(Backend):
                 error=f"budget exceeded: {reason or guard.reason()}",
             )
 
-        from ._http_fallback import call_upstream_llm_fallback, has_any_upstream_key  # noqa: PLC0415
+        from ._http_fallback import (  # noqa: PLC0415
+            call_upstream_llm_fallback,
+            has_any_upstream_key,
+        )
 
         if envelope.workspace_dir and has_any_upstream_key():
             loop = asyncio.get_running_loop()
@@ -63,9 +66,12 @@ class KhavisBackend(Backend):
                 call_upstream_llm_fallback,
                 envelope.prompt,
                 "LangGraph-7-Role",
-                "khavis",
-                65,
-                envelope.workspace_dir,
+                    "khavis",
+                    65,
+                    envelope.workspace_dir,
+                    True,
+                    envelope.thinking_mode,
+                    envelope.thinking_parameter,
             )
             if fb.get("ok"):
                 return BackendResult(
@@ -106,7 +112,10 @@ class KhavisBackend(Backend):
             except Exception:  # noqa: BLE001
                 pass
         except Exception as exc:  # noqa: BLE001
-            from ._http_fallback import call_upstream_llm_fallback, has_any_upstream_key  # noqa: PLC0415
+            from ._http_fallback import (  # noqa: PLC0415
+                call_upstream_llm_fallback,
+                has_any_upstream_key,
+            )
 
             if has_any_upstream_key():
                 loop = asyncio.get_running_loop()
@@ -119,6 +128,9 @@ class KhavisBackend(Backend):
                     "khavis",
                     30,
                     envelope.workspace_dir,
+                    True,
+                    envelope.thinking_mode,
+                    envelope.thinking_parameter,
                 )
                 if fb.get("ok"):
                     return BackendResult(

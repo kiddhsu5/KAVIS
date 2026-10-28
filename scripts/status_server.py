@@ -23,12 +23,13 @@ accepts a self-signed origin cert outside strict mode).
 from __future__ import annotations
 
 import argparse
+import base64
 import concurrent.futures
 import hmac
-import html
 import json
 import os
 import re
+import secrets
 import socket
 import socketserver
 import ssl
@@ -82,6 +83,98 @@ def _redact(text: str) -> str:
     for pat in _SECRET_PATTERNS:
         text = pat.sub("[redacted]", text)
     return text
+
+
+_MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
+_MAX_ATTACHMENT_TOTAL_BYTES = 25 * 1024 * 1024
+_MAX_ATTACHMENT_COUNT = 8
+_BLOCKED_ATTACHMENT_NAMES = {
+    ".env",
+    ".env.local",
+    ".env.production",
+    "id_rsa",
+    "id_ed25519",
+    "credentials.json",
+    "auth.json",
+}
+_BLOCKED_ATTACHMENT_SUFFIXES = {".pem", ".key", ".p12", ".pfx", ".crt", ".secret"}
+
+
+def _validate_attachment_name(raw_name: object) -> str:
+    """Return a safe basename, rejecting path traversal and credential files."""
+    name = str(raw_name or "").strip()
+    if not name or name in {".", ".."} or "/" in name or "\\" in name:
+        raise ValueError("附件檔名無效或包含路徑")
+    if name in _BLOCKED_ATTACHMENT_NAMES or Path(name).suffix.lower() in _BLOCKED_ATTACHMENT_SUFFIXES:
+        raise ValueError(f"不允許上傳敏感附件：{name}")
+    if len(name) > 180 or any(ord(ch) < 32 for ch in name):
+        raise ValueError("附件檔名過長或包含控制字元")
+    return name
+
+
+def _store_dispatch_attachments(payload: dict[str, Any], shared_dir: Path) -> list[dict[str, str]]:
+    """Decode bounded browser attachments into a private per-dispatch folder."""
+    raw_items = payload.get("attachments")
+    if raw_items in (None, ""):
+        return []
+    if not isinstance(raw_items, list):
+        raise ValueError("attachments 必須是陣列")
+    if len(raw_items) > _MAX_ATTACHMENT_COUNT:
+        raise ValueError(f"附件最多 {_MAX_ATTACHMENT_COUNT} 個")
+
+    total_bytes = 0
+    decoded: list[tuple[str, str, bytes]] = []
+    for item in raw_items:
+        if not isinstance(item, dict):
+            raise ValueError("附件項目格式無效")
+        name = _validate_attachment_name(item.get("name"))
+        encoded = str(item.get("data_base64") or "").strip()
+        if not encoded:
+            raise ValueError(f"附件沒有內容：{name}")
+        if len(encoded) > ((_MAX_ATTACHMENT_BYTES + 2) * 4 // 3) + 16:
+            raise ValueError(f"附件超過單檔 {_MAX_ATTACHMENT_BYTES // (1024 * 1024)} MB 限制：{name}")
+        try:
+            content = base64.b64decode(encoded, validate=True)
+        except Exception as exc:  # noqa: BLE001
+            raise ValueError(f"附件 Base64 內容無效：{name}") from exc
+        if len(content) > _MAX_ATTACHMENT_BYTES:
+            raise ValueError(f"附件超過單檔 {_MAX_ATTACHMENT_BYTES // (1024 * 1024)} MB 限制：{name}")
+        total_bytes += len(content)
+        if total_bytes > _MAX_ATTACHMENT_TOTAL_BYTES:
+            raise ValueError(f"附件總量不能超過 {_MAX_ATTACHMENT_TOTAL_BYTES // (1024 * 1024)} MB")
+        decoded.append((name, str(item.get("type") or "application/octet-stream")[:120], content))
+
+    if not decoded:
+        return []
+    target_dir = shared_dir / ".khavis_attachments" / f"dispatch-{int(time.time())}-{secrets.token_hex(6)}"
+    target_dir.mkdir(parents=True, exist_ok=False)
+    target_root = target_dir.resolve()
+    refs: list[dict[str, str]] = []
+    for index, (name, content_type, content) in enumerate(decoded, start=1):
+        output_path = (target_dir / f"{index:02d}-{name}").resolve()
+        if target_root not in output_path.parents:
+            raise ValueError("附件路徑驗證失敗")
+        output_path.write_bytes(content)
+        refs.append(
+            {
+                "name": name,
+                "type": content_type,
+                "size": str(len(content)),
+                "path": str(output_path),
+            }
+        )
+    return refs
+
+
+def _attachment_prompt_context(refs: list[dict[str, str]]) -> str:
+    if not refs:
+        return ""
+    lines = [
+        "\n\n【本輪對話附件】",
+        "以下附件已由 K.H.A.V.I.S. 儲存到共用工作區，請依任務需要讀取或分析；不要猜測附件內容：",
+    ]
+    lines.extend(f"- {item['name']} ({item['type']}, {item['size']} bytes): {item['path']}" for item in refs)
+    return "\n".join(lines)
 
 
 # (rows, monotonic timestamp). Served stale and refreshed in the
@@ -530,6 +623,8 @@ class Handler(BaseHTTPRequestHandler):
             "/work",
             "/workbench-c",
             "/workbench-legacy",
+            "/agents",
+            "/database",
             "/api/dashboard",
             "/api/quota",
             "/api/alerts",
@@ -540,6 +635,7 @@ class Handler(BaseHTTPRequestHandler):
             "/api/workbench/models",
             "/api/workbench/workspace",
             "/api/workbench/setup",
+            "/api/workbench/capabilities",
         )
         if path not in allowed:
             self._send(404, b'{"error":"not found"}', "application/json")
@@ -665,8 +761,8 @@ class Handler(BaseHTTPRequestHandler):
                 "application/json; charset=utf-8",
             )
             return
-        if path in ("/workbench", "/work", "/workbench-c"):
-            # 現行介面 = 選項 C（任務卡片流）。/workbench-c 保留為別名。
+        if path in ("/workbench", "/work", "/workbench-c", "/agents", "/database"):
+            # 現行介面 = 選項 C（任務卡片流）。/agents 與 /database 為獨立子頁面路由。
             from web.workbench_c import render_workbench_html_c  # noqa: PLC0415
 
             self._send(200, render_workbench_html_c().encode(), "text/html; charset=utf-8")
@@ -747,6 +843,16 @@ class Handler(BaseHTTPRequestHandler):
                 "application/json; charset=utf-8",
             )
             return
+        if path == "/api/workbench/capabilities":
+            from web.workbench import get_workbench_capabilities  # noqa: PLC0415
+
+            payload = get_workbench_capabilities()
+            self._send(
+                200,
+                json.dumps(payload, ensure_ascii=False).encode(),
+                "application/json; charset=utf-8",
+            )
+            return
         if path in ("/dashboard", "/wall"):
             from bot import history as bot_history  # noqa: PLC0415
             from web.dashboard import (  # noqa: PLC0415
@@ -774,9 +880,8 @@ class Handler(BaseHTTPRequestHandler):
             if self._require_console_token():
                 self._handle_manus_post(path)
             return
-        if path.startswith("/api/workbench/"):
-            if not self._require_workbench_write_token():
-                return
+        if path.startswith("/api/workbench/") and not self._require_workbench_write_token():
+            return
         if path == "/api/workbench/models":
             content_len = int(self.headers.get("Content-Length", 0))
             raw_body = self.rfile.read(content_len).decode("utf-8", errors="replace")
@@ -883,7 +988,15 @@ class Handler(BaseHTTPRequestHandler):
 
             from web.workbench import update_setup_wizard_config  # noqa: PLC0415
 
-            res = update_setup_wizard_config(payload if isinstance(payload, dict) else {})
+            try:
+                res = update_setup_wizard_config(payload if isinstance(payload, dict) else {})
+            except ValueError as exc:
+                self._send(
+                    400,
+                    json.dumps({"ok": False, "detail": str(exc)}, ensure_ascii=False).encode(),
+                    "application/json; charset=utf-8",
+                )
+                return
             self._send(
                 200,
                 json.dumps(res, ensure_ascii=False).encode(),
@@ -893,6 +1006,13 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/api/workbench/dispatch":
             content_len = int(self.headers.get("Content-Length", 0))
+            if content_len <= 0 or content_len > 35 * 1024 * 1024:
+                self._send(
+                    413,
+                    json.dumps({"ok": False, "detail": "dispatch body 超過 35 MB 限制"}, ensure_ascii=False).encode(),
+                    "application/json; charset=utf-8",
+                )
+                return
             raw_body = self.rfile.read(content_len).decode("utf-8", errors="replace")
             try:
                 payload = json.loads(raw_body)
@@ -905,6 +1025,22 @@ class Handler(BaseHTTPRequestHandler):
             capability = payload.get("capability") or None
             raw_models = payload.get("agent_models")
             agent_models = raw_models if isinstance(raw_models, dict) else {}
+            thinking_mode = str(payload.get("thinking_mode") or "").strip() or None
+            thinking_parameter = str(payload.get("thinking_parameter") or "").strip() or None
+            if thinking_mode and not re.fullmatch(r"[A-Za-z0-9_.:-]{1,64}", thinking_mode):
+                self._send(
+                    400,
+                    json.dumps({"ok": False, "detail": "thinking_mode 格式無效"}, ensure_ascii=False).encode(),
+                    "application/json; charset=utf-8",
+                )
+                return
+            if thinking_parameter and not re.fullmatch(r"[A-Za-z0-9_]{1,64}", thinking_parameter):
+                self._send(
+                    400,
+                    json.dumps({"ok": False, "detail": "thinking_parameter 格式無效"}, ensure_ascii=False).encode(),
+                    "application/json; charset=utf-8",
+                )
+                return
             isolation_mode = str(payload.get("isolation_mode") or "").strip().lower() or None
             project_name = str(payload.get("project") or payload.get("project_id") or "").strip() or None
             collab_mode = str(payload.get("collab_mode") or "auto_loop").strip().lower()
@@ -962,6 +1098,16 @@ class Handler(BaseHTTPRequestHandler):
                 agent_cwds[aid] = prepare_agent_cwd(aid, isolation_mode=eff_mode, project_name=eff_project)
 
             shared_dir = prepare_agent_cwd("shared", isolation_mode="shared", project_name=eff_project)
+            try:
+                attachment_refs = _store_dispatch_attachments(payload, shared_dir)
+            except ValueError as exc:
+                self._send(
+                    400,
+                    json.dumps({"ok": False, "detail": str(exc)}, ensure_ascii=False).encode(),
+                    "application/json; charset=utf-8",
+                )
+                return
+            effective_prompt = prompt + _attachment_prompt_context(attachment_refs)
 
             backends: dict[BackendName, Any] = {
                 "claude": ClaudeBackend(
@@ -1011,12 +1157,14 @@ class Handler(BaseHTTPRequestHandler):
                         router=router,
                         backends=backends,
                         agents=agents,
-                        prompt=prompt,
+                        prompt=effective_prompt,
                         capability=capability,
                         shared_dir=shared_dir,
                         agent_cwds=agent_cwds,
                         collab_mode=collab_mode,
                         previous_context=previous_context,
+                        thinking_mode=thinking_mode,
+                        thinking_parameter=thinking_parameter,
                     )
                 )
             finally:
@@ -1057,6 +1205,9 @@ class Handler(BaseHTTPRequestHandler):
                 "next_actions": orch["next_actions"],
                 "isolation_mode": eff_mode,
                 "project": eff_project,
+                "thinking_mode": thinking_mode,
+                "thinking_parameter": thinking_parameter,
+                "attachments": attachment_refs,
                 "shared_dir": str(shared_dir),
                 "shared_changed_files": orch["shared_changed_files"],
                 "shared_diff": orch["shared_diff"],

@@ -43,10 +43,10 @@ check_cli() {
     fi
 }
 
-check_cli "Claude Code" "claude" "預設模型 MiniMax-M3.1-Flash (MiniMax Token Plan)"
-check_cli "OpenAI Codex" "codex" "使用 GLM 5.3 FlashX (glm-5.3-flashx)"
+check_cli "Claude Code" "claude" "預設模型 gemini-4-argon (供應商模型目錄)"
+check_cli "OpenAI Codex" "codex" "預設模型 kimi-k3.1-pro (JUAPI TokenRouter)"
 check_cli "Antigravity" "antigravity" "Google Antigravity Agentic CLI (agy / antigravity)"
-check_cli "MiniMax Code" "minimax" "預設模型 MiniMax-M3.1 (MiniMax Token Plan)"
+check_cli "MiniMax Code" "minimax" "預設模型 MiniMax-M3.1-Flash (MiniMax Token Plan)"
 check_cli "OpenCode" "opencode" "預設模型 GLM 5.3 FlashX (GLM Coding Plan)"
 
 # 3. 檢測 4 大付費方案金鑰環境

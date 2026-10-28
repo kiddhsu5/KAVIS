@@ -18,6 +18,7 @@ import re
 import shutil
 import subprocess
 import time
+from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
@@ -172,10 +173,8 @@ def ensure_project_completeness(
             "python3 -m unittest discover -s tests -v\n",
             encoding="utf-8",
         )
-        try:
+        with suppress(OSError):
             run_sh.chmod(0o755)
-        except OSError:
-            pass
         updated.append("scripts/run.sh")
 
     examples_dir = proj_dir / "examples"

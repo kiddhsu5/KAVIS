@@ -6,9 +6,12 @@ import asyncio
 import contextlib
 import json
 import os
+import re
 import shutil
 import time
 from typing import Any
+
+from core.provider_capabilities import parse_model_ref
 
 from ..models import BackendResult, DispatchEnvelope
 from .base import Backend, HealthResult
@@ -26,7 +29,7 @@ class ClaudeBackend(Backend):
     ) -> None:
         self._binary = binary
         self._timeout = timeout_s
-        self._model = model or os.environ.get("CLAUDE_DISPATCH_MODEL", "MiniMax-M3.1-Flash")
+        self._model = model or os.environ.get("CLAUDE_DISPATCH_MODEL", "gemini-4-argon")
         self._cwd = cwd
 
     async def health(self) -> HealthResult:
@@ -53,13 +56,17 @@ class ClaudeBackend(Backend):
             return HealthResult(False, str(exc))
 
     async def run(self, envelope: DispatchEnvelope) -> BackendResult:
+        provider_env, model_id = parse_model_ref(self._model)
         args: list[str] = [self._binary, "-p", "--dangerously-skip-permissions"]
-        if self._model:
-            args += ["--model", self._model]
+        if model_id:
+            args += ["--model", model_id]
         # Ask Claude Code for a single JSON object — easy to parse.
         args += ["--output-format", "json"]
         # ``--`` ends option parsing so a prompt such as "--help" or
         # "--dangerously-skip-permissions" is never read as a CLI flag.
+        thinking_mode = envelope.thinking_mode
+        if thinking_mode and thinking_mode.lower() != "auto" and re.fullmatch(r"[A-Za-z0-9_.:-]{1,64}", thinking_mode):
+            args += ["--effort", thinking_mode]
         args += ["--", envelope.prompt]
 
         env = {
@@ -67,11 +74,18 @@ class ClaudeBackend(Backend):
             "CI": "1",  # disable interactive hooks
             "NONINTERACTIVE": "1",
         }
+        if thinking_mode and thinking_mode.lower() != "auto":
+            env["KHAVIS_THINKING_MODE"] = thinking_mode
         # Dynamic cross-provider credential mapping based on selected model
-        model_lower = self._model.lower()
+        model_lower = model_id.lower()
+        juapi_key = os.environ.get("JUAPI_API_KEY")
         minimax_key = os.environ.get("MINIMAX_API_KEY")
         glm_key = os.environ.get("ZHIPUAI_API_KEY") or os.environ.get("GLM_API_KEY")
-        if "minimax" in model_lower and minimax_key:
+        if juapi_key and (provider_env == "JUAPI_API_KEY" or (not provider_env and _uses_juapi_model(model_lower))):
+            env["ANTHROPIC_API_KEY"] = juapi_key
+            env["ANTHROPIC_AUTH_TOKEN"] = juapi_key
+            env["ANTHROPIC_BASE_URL"] = _juapi_anthropic_base_url()
+        elif "minimax" in model_lower and minimax_key:
             env["ANTHROPIC_API_KEY"] = minimax_key
             env["ANTHROPIC_AUTH_TOKEN"] = minimax_key
             env.setdefault("ANTHROPIC_BASE_URL", "https://api.minimaxi.com/anthropic")
@@ -119,7 +133,10 @@ class ClaudeBackend(Backend):
 
         if rc != 0 or err_detail:
             if run_cwd or (rc != 0 and not err_detail):
-                from ._http_fallback import call_upstream_llm_fallback, has_any_upstream_key  # noqa: PLC0415
+                from ._http_fallback import (  # noqa: PLC0415
+                    call_upstream_llm_fallback,
+                    has_any_upstream_key,
+                )
 
                 if has_any_upstream_key():
                     loop = asyncio.get_running_loop()
@@ -131,6 +148,9 @@ class ClaudeBackend(Backend):
                         "claude",
                         30,
                         run_cwd,
+                        True,
+                        envelope.thinking_mode,
+                        envelope.thinking_parameter,
                     )
                     if fb.get("ok"):
                         return BackendResult(
@@ -168,6 +188,26 @@ async def _kill(proc: asyncio.subprocess.Process) -> None:
         proc.kill()
     with contextlib.suppress(Exception):
         await asyncio.wait_for(proc.wait(), timeout=5)
+
+
+def _uses_juapi_model(model_lower: str) -> bool:
+    """Return whether the selected model is explicitly registered to JUAPI."""
+    configured = {
+        item.strip().lower()
+        for item in os.environ.get("JUAPI_MODELS", "").split(",")
+        if item.strip()
+    }
+    return model_lower in configured or model_lower in {"gemini4", "gemini-4", "gemini-4-argon"}
+
+
+def _juapi_anthropic_base_url() -> str:
+    """Normalize JUAPI's OpenAI-style /v1 base into Claude's root base URL."""
+    base = (
+        os.environ.get("JUAPI_ANTHROPIC_BASE_URL", "").strip()
+        or os.environ.get("JUAPI_BASE_URL", "").strip()
+        or "https://www.juapi.net"
+    ).rstrip("/")
+    return base[:-3] if base.endswith("/v1") else base
 
 
 def _parse_claude_json(raw: str, prompt: str) -> tuple[str, str, int, int]:

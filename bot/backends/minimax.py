@@ -23,6 +23,8 @@ import shutil
 import time
 from typing import Any
 
+from core.provider_capabilities import parse_model_ref
+
 from ..models import BackendResult, DispatchEnvelope
 from .base import Backend, HealthResult
 
@@ -74,9 +76,10 @@ class MinimaxBackend(Backend):
             return HealthResult(False, repr(exc))
 
     async def run(self, envelope: DispatchEnvelope) -> BackendResult:
+        _, model_id = parse_model_ref(self._model)
         args: list[str] = [self._binary, "exec"]
-        if self._model:
-            args += ["--model", self._model]
+        if model_id:
+            args += ["--model", model_id]
         args += ["--output-format", "json"]
         args += ["--", envelope.prompt]
 
@@ -85,6 +88,9 @@ class MinimaxBackend(Backend):
             "CI": "1",
             "NONINTERACTIVE": "1",
         }
+        if envelope.thinking_mode and envelope.thinking_mode.lower() != "auto":
+            env["KHAVIS_THINKING_MODE"] = envelope.thinking_mode
+            env["MINIMAX_THINKING_MODE"] = envelope.thinking_mode
         api_key = os.environ.get("MINIMAX_API_KEY")
         if api_key:
             env["MINIMAX_API_KEY"] = api_key
@@ -126,7 +132,10 @@ class MinimaxBackend(Backend):
         if rc != 0 or err_detail:
             err_msg = err_detail or stderr or stdout or f"process exited with {rc}"
             if run_cwd or (rc != 0 and not err_detail):
-                from ._http_fallback import call_upstream_llm_fallback, has_any_upstream_key  # noqa: PLC0415
+                from ._http_fallback import (  # noqa: PLC0415
+                    call_upstream_llm_fallback,
+                    has_any_upstream_key,
+                )
 
                 if has_any_upstream_key():
                     loop = asyncio.get_running_loop()
@@ -138,6 +147,9 @@ class MinimaxBackend(Backend):
                         "minimax",
                         30,
                         run_cwd,
+                        True,
+                        envelope.thinking_mode,
+                        envelope.thinking_parameter,
                     )
                     if fb.get("ok"):
                         return BackendResult(

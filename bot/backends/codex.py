@@ -6,9 +6,12 @@ import asyncio
 import contextlib
 import json
 import os
+import re
 import shutil
 import time
 from typing import Any
+
+from core.provider_capabilities import parse_model_ref
 
 from ..models import BackendResult, DispatchEnvelope
 from .base import Backend, HealthResult
@@ -26,7 +29,7 @@ class CodexBackend(Backend):
     ) -> None:
         self._binary = binary
         self._timeout = timeout_s
-        self._model = model or os.environ.get("CODEX_DISPATCH_MODEL", "glm-5.3-flashx")
+        self._model = model or os.environ.get("CODEX_DISPATCH_MODEL", "kimi-k3.1-pro")
         self._cwd = cwd
 
     async def health(self) -> HealthResult:
@@ -55,14 +58,18 @@ class CodexBackend(Backend):
             return HealthResult(False, repr(exc))
 
     async def run(self, envelope: DispatchEnvelope) -> BackendResult:
+        provider_env, model_id = parse_model_ref(self._model)
         args: list[str] = [
             self._binary,
             "exec",
             "--skip-git-repo-check",
             "--dangerously-bypass-approvals-and-sandbox",
         ]
-        if self._model:
-            args += ["-m", self._model]
+        if model_id:
+            args += ["-m", model_id]
+        thinking_mode = envelope.thinking_mode
+        if thinking_mode and thinking_mode.lower() != "auto" and re.fullmatch(r"[A-Za-z0-9_.:-]{1,64}", thinking_mode):
+            args += ["-c", f"model_reasoning_effort={thinking_mode}"]
         # Try JSON output first; fall back to plain text if the flag is rejected.
         args += ["--json"]
         # ``--`` ends option parsing so a prompt that starts with "-" (or
@@ -74,11 +81,17 @@ class CodexBackend(Backend):
             "CI": "1",
             "NONINTERACTIVE": "1",
         }
+        if thinking_mode and thinking_mode.lower() != "auto":
+            env["KHAVIS_THINKING_MODE"] = thinking_mode
         # Dynamic cross-provider credential mapping based on selected model
-        model_lower = self._model.lower()
+        model_lower = model_id.lower()
+        juapi_key = os.environ.get("JUAPI_API_KEY")
         glm_key = os.environ.get("ZHIPUAI_API_KEY") or os.environ.get("GLM_API_KEY")
         minimax_key = os.environ.get("MINIMAX_API_KEY")
-        if glm_key and ("glm" in model_lower or "flashx" in model_lower or "codegeex" in model_lower):
+        if juapi_key and (provider_env == "JUAPI_API_KEY" or (not provider_env and _uses_juapi_model(model_lower))):
+            env["OPENAI_API_KEY"] = juapi_key
+            env["OPENAI_BASE_URL"] = _juapi_openai_base_url()
+        elif glm_key and ("glm" in model_lower or "flashx" in model_lower or "codegeex" in model_lower):
             env["OPENAI_API_KEY"] = glm_key
             if "OPENAI_BASE_URL" not in env:
                 env["OPENAI_BASE_URL"] = "https://open.bigmodel.cn/api/paas/v4"
@@ -126,7 +139,10 @@ class CodexBackend(Backend):
             if not err_detail and "--json" in args and "unknown flag" in stderr.lower():
                 return await self._run_plain(envelope, latency_ms=latency_ms)
             if run_cwd or (rc != 0 and not err_detail):
-                from ._http_fallback import call_upstream_llm_fallback, has_any_upstream_key  # noqa: PLC0415
+                from ._http_fallback import (  # noqa: PLC0415
+                    call_upstream_llm_fallback,
+                    has_any_upstream_key,
+                )
 
                 if has_any_upstream_key():
                     loop = asyncio.get_running_loop()
@@ -138,6 +154,9 @@ class CodexBackend(Backend):
                         "codex",
                         30,
                         run_cwd,
+                        True,
+                        envelope.thinking_mode,
+                        envelope.thinking_parameter,
                     )
                     if fb.get("ok"):
                         return BackendResult(
@@ -169,9 +188,13 @@ class CodexBackend(Backend):
         )
 
     async def _run_plain(self, envelope: DispatchEnvelope, *, latency_ms: int = 0) -> BackendResult:
+        _, model_id = parse_model_ref(self._model)
         args = [self._binary, "exec"]
-        if self._model:
-            args += ["-m", self._model]
+        if model_id:
+            args += ["-m", model_id]
+        thinking_mode = envelope.thinking_mode
+        if thinking_mode and thinking_mode.lower() != "auto" and re.fullmatch(r"[A-Za-z0-9_.:-]{1,64}", thinking_mode):
+            args += ["-c", f"model_reasoning_effort={thinking_mode}"]
         args += ["--", envelope.prompt]
         try:
             proc = await asyncio.create_subprocess_exec(
@@ -222,6 +245,26 @@ async def _kill(proc: asyncio.subprocess.Process) -> None:
         proc.kill()
     with contextlib.suppress(Exception):
         await asyncio.wait_for(proc.wait(), timeout=5)
+
+
+def _uses_juapi_model(model_lower: str) -> bool:
+    """Return whether the selected model is explicitly registered to JUAPI."""
+    configured = {
+        item.strip().lower()
+        for item in os.environ.get("JUAPI_MODELS", "").split(",")
+        if item.strip()
+    }
+    return model_lower in configured or model_lower.startswith("kimi-")
+
+
+def _juapi_openai_base_url() -> str:
+    """Normalize JUAPI's generic base URL to the documented `/v1` endpoint."""
+    base = (
+        os.environ.get("JUAPI_OPENAI_BASE_URL", "").strip()
+        or os.environ.get("JUAPI_BASE_URL", "").strip()
+        or "https://www.juapi.net/v1"
+    ).rstrip("/")
+    return base if base.endswith("/v1") else f"{base}/v1"
 
 
 def _parse_codex_output(raw: str) -> tuple[str, str, int, int]:

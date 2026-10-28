@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 _LOCK = threading.Lock()
-_MAX_LINE_CHARS = 12_000
+_MAX_FIELD_CHARS = 2_000
 
 
 def history_path() -> Path:
@@ -28,11 +28,11 @@ def record(event: dict[str, Any]) -> None:
     """Append one dispatch event. Never raises."""
     payload = dict(event)
     payload.setdefault("ts", time.time())
-    # Keep the file bounded: trim huge text fields.
-    for key in ("prompt", "consensus", "result"):
+    # Keep the file bounded: trim every user/model-controlled long text field.
+    for key in ("prompt", "consensus", "result", "review_details", "error"):
         v = payload.get(key)
-        if isinstance(v, str) and len(v) > _MAX_LINE_CHARS:
-            payload[key] = v[:_MAX_LINE_CHARS] + "…"
+        if isinstance(v, str) and len(v) > _MAX_FIELD_CHARS:
+            payload[key] = v[:_MAX_FIELD_CHARS] + "…"
     line = json.dumps(payload, ensure_ascii=False, default=str)
     try:
         with _LOCK, history_path().open("a", encoding="utf-8") as fh:

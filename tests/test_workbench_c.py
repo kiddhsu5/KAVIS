@@ -10,6 +10,7 @@ Licensed under the Apache License, Version 2.0.
 from __future__ import annotations
 
 import re
+import subprocess
 from html.parser import HTMLParser
 from pathlib import Path
 
@@ -42,6 +43,8 @@ REQUIRED_DOM_IDS = (
     "ca-name",
     "ca-type",
     "capability-hint",
+    "attachment-input",
+    "attachment-list",
     "card-title-antigravity",
     "card-title-claude",
     "card-title-codex",
@@ -62,6 +65,8 @@ REQUIRED_DOM_IDS = (
     "model-save-toast",
     "model-settings-panel",
     "prompt-input",
+    "thinking-capability-source",
+    "thinking-mode",
     "quota-capsule-strip",
     "quota-cards-grid",
     "theme-icon",
@@ -127,6 +132,9 @@ def test_render_workbench_html_c_basics() -> None:
     # Morandi palette tokens
     assert "--m-mist" in html
     assert "#7C9BB5" in html
+    assert "JUAPI TokenRouter" in html
+    assert "gemini-4-argon" in html
+    assert "kimi-k3.1-pro" in html
 
 
 @pytest.mark.parametrize("dom_id", REQUIRED_DOM_IDS)
@@ -241,7 +249,6 @@ def test_c_page_next_step_and_followup_are_wired() -> None:
 
 def _run_node_harness(script_name: str, page_html: str) -> subprocess.CompletedProcess:
     import shutil
-    import subprocess
     import tempfile
 
     node = shutil.which("node")

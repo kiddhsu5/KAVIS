@@ -21,6 +21,8 @@ import time
 import urllib.request
 from typing import Any
 
+from core.provider_capabilities import parse_model_ref
+
 from ..models import BackendResult, DispatchEnvelope
 from .base import Backend, HealthResult
 
@@ -64,15 +66,29 @@ class CustomAgentBackend(Backend):
         run_cwd = self._cwd or envelope.workspace_dir or None
 
         if agent_type == "cli" and exe_path:
-            return await self._run_cli(bin_parts, envelope.prompt, run_cwd)
-        return await self._run_http_fallback(envelope.prompt, run_cwd)
+            return await self._run_cli(
+                bin_parts,
+                envelope.prompt,
+                run_cwd,
+                envelope.thinking_mode,
+                envelope.thinking_parameter,
+            )
+        return await self._run_http_fallback(
+            envelope.prompt,
+            run_cwd,
+            envelope.thinking_mode,
+            envelope.thinking_parameter,
+        )
 
     async def _run_cli(
         self,
         bin_parts: list[str],
         prompt: str,
         run_cwd: str | None,
+        thinking_mode: str | None = None,
+        thinking_parameter: str | None = None,
     ) -> BackendResult:
+        _, model_id = parse_model_ref(self._model)
         template = str(self._spec.get("args_template") or "--model {model} -- {prompt}").strip()
         raw_tokens = shlex.split(template) if template else ["--", "{prompt}"]
         built_args: list[str] = list(bin_parts)
@@ -82,13 +98,17 @@ class CustomAgentBackend(Backend):
                 built_args.append(tok.replace("{prompt}", prompt))
                 prompt_injected = True
             elif "{model}" in tok:
-                built_args.append(tok.replace("{model}", self._model))
+                built_args.append(tok.replace("{model}", model_id))
             else:
                 built_args.append(tok)
         if not prompt_injected:
             built_args += ["--", prompt]
 
         env = {**os.environ, "CI": "1", "NONINTERACTIVE": "1"}
+        if thinking_mode and thinking_mode.lower() != "auto":
+            env["KHAVIS_THINKING_MODE"] = thinking_mode
+            if thinking_parameter:
+                env["KHAVIS_THINKING_PARAMETER"] = thinking_parameter
         api_key_env = str(self._spec.get("api_key_env") or "").strip()
         if api_key_env and os.environ.get(api_key_env):
             key_val = os.environ[api_key_env]
@@ -150,10 +170,17 @@ class CustomAgentBackend(Backend):
             model=self._model,
         )
 
-    async def _run_http_fallback(self, prompt: str, run_cwd: str | None) -> BackendResult:
+    async def _run_http_fallback(
+        self,
+        prompt: str,
+        run_cwd: str | None,
+        thinking_mode: str | None = None,
+        thinking_parameter: str | None = None,
+    ) -> BackendResult:
         """Execute custom agent via OpenAI-compatible Chat Completions API."""
         t0 = time.perf_counter()
-        model_lower = self._model.lower()
+        _, model_id = parse_model_ref(self._model)
+        model_lower = model_id.lower()
         api_key_env = str(self._spec.get("api_key_env") or "").strip()
         api_key = (
             (os.environ.get(api_key_env) if api_key_env else None)
@@ -181,17 +208,18 @@ class CustomAgentBackend(Backend):
             or f"You are {self._spec.get('name') or self.name}, a specialized coding and engineering agent running in workspace {run_cwd or '.'}. Respond concisely in Traditional Chinese."
         )
 
-        req_body = json.dumps(
-            {
-                "model": self._model,
-                "messages": [
-                    {"role": "system", "content": sys_prompt},
-                    {"role": "user", "content": prompt},
-                ],
-                "temperature": 0.3,
-                "max_tokens": 1200,
-            }
-        ).encode("utf-8")
+        request_body: dict[str, Any] = {
+            "model": model_id,
+            "messages": [
+                {"role": "system", "content": sys_prompt},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0.3,
+            "max_tokens": 1200,
+        }
+        if thinking_mode and thinking_mode.lower() != "auto":
+            request_body[thinking_parameter or "reasoning_effort"] = thinking_mode
+        req_body = json.dumps(request_body).encode("utf-8")
 
         def _do_request() -> tuple[bool, str, int, int]:
             req = urllib.request.Request(

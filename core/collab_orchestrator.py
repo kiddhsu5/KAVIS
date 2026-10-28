@@ -15,7 +15,6 @@ Licensed under the Apache License, Version 2.0.
 from __future__ import annotations
 
 import asyncio
-import json
 import re
 import time
 from pathlib import Path
@@ -198,6 +197,8 @@ async def run_collaborative_workflow(
     agent_cwds: dict[str, Path],
     collab_mode: str = "auto_loop",
     previous_context: dict[str, Any] | None = None,
+    thinking_mode: str | None = None,
+    thinking_parameter: str | None = None,
 ) -> dict[str, Any]:
     """Execute the requested multi-agent collaboration mode and return structured results."""
     mode = (collab_mode or "auto_loop").strip().lower()
@@ -242,6 +243,8 @@ async def run_collaborative_workflow(
                 only=[agent_id],  # type: ignore[arg-type]
                 capability=capability,
                 workspace_dir=str(shared_dir),
+                thinking_mode=thinking_mode,
+                thinking_parameter=thinking_parameter,
             )
             rep = await router.dispatch(env)
             step_ms = int((time.perf_counter() - step_t0) * 1000)
@@ -278,6 +281,8 @@ async def run_collaborative_workflow(
             only=agents,  # type: ignore[arg-type]
             capability=capability,
             workspace_dir=str(shared_dir),
+            thinking_mode=thinking_mode,
+            thinking_parameter=thinking_parameter,
         )
         report = await router.dispatch(env)
         stage1_ms = int((time.perf_counter() - t_stage1) * 1000)

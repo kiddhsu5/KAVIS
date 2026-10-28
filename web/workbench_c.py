@@ -36,22 +36,28 @@ _SLICES: Final[dict[str, tuple[int, int]]] = {
     # 工作區 + Git worktree/diff 主控台
     "workspace": (250, 327),
     # 拓撲畫布 + Agent 節點 + 協同模式 + 任務範本 (不含輸入框, 見 composer)
-    "topology": (329, 709),
+    "topology": (329, 702),
     # 快速範本 + textarea + 能力路由 + 派工按鈕
-    "composer": (710, 743),
+    "composer": (703, 756),
     # 執行面板：狀態列、pipeline stepper、延遲圖、成果容器
-    "result": (747, 836),
+    "result": (761, 847),
     # VIEW 2-5：交付文件 / 額度熔斷 / Agent 集群 / 部署精靈
-    "views": (839, 970),
+    "views": (851, 981),
     # 產物預覽抽屜
-    "drawers": (975, 998),
+    "drawers": (986, 1009),
 }
 
 
 def _slice(name: str) -> str:
     """Return a 1-indexed inclusive slice of the legacy markup."""
     start, end = _SLICES[name]
-    return "\n".join(_LINES[start - 1 : end])
+    fragment = "\n".join(_LINES[start - 1 : end])
+    if name == "composer":
+        # The legacy composer closes three wrappers that are not part of the
+        # extracted C-page fragment; the C chrome owns those wrappers.
+        for _ in range(3):
+            fragment = re.sub(r"\n\s*</div>\s*$", "", fragment)
+    return fragment
 
 
 def _rebalance(html: str, extra_open: int = 0) -> str:
@@ -553,7 +559,7 @@ _SIDEBAR: Final[str] = """
   <!-- ═══════════════════════════════════════════════════════════════
        左上區塊 1：歷史談話 (History Conversations)
        ═══════════════════════════════════════════════════════════════ -->
-  <div class="flex-[4] min-h-0 flex flex-col border-b m-line">
+  <div class="flex-1 min-h-0 flex flex-col border-b m-line">
     <div class="c-zone-header">
       <div class="w-6 h-6 rounded-md grid place-items-center text-[10px] font-black shrink-0"
            style="background:linear-gradient(135deg,#7C9BB5,#8FA894);color:#16181D">K</div>
@@ -627,21 +633,47 @@ _SIDEBAR: Final[str] = """
   </div>
 
   <!-- ═══════════════════════════════════════════════════════════════
-       左中區塊 2：資料庫 (Database / Deliverables & Knowledge Base)
+       左中區塊 2：獨立頁面快捷入口 (首頁僅顯示按鈕，點擊進入獨立頁面)
        ═══════════════════════════════════════════════════════════════ -->
-  <div class="flex-[3] min-h-0 flex flex-col border-b m-line">
-    <div class="c-zone-header">
-      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" style="color:var(--m-sage)" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"/></svg>
-      <span class="c-zone-title">資料庫</span>
-      <span id="artifacts-badge" class="text-[10px] font-mono px-1.5 py-0.5 rounded" style="background:var(--m-sage-soft);color:var(--m-sage)">--</span>
-      <div class="flex-1"></div>
-      <button type="button" onclick="switchTab('artifacts')" id="nav-artifacts" class="tab-btn px-2 py-0.5 rounded text-[10px] m-btn-ghost transition" title="展開完整資料庫檢視">
-        全頁檢視 ↗
-      </button>
+  <div class="shrink-0 p-2.5 space-y-2 border-b m-line" style="background:var(--m-panel-2)">
+    <div class="flex items-center justify-between px-1">
+      <span class="m-section-label">獨立功能專頁</span>
+      <span class="text-[10px] font-mono" style="color:var(--m-faint)">點擊開啟全頁管理</span>
     </div>
-    <div id="c-db-list" class="flex-1 overflow-y-auto m-scroll p-2 space-y-1 text-xs">
-      <div class="text-[11px] py-4 text-center" style="color:var(--m-faint)">載入資料庫中…</div>
-    </div>
+
+    <button type="button" onclick="cOpenPage('agents')" id="nav-agents"
+            class="tab-btn w-full p-2.5 rounded-xl m-line frost hover:border-sky-400/50 transition flex items-center justify-between gap-2 text-left group">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <div class="w-8 h-8 rounded-lg grid place-items-center shrink-0" style="background:var(--m-sage-soft);color:var(--m-sage)">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="18" r="2"/><path d="M12 7v4m0 0-5 5m5-5 5 5" stroke-linecap="round"/></svg>
+        </div>
+        <div class="min-w-0">
+          <div class="text-xs font-bold flex items-center gap-1.5" style="color:var(--m-bone)">
+            <span>Agent 狀態</span>
+            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded" style="background:var(--m-sage-soft);color:var(--m-sage)"><span id="c-fleet-count">6</span>/6 在線</span>
+          </div>
+          <div class="text-[10px] truncate mt-0.5" style="color:var(--m-faint)">模型新增/刪除/異動 · 新增服務商</div>
+        </div>
+      </div>
+      <span class="text-xs font-mono shrink-0 group-hover:translate-x-0.5 transition" style="color:var(--m-mist)">進入 ↗</span>
+    </button>
+
+    <button type="button" onclick="cOpenPage('artifacts')" id="nav-artifacts"
+            class="tab-btn w-full p-2.5 rounded-xl m-line frost hover:border-sky-400/50 transition flex items-center justify-between gap-2 text-left group">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <div class="w-8 h-8 rounded-lg grid place-items-center shrink-0" style="background:var(--m-mist-soft);color:var(--m-mist)">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"/></svg>
+        </div>
+        <div class="min-w-0">
+          <div class="text-xs font-bold flex items-center gap-1.5" style="color:var(--m-bone)">
+            <span>資料庫</span>
+            <span id="artifacts-badge" class="text-[10px] font-mono px-1.5 py-0.5 rounded" style="background:var(--m-mist-soft);color:var(--m-mist)">--</span>
+          </div>
+          <div class="text-[10px] truncate mt-0.5" style="color:var(--m-faint)">檢視、搜尋與預覽所有交付產物文件</div>
+        </div>
+      </div>
+      <span class="text-xs font-mono shrink-0 group-hover:translate-x-0.5 transition" style="color:var(--m-mist)">進入 ↗</span>
+    </button>
   </div>
 
   <!-- ═══════════════════════════════════════════════════════════════
@@ -678,14 +710,14 @@ _SIDEBAR: Final[str] = """
       </div>
 
       <div class="grid grid-cols-3 gap-1 pt-0.5">
-        <button type="button" onclick="switchTab('quotas')" id="nav-quotas" class="tab-btn px-2 py-1.5 rounded-lg m-btn-ghost text-[11px] font-medium flex items-center justify-center gap-1 transition">
+        <button type="button" onclick="cOpenPage('quotas')" id="nav-quotas" class="tab-btn px-2 py-1.5 rounded-lg m-btn-ghost text-[11px] font-medium flex items-center justify-center gap-1 transition">
           <span>額度熔斷</span>
         </button>
-        <button type="button" onclick="switchTab('wizard')" id="nav-wizard" class="tab-btn px-2 py-1.5 rounded-lg m-btn-ghost text-[11px] font-medium flex items-center justify-center gap-1 transition">
-          <span>模型設定</span>
+        <button type="button" onclick="cOpenPage('agents')" id="nav-wizard" class="tab-btn px-2 py-1.5 rounded-lg m-btn-ghost text-[11px] font-medium flex items-center justify-center gap-1 transition">
+          <span>模型與服務商</span>
         </button>
-        <button type="button" onclick="switchTab('agents')" id="nav-agents" class="tab-btn px-2 py-1.5 rounded-lg m-btn-ghost text-[11px] font-medium flex items-center justify-center gap-1 transition">
-          <span>集群設定</span>
+        <button type="button" onclick="cOpenPage('command')" class="px-2 py-1.5 rounded-lg m-btn-ghost text-[11px] font-medium flex items-center justify-center gap-1 transition">
+          <span>對話首頁</span>
         </button>
       </div>
     </div>
@@ -695,23 +727,37 @@ _SIDEBAR: Final[str] = """
 
 _TOPBAR: Final[str] = """
 <header class="h-11 shrink-0 bg-ink-800/60 backdrop-blur border-b m-line flex items-center justify-between px-3 sm:px-4 gap-3">
-  <div class="flex items-center gap-2 text-xs min-w-0">
+  <div class="flex items-center gap-2 text-xs shrink-0">
     <button type="button" onclick="cToggleSidebar(true)" id="c-menu-btn"
             class="w-7 h-7 shrink-0 rounded-lg m-btn-ghost grid place-items-center"
             aria-label="開啟側欄" aria-controls="c-sidebar" aria-expanded="false">
       <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16" stroke-linecap="round"/></svg>
     </button>
-    <span class="c-zone-title">
+    <button type="button" onclick="cOpenPage('command')" id="nav-command"
+            class="tab-btn c-zone-title px-2.5 py-1 rounded-lg m-nav-active transition flex items-center gap-1.5 whitespace-nowrap shrink-0" title="返回對話串主畫面">
       <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" style="color:var(--m-mist)" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke-linejoin="round"/></svg>
-      對話串
-    </span>
-    <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--m-faint)" aria-hidden="true"><path d="m9 6 6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    <button type="button" onclick="switchTab('command')" id="nav-command" class="tab-btn m-nav rounded-lg px-2 py-0.5 truncate text-[11px]" title="回到對話串主畫面">shared-app</button>
-    <span class="font-medium truncate text-[11px]" id="c-view-title" style="color:var(--m-faint)">主對話視窗</span>
+      <span>對話串</span>
+    </button>
+    <button type="button" onclick="cOpenPage('agents')" id="c-top-btn-agents"
+            class="px-2.5 py-1 rounded-lg m-btn-ghost text-[11px] font-semibold transition inline-flex items-center gap-1.5 shrink-0 whitespace-nowrap"
+            title="進入 Agent 狀態、模型新增/刪除/調整與服務商管理專頁">
+      <span>🤖 Agent 狀態<span class="hidden 2xl:inline">與模型/服務商</span></span>
+    </button>
+    <button type="button" onclick="cOpenPage('artifacts')" id="c-top-btn-db"
+            class="px-2.5 py-1 rounded-lg m-btn-ghost text-[11px] font-semibold transition inline-flex items-center gap-1.5 shrink-0 whitespace-nowrap"
+            title="進入資料庫產物專頁">
+      <span>📚 資料庫</span>
+    </button>
+    <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" class="hidden md:inline" style="color:var(--m-faint)" aria-hidden="true"><path d="m9 6 6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span class="font-medium truncate text-[11px] hidden md:inline" id="c-view-title" style="color:var(--m-faint)">主對話視窗</span>
   </div>
 
-  <div class="flex items-center gap-2 min-w-0 overflow-hidden">
-    <div id="c-task-filter" class="inline-flex rounded-lg p-0.5 m-line text-[11px] shrink-0" style="background:var(--m-ink-700)" role="group" aria-label="任務篩選">
+  <div class="flex items-center justify-end gap-2 min-w-0 flex-1 overflow-hidden">
+    <span id="c-exec-timer" class="font-mono text-[10px] px-1.5 py-0.5 rounded shrink-0"
+          style="background:var(--m-mist-soft);color:var(--m-mist)">0.0s</span>
+    <span id="c-exec-status-text" class="hidden">待命就緒</span>
+
+    <div id="c-task-filter" class="hidden lg:inline-flex rounded-lg p-0.5 m-line text-[11px] shrink-0" style="background:var(--m-ink-700)" role="group" aria-label="任務篩選">
       <button type="button" onclick="cFilter('all')" class="c-filter-btn px-2 py-0.5 rounded-md font-medium" data-filter="all" aria-pressed="true">全部</button>
       <button type="button" onclick="cFilter('running')" class="c-filter-btn px-2 py-0.5 rounded-md" data-filter="running" aria-pressed="false">執行中</button>
       <button type="button" onclick="cFilter('done')" class="c-filter-btn px-2 py-0.5 rounded-md" data-filter="done" aria-pressed="false">已完成</button>
@@ -727,7 +773,7 @@ _TOPBAR: Final[str] = """
 
     <button type="button" onclick="cToggleDrawer()" id="c-drawer-btn"
             class="w-7 h-7 rounded-lg m-btn-ghost grid place-items-center transition shrink-0 relative xl:hidden"
-            title="展開右側 Agent 狀態與 Using 檔案" aria-label="右側面板" aria-expanded="false">
+            title="展開右側 Using 檔案面板" aria-label="右側面板" aria-expanded="false">
       <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></svg>
       <span id="c-drawer-dot" class="hidden absolute top-1 right-1 w-1.5 h-1.5 rounded-full m-live" style="background:var(--m-mist)"></span>
     </button>
@@ -749,7 +795,7 @@ _COMPOSER_CHROME_TOP: Final[str] = """
 <!-- ═══════════════════════════════════════════════════════════════
      中下區塊 5：輸入框 (Prompt Input & Collaborative Composer)
      ═══════════════════════════════════════════════════════════════ -->
-<div class="shrink-0 border-t m-line px-3 sm:px-5 py-2.5" style="background:var(--m-panel);backdrop-filter:blur(12px)">
+<div id="c-composer-wrap" class="shrink-0 border-t m-line px-3 sm:px-5 py-2.5" style="background:var(--m-panel);backdrop-filter:blur(12px)">
   <div class="max-w-4xl mx-auto">
     <div class="composer frost-2 m-line rounded-2xl p-3 transition">
 
@@ -877,13 +923,11 @@ if (_nativeFetch) {
   };
 }
 
-// ── 覆寫 switchTab：改用莫蘭迪選中態 ───────────────────────────────
+// ── 覆寫 switchTab 與獨立頁面切換 cOpenPage ───────────────────────────────
 const _switchTabLegacy = __legacySwitchTab;
 function switchTab(tab) {
   _switchTabLegacy(tab);
   document.querySelectorAll('.tab-btn').forEach(b => {
-    // legacy 會塞 bg-sky-600/20 / text-sky-400 等高對比天藍選中態，
-    // 在莫蘭迪配色下會像壞掉的一顆藥丸 → 一律清掉改用 m-nav-active。
     b.classList.remove('m-nav-active', 'bg-sky-600/20', 'text-sky-400', 'border-sky-500/30');
     b.classList.add('m-nav');
     b.setAttribute('aria-current', 'false');
@@ -895,11 +939,71 @@ function switchTab(tab) {
     active.classList.remove('m-nav');
     active.setAttribute('aria-current', 'page');
   }
-  const titles = { command:'任務', artifacts:'交付文件', quotas:'額度與熔斷', agents:'Agent 拓撲', wizard:'模型與部署' };
+  const topAgents = document.getElementById('c-top-btn-agents');
+  if (topAgents) {
+    topAgents.classList.toggle('m-nav-active', tab === 'agents' || tab === 'wizard');
+    topAgents.classList.toggle('m-btn-ghost', !(tab === 'agents' || tab === 'wizard'));
+  }
+  const topDb = document.getElementById('c-top-btn-db');
+  if (topDb) {
+    topDb.classList.toggle('m-nav-active', tab === 'artifacts');
+    topDb.classList.toggle('m-btn-ghost', tab !== 'artifacts');
+  }
+  const titles = {
+    command:'主對話視窗',
+    artifacts:'📚 資料庫獨立專頁',
+    quotas:'📊 額度與熔斷監控',
+    agents:'🤖 Agent 狀態 · 模型與服務商管理專頁',
+    wizard:'🚀 部署與服務商金鑰設定'
+  };
   const t = document.getElementById('c-view-title');
-  if (t) t.textContent = titles[tab] || '任務';
+  if (t) t.textContent = titles[tab] || '主對話視窗';
+
+  // 當進入「Agent 狀態」或「資料庫」等獨立頁面時，自動隱藏首頁底部的輸入框與右側 Using 檔案欄，讓獨立頁面全寬展示
+  const isHome = (tab === 'command');
+  const compWrap = document.getElementById('c-composer-wrap');
+  if (compWrap) compWrap.classList.toggle('hidden', !isHome);
+  const rightDrawer = document.getElementById('c-drawer');
+  if (rightDrawer) rightDrawer.classList.toggle('hidden', !isHome);
+  const mainContainer = document.getElementById('c-main-container');
+  if (mainContainer) {
+    mainContainer.className = isHome
+      ? 'max-w-4xl mx-auto px-4 sm:px-6 py-4'
+      : 'max-w-6xl mx-auto px-4 sm:px-6 py-5';
+  }
+
+  if (tab === 'agents') {
+    if (typeof cLoadAgentsAndProvidersPage === 'function') cLoadAgentsAndProvidersPage();
+  }
+  if (tab === 'artifacts') {
+    if (typeof cLoadDatabasePage === 'function') cLoadDatabasePage();
+  }
   // 窄螢幕下側欄是抽屜，切換頁籤後自動收合
   cToggleSidebar(false);
+}
+
+function cTabFromLocation() {
+  try {
+    const path = location.pathname || '';
+    if (path === '/agents') return 'agents';
+    if (path === '/database') return 'artifacts';
+    const page = new URLSearchParams(location.search).get('page');
+    if (page === 'quotas') return 'quotas';
+  } catch (_) {}
+  return 'command';
+}
+
+function cOpenPage(tab, pushUrl = true) {
+  switchTab(tab);
+  if (pushUrl && typeof history !== 'undefined' && typeof history.pushState === 'function') {
+    try {
+      const urlMap = { command: '/workbench', agents: '/agents', artifacts: '/database', quotas: '/workbench?page=quotas', wizard: '/agents' };
+      const targetUrl = urlMap[tab] || '/workbench';
+      if (typeof location !== 'undefined' && location.pathname + location.search !== targetUrl) {
+        history.pushState({ page: tab }, '', targetUrl);
+      }
+    } catch (_) {}
+  }
 }
 
 // ── 覆寫 setCollabMode：同步 composer 內的模式列 ───────────────────
@@ -1515,8 +1619,15 @@ function cRenderAgentChips() {
 }
 
 function cAddAgent() {
+  // 拓撲／自訂 Agent 面板已移到「Agent 狀態」專頁，先切過去再展開
+  cOpenPage('agents');
   const d = document.getElementById('c-topology-collapse');
-  if (d) { d.open = true; d.scrollIntoView({ behavior:'smooth', block:'center' }); }
+  if (d) {
+    d.open = true;
+    setTimeout(() => d.scrollIntoView({ behavior:'smooth', block:'center' }), 80);
+  }
+  const p = document.getElementById('custom-agent-panel');
+  if (p) p.classList.remove('hidden');
 }
 
 function cSelectProject(name) {
@@ -2167,8 +2278,10 @@ function cRenderAgentStatusPanel() {
   document.querySelectorAll('input[name="agent_target"]').forEach(b => {
     if (!seen.some(v => v.value === b.value)) seen.push(b);
   });
-  const countEl = document.getElementById('c-fleet-count');
-  if (countEl) countEl.textContent = String(seen.length || 6);
+  ['c-fleet-count', 'c-fleet-count-page'].forEach(cid => {
+    const countEl = document.getElementById(cid);
+    if (countEl) countEl.textContent = String(seen.length || 6);
+  });
 
   host.innerHTML = seen.map(b => {
     const id = b.value;
@@ -2206,17 +2319,23 @@ function cRenderAgentStatusPanel() {
   }).join('');
 }
 
-// ── 左中「資料庫」清單載入 ────────────────────────────────────────
+// ── 資料庫獨立頁面與搜尋過濾 ────────────────────────────────────────
+let cAllArtifactsCache = [];
+let cArtifactFilterBadge = 'all';
+
 async function cLoadSidebarDatabase() {
   const host = document.getElementById('c-db-list');
-  if (!host) return;
   try {
     const res = await fetch('/api/workbench/artifacts');
     if (!res.ok) return;
     const data = await res.json();
     const items = data.artifacts || [];
+    cAllArtifactsCache = items;
     const badge = document.getElementById('artifacts-badge');
     if (badge) badge.textContent = String(items.length);
+    const pageCount = document.getElementById('c-db-page-count');
+    if (pageCount) pageCount.textContent = String(items.length);
+    if (!host) return;
     if (!items.length) {
       host.innerHTML = '<div class="text-[11px] py-4 text-center" style="color:var(--m-faint)">尚無資料庫產物</div>';
       return;
@@ -2233,6 +2352,703 @@ async function cLoadSidebarDatabase() {
         <span class="text-[10px] font-mono shrink-0" style="color:var(--m-faint)">${escapeHtml(item.size || '')}</span>
       </button>
     `).join('');
+  } catch (_) {}
+}
+
+async function cLoadDatabasePage() {
+  await cLoadSidebarDatabase();
+  // 依實際產物種類動態產生類型下拉選單，保留目前選取
+  const sel = document.getElementById('c-artifact-badge');
+  if (sel) {
+    const types = Array.from(new Set(cAllArtifactsCache.map(i => String(i.badge || 'DOC').toUpperCase()))).sort();
+    sel.innerHTML = '<option value="all">全部類型</option>' +
+      types.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+    sel.value = (cArtifactFilterBadge !== 'all' && types.indexOf(String(cArtifactFilterBadge).toUpperCase()) !== -1)
+      ? String(cArtifactFilterBadge).toUpperCase() : 'all';
+    if (sel.value === 'all') cArtifactFilterBadge = 'all';
+  }
+  cFilterArtifactsPage();
+}
+
+function cFilterArtifactsPage(queryText, badgeType) {
+  if (badgeType !== undefined) cArtifactFilterBadge = badgeType;
+  const searchEl = document.getElementById('c-artifact-search');
+  const q = String(queryText !== undefined ? queryText : (searchEl ? searchEl.value : '')).trim().toLowerCase();
+  const grid = document.getElementById('artifacts-grid');
+  if (!grid) return;
+  if (!cAllArtifactsCache.length) {
+    grid.innerHTML = '<div class="text-slate-400 py-8 text-center col-span-3">尚無資料庫產物</div>';
+    return;
+  }
+  const filtered = cAllArtifactsCache.filter(item => {
+    const b = String(item.badge || 'DOC').toUpperCase();
+    if (cArtifactFilterBadge !== 'all' && b !== cArtifactFilterBadge.toUpperCase()) return false;
+    if (!q) return true;
+    const hay = `${item.name || ''} ${item.path || ''} ${item.badge || ''}`.toLowerCase();
+    return hay.indexOf(q) !== -1;
+  });
+  if (!filtered.length) {
+    grid.innerHTML = '<div class="text-slate-400 py-8 text-center col-span-3">找不到符合篩選條件的資料庫產物</div>';
+    return;
+  }
+  grid.innerHTML = filtered.map(item => `
+    <div class="glass-panel p-4 rounded-xl border border-white/10 hover:border-sky-500/40 transition flex flex-col justify-between group">
+      <div class="space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 font-semibold">
+            ${escapeHtml(item.badge || 'DOC')}
+          </span>
+          <span class="text-[11px] text-slate-400 font-mono">${escapeHtml(item.size)}</span>
+        </div>
+        <h4 class="font-bold text-white text-sm group-hover:text-sky-400 transition flex items-center gap-2">
+          <i class="fas ${item.icon || 'fa-file'} text-sky-400"></i>
+          <span class="truncate">${escapeHtml(item.name)}</span>
+        </h4>
+        <p class="text-[11px] text-slate-400 font-mono truncate" title="${escapeHtml(item.path)}">${escapeHtml(item.path)}</p>
+      </div>
+      <div class="pt-4 flex items-center justify-between border-t border-white/5 mt-3">
+        <span class="text-[10px] text-slate-400 font-mono">${escapeHtml(item.mtime)}</span>
+        <button onclick="openArtifact('${escapeHtml(item.path)}', '${escapeHtml(item.name)}')" class="px-2.5 py-1 rounded bg-white/5 hover:bg-sky-500 hover:text-white text-xs text-sky-400 transition font-medium">
+          查看內容 &rarr;
+        </button>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── Agent 狀態 · 模型新增/刪除/調整異動 · 服務商點選新增管理專頁 ────────
+const C_PROVIDER_PRESETS = {
+  juapi: {
+    label: 'JUAPI TokenRouter',
+    env: 'JUAPI_API_KEY',
+    base_url_env: 'JUAPI_BASE_URL',
+    base_url: 'https://www.juapi.net/v1',
+    agents: 'Claude Code (Anthropic Messages) / Codex (OpenAI Responses)',
+    models: 'gemini-4-argon, kimi-k3.1-pro'
+  },
+  openrouter: {
+    label: 'OpenRouter 全模型路由',
+    env: 'OPENROUTER_API_KEY',
+    base_url_env: 'OPENROUTER_BASE_URL',
+    base_url: 'https://openrouter.ai/api/v1',
+    agents: '所有 Agent 節點 (OpenCode / Codex / Claude / 自訂 HTTP)',
+    models: 'deepseek/deepseek-chat-v3-0324, anthropic/claude-3.7-sonnet, google/gemini-2.5-pro'
+  },
+  deepseek: {
+    label: 'DeepSeek 官方 API',
+    env: 'DEEPSEEK_API_KEY',
+    base_url_env: 'DEEPSEEK_BASE_URL',
+    base_url: 'https://api.deepseek.com/v1',
+    agents: 'OpenCode / Codex / DeepSeek Coder',
+    models: 'deepseek-chat, deepseek-reasoner'
+  },
+  anthropic: {
+    label: 'Anthropic Claude 官方 API',
+    env: 'ANTHROPIC_API_KEY',
+    base_url_env: 'ANTHROPIC_BASE_URL',
+    base_url: 'https://api.anthropic.com',
+    agents: 'Claude Code CLI 官方直連',
+    models: 'claude-sonnet-4-20250514, claude-3-7-sonnet-20250219, claude-3-5-haiku-20241022'
+  },
+  groq: {
+    label: 'Groq 極速推理雲',
+    env: 'GROQ_API_KEY',
+    base_url_env: 'GROQ_BASE_URL',
+    base_url: 'https://api.groq.com/openai/v1',
+    agents: 'OpenCode / 高速輕量推理節點',
+    models: 'llama-3.3-70b-versatile, qwen-qwq-32b'
+  },
+  xai: {
+    label: 'xAI Grok 官方 API',
+    env: 'XAI_API_KEY',
+    base_url_env: 'XAI_BASE_URL',
+    base_url: 'https://api.x.ai/v1',
+    agents: 'Codex / OpenCode / Grok 推理節點',
+    models: 'grok-3-beta, grok-3-mini-beta'
+  },
+  gemini: {
+    label: 'Google Gemini AI Studio',
+    env: 'GEMINI_API_KEY',
+    base_url_env: 'GEMINI_BASE_URL',
+    base_url: 'https://generativelanguage.googleapis.com/v1beta/openai',
+    agents: 'Antigravity / Gemini 節點',
+    models: 'gemini-2.5-pro, gemini-2.5-flash'
+  },
+  ollama: {
+    label: 'Ollama 本地 / 內網推理伺服器',
+    env: 'OLLAMA_API_KEY',
+    base_url_env: 'OLLAMA_BASE_URL',
+    base_url: 'http://127.0.0.1:11434/v1',
+    agents: '本地兜底與離線代碼生成',
+    models: 'qwen2.5-coder:32b, deepseek-r1:32b'
+  },
+  custom: {
+    label: '',
+    env: '',
+    base_url_env: '',
+    base_url: 'https://',
+    agents: '所有 CLI / HTTP Agent 節點',
+    models: ''
+  }
+};
+
+function cFillProviderPreset(presetKey) {
+  const p = C_PROVIDER_PRESETS[presetKey] || C_PROVIDER_PRESETS.custom;
+  const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+  setVal('c-prov-label', p.label);
+  setVal('c-prov-env', p.env);
+  setVal('c-prov-url-env', p.base_url_env);
+  setVal('c-prov-url', p.base_url);
+  setVal('c-prov-agents', p.agents);
+  setVal('c-prov-models', p.models);
+  const keyInput = document.getElementById('c-prov-key');
+  if (keyInput) {
+    keyInput.value = '';
+    keyInput.focus();
+  }
+  const formBox = document.getElementById('c-provider-form-box');
+  if (formBox && typeof formBox.scrollIntoView === 'function') {
+    formBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  cToast(`已帶入「${p.label || '自訂服務商'}」範本，貼上 API Key 即可一鍵新增！`, 'ok');
+}
+
+function cEditExistingProvider(envKey, label, baseUrl, baseUrlEnv, agentsDesc, modelsStr) {
+  const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+  setVal('c-prov-label', label);
+  setVal('c-prov-env', envKey);
+  setVal('c-prov-url-env', baseUrlEnv);
+  setVal('c-prov-url', baseUrl);
+  setVal('c-prov-agents', agentsDesc);
+  setVal('c-prov-models', modelsStr);
+  const keyInput = document.getElementById('c-prov-key');
+  if (keyInput) keyInput.focus();
+  const formBox = document.getElementById('c-provider-form-box');
+  if (formBox && typeof formBox.scrollIntoView === 'function') {
+    formBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  cToast(`正在編輯服務商 ${label} (${envKey})`, 'ok');
+}
+
+async function cUpsertProvider() {
+  const getVal = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+  const label = getVal('c-prov-label');
+  const env = getVal('c-prov-env').toUpperCase();
+  const api_key = getVal('c-prov-key');
+  const base_url = getVal('c-prov-url');
+  const base_url_env = getVal('c-prov-url-env').toUpperCase();
+  const agents = getVal('c-prov-agents') || '通用 Agent 節點';
+  const models = getVal('c-prov-models');
+  const target_agent = getVal('c-prov-target-agent') || 'all';
+
+  if (!label && !env) {
+    cToast('請先點選上方服務商按鈕，或填寫「服務商名稱」與「環境變數名稱」', 'err');
+    return;
+  }
+  try {
+    const res = await fetch('/api/workbench/setup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'upsert_provider',
+        label,
+        env,
+        api_key,
+        base_url,
+        base_url_env,
+        agents,
+        models,
+        target_agent
+      })
+    });
+    const data = await res.json();
+    if (!res.ok || data.ok === false) {
+      cToast('儲存服務商失敗：' + (data.detail || '請檢查欄位格式'), 'err');
+      return;
+    }
+    const keyEl = document.getElementById('c-prov-key');
+    if (keyEl) keyEl.value = '';
+    cToast(`✅ 已成功儲存服務商「${label || env}」${models ? ' 並同步新增模型至選單' : ''}！`, 'ok');
+    await cLoadAgentsAndProvidersPage();
+  } catch (err) {
+    cToast('儲存服務商連線錯誤：' + err.message, 'err');
+  }
+}
+
+async function cSaveSingleProviderKey(envKey, baseUrlEnv) {
+  const keyInp = document.querySelector(`input[data-c-prov-key="${envKey}"]`);
+  const urlInp = document.querySelector(`input[data-c-prov-url="${envKey}"]`);
+  const keys = {};
+  const base_urls = {};
+  if (keyInp && keyInp.value.trim()) keys[envKey] = keyInp.value.trim();
+  if (urlInp && urlInp.value.trim() && baseUrlEnv) base_urls[baseUrlEnv] = urlInp.value.trim();
+  if (!Object.keys(keys).length && !Object.keys(base_urls).length) {
+    cToast('請先輸入要更新的 API Key 或 Base URL', 'err');
+    return;
+  }
+  try {
+    const res = await fetch('/api/workbench/setup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keys, base_urls })
+    });
+    const data = await res.json();
+    if (res.ok && data.ok !== false) {
+      cToast(`✅ 已更新 ${envKey} 金鑰設定並寫入 .env！`, 'ok');
+      await cLoadAgentsAndProvidersPage();
+    } else {
+      cToast('儲存金鑰失敗：' + (data.detail || '未知錯誤'), 'err');
+    }
+  } catch (err) {
+    cToast('儲存金鑰失敗：' + err.message, 'err');
+  }
+}
+
+async function cDeleteProvider(envKey, isCustom) {
+  try {
+    const res = await fetch('/api/workbench/setup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'delete_provider',
+        env: envKey,
+        hide_builtin: !isCustom
+      })
+    });
+    if (res.ok) {
+      cToast(`🗑️ 已移除服務商 ${envKey} 並清除金鑰`, 'ok');
+      await cLoadAgentsAndProvidersPage();
+    }
+  } catch (err) {
+    cToast('移除服務商失敗：' + err.message, 'err');
+  }
+}
+
+async function cRestoreBuiltinProviders() {
+  try {
+    const res = await fetch('/api/workbench/setup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'restore_providers' })
+    });
+    if (res.ok) {
+      cToast('✅ 已還原所有預設服務商欄位', 'ok');
+      await cLoadAgentsAndProvidersPage();
+    }
+  } catch (_) {}
+}
+
+// ── 模型 CRUD（直接在頁面上新增、刪除、改名、切換、還原預設） ─────────────
+async function cSwitchAgentModel(agentId, modelName) {
+  if (!agentId || !modelName || modelName === '__custom__') return;
+  try {
+    const payload = { models: Object.assign({}, typeof currentAgentModels !== 'undefined' ? currentAgentModels : {}, { [agentId]: modelName }) };
+    const res = await fetch('/api/workbench/models', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (res.ok && data.models) {
+      if (typeof currentAgentModels !== 'undefined') {
+        Object.assign(currentAgentModels, data.models);
+      }
+      if (typeof syncModelUIElements === 'function') syncModelUIElements();
+      cRenderAgentStatusPanel();
+      cToast(`✅ 已將 ${agentId.toUpperCase()} 切換為模型「${modelName}」並寫入 .env`, 'ok');
+      await cLoadAgentsAndProvidersPage();
+    } else {
+      cToast('切換模型失敗：' + (data.detail || '未知錯誤'), 'err');
+    }
+  } catch (err) {
+    cToast('切換模型錯誤：' + err.message, 'err');
+  }
+}
+
+async function cAddModelOption(agentIdOverride, modelNameOverride) {
+  const agentSel = document.getElementById('c-model-crud-agent');
+  const modelInp = document.getElementById('c-model-crud-input');
+  const agent_id = agentIdOverride || (agentSel ? agentSel.value : 'all') || 'all';
+  const model = (modelNameOverride != null ? String(modelNameOverride) : (modelInp ? modelInp.value : '')).trim();
+  if (!model) {
+    cToast('請輸入要新增的模型名稱（例如 deepseek-chat 或 MiniMax-M3.1-Flash）', 'err');
+    return;
+  }
+  try {
+    const res = await fetch('/api/workbench/models', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'add_model',
+        agent_id,
+        model,
+        set_active: true
+      })
+    });
+    const data = await res.json();
+    if (!res.ok || data.ok === false) {
+      cToast('新增模型失敗：' + (data.detail || '模型名稱格式不符'), 'err');
+      return;
+    }
+    if (modelInp && !modelNameOverride) modelInp.value = '';
+    if (data.models && typeof currentAgentModels !== 'undefined') {
+      Object.assign(currentAgentModels, data.models);
+    }
+    if (typeof syncModelUIElements === 'function') syncModelUIElements();
+    cToast(`✅ 已新增模型「${model}」至 ${agent_id === 'all' ? '全部 Agent' : agent_id.toUpperCase()}！`, 'ok');
+    await cLoadAgentsAndProvidersPage();
+  } catch (err) {
+    cToast('新增模型失敗：' + err.message, 'err');
+  }
+}
+
+async function cAddModelForAgent(agentId) {
+  const inp = document.getElementById(`c-agent-new-model-${agentId}`);
+  const val = inp ? inp.value.trim() : '';
+  if (!val) {
+    cToast('請在此 Agent 卡片下方輸入要新增的模型名稱', 'err');
+    if (inp) inp.focus();
+    return;
+  }
+  await cAddModelOption(agentId, val);
+  if (inp) inp.value = '';
+}
+
+async function cDeleteModelOption(agentId, modelName) {
+  if (!agentId || !modelName) return;
+  try {
+    const res = await fetch('/api/workbench/models', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'delete_model',
+        agent_id: agentId,
+        model: modelName
+      })
+    });
+    const data = await res.json();
+    if (res.ok && data.ok !== false) {
+      if (data.models && typeof currentAgentModels !== 'undefined') {
+        Object.assign(currentAgentModels, data.models);
+      }
+      if (typeof syncModelUIElements === 'function') syncModelUIElements();
+      cToast(`🗑️ 已從 ${agentId.toUpperCase()} 移除模型「${modelName}」`, 'ok');
+      await cLoadAgentsAndProvidersPage();
+    } else {
+      cToast('刪除模型失敗：' + (data.detail || '未知錯誤'), 'err');
+    }
+  } catch (err) {
+    cToast('刪除模型錯誤：' + err.message, 'err');
+  }
+}
+
+function cStartRenameModel(agentId, oldModel) {
+  const box = document.getElementById(`c-rename-box-${agentId}`);
+  const oldInp = document.getElementById(`c-rename-old-${agentId}`);
+  const newInp = document.getElementById(`c-rename-new-${agentId}`);
+  if (!box || !oldInp || !newInp) return;
+  oldInp.value = oldModel;
+  newInp.value = oldModel;
+  box.classList.remove('hidden');
+  newInp.focus();
+  newInp.select();
+}
+
+async function cConfirmRenameModel(agentId) {
+  const oldInp = document.getElementById(`c-rename-old-${agentId}`);
+  const newInp = document.getElementById(`c-rename-new-${agentId}`);
+  const old_model = oldInp ? oldInp.value.trim() : '';
+  const new_model = newInp ? newInp.value.trim() : '';
+  if (!old_model || !new_model) {
+    cToast('請輸入修改後的模型名稱', 'err');
+    return;
+  }
+  try {
+    const res = await fetch('/api/workbench/models', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'rename_model',
+        agent_id: agentId,
+        old_model,
+        new_model,
+        set_active: true
+      })
+    });
+    const data = await res.json();
+    if (res.ok && data.ok !== false) {
+      if (data.models && typeof currentAgentModels !== 'undefined') {
+        Object.assign(currentAgentModels, data.models);
+      }
+      if (typeof syncModelUIElements === 'function') syncModelUIElements();
+      cToast(`✏️ 已將 ${agentId.toUpperCase()} 模型「${old_model}」修改為「${new_model}」`, 'ok');
+      await cLoadAgentsAndProvidersPage();
+    } else {
+      cToast('修改模型名稱失敗：' + (data.detail || '格式不符'), 'err');
+    }
+  } catch (err) {
+    cToast('修改模型錯誤：' + err.message, 'err');
+  }
+}
+
+async function cResetAllModelsDefault() {
+  try {
+    const res = await fetch('/api/workbench/models', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reset: true })
+    });
+    const data = await res.json();
+    if (res.ok && data.models) {
+      if (typeof currentAgentModels !== 'undefined') Object.assign(currentAgentModels, data.models);
+      if (typeof syncModelUIElements === 'function') syncModelUIElements();
+      cToast('✅ 已還原所有 Agent 的系統預設模型與選單！', 'ok');
+      await cLoadAgentsAndProvidersPage();
+    }
+  } catch (err) {
+    cToast('還原預設模型失敗：' + err.message, 'err');
+  }
+}
+
+function cRenderProviderPresets() {
+  const host = document.getElementById('c-prov-presets');
+  if (!host) return;
+  host.innerHTML = Object.keys(C_PROVIDER_PRESETS).map(key => {
+    const p = C_PROVIDER_PRESETS[key];
+    const name = key === 'custom' ? '＋ 自訂服務商' : '＋ ' + String(p.label).split(' ')[0];
+    return `<button type="button" onclick="cFillProviderPreset('${escapeHtml(key)}')"
+              class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-emerald-500/20 border border-white/10 hover:border-emerald-500/40 text-xs font-mono text-slate-200 transition"
+              title="${escapeHtml(p.label || '手動輸入所有欄位')}">${escapeHtml(name)}</button>`;
+  }).join('');
+}
+
+function cFillAgentSelects(agents) {
+  // 把目前所有 Agent（含自訂）填進「新增模型」與「新增服務商」的目標下拉選單
+  ['c-model-crud-agent', 'c-prov-target-agent'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const prev = sel.value || 'all';
+    const adjustable = (agents || []).filter(a => a.adjustable);
+    sel.innerHTML = '<option value="all">全部 Agent</option>' +
+      adjustable.map(a => `<option value="${escapeHtml(a.id)}">${escapeHtml(a.name || a.id)}</option>`).join('');
+    sel.value = adjustable.some(a => a.id === prev) ? prev : 'all';
+  });
+}
+
+async function cLoadAgentsAndProvidersPage() {
+  cRenderAgentStatusPanel();
+  cRenderProviderPresets();
+  const agentsGrid = document.getElementById('agents-fleet-grid');
+  const provGrid = document.getElementById('c-providers-crud-grid');
+
+  try {
+    const [agRes, setupRes, capRes] = await Promise.all([
+      fetch('/api/workbench/agents'),
+      fetch('/api/workbench/setup'),
+      fetch('/api/workbench/capabilities')
+    ]);
+
+    let capabilityData = {};
+    if (capRes && capRes.ok) {
+      capabilityData = await capRes.json();
+      if (typeof currentModelCatalog !== 'undefined') currentModelCatalog = capabilityData.model_catalog || {};
+      if (typeof currentModelOptions !== 'undefined') currentModelOptions = capabilityData.model_options || {};
+      if (typeof currentAgentModels !== 'undefined') {
+        Object.assign(currentAgentModels, capabilityData.active_model_refs || {});
+      }
+    }
+
+    if (agRes && agRes.ok && agentsGrid) {
+      const agData = await agRes.json();
+      const agents = agData.agents || [];
+      cFillAgentSelects(agents);
+      const checkedSet = new Set(
+        Array.from(document.querySelectorAll('input[name="agent_target"]:checked')).map(c => c.value)
+      );
+
+      agentsGrid.innerHTML = agents.map(a => {
+        const isChecked = checkedSet.has(a.id);
+        const activeModel = (typeof currentAgentModels !== 'undefined' && currentAgentModels[a.id])
+          || (capabilityData.active_model_refs || {})[a.id]
+          || a.model;
+        const dynamicOptions = capabilityData.model_options || {};
+        const opts = Array.isArray(dynamicOptions[a.id]) && dynamicOptions[a.id].length
+          ? dynamicOptions[a.id]
+          : (Array.isArray(a.options) && a.options.length ? a.options : [activeModel]);
+        const optsHtml = opts.map(opt =>
+          `<option value="${escapeHtml(opt)}" ${opt === activeModel ? 'selected' : ''}>${escapeHtml(modelRefLabel(opt))}</option>`
+        ).join('');
+
+        const pillsHtml = a.adjustable ? opts.map(opt => {
+          const active = (opt === activeModel);
+          return `
+            <div class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-mono border transition ${active ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 font-bold' : 'bg-white/5 text-slate-300 border-white/10 hover:border-sky-400/40'}">
+              <button type="button" onclick="cSwitchAgentModel('${escapeHtml(a.id)}', '${escapeHtml(opt)}')" title="點擊切換為此模型">
+                ${active ? '✓ ' : ''}${escapeHtml(modelRefLabel(opt))}
+              </button>
+              <button type="button" onclick="cStartRenameModel('${escapeHtml(a.id)}', '${escapeHtml(opt)}')" class="text-slate-400 hover:text-sky-300 px-0.5" title="修改此模型名稱">
+                ✏️
+              </button>
+              <button type="button" onclick="cDeleteModelOption('${escapeHtml(a.id)}', '${escapeHtml(opt)}')" class="text-slate-400 hover:text-rose-400 px-0.5 font-bold" title="刪除此模型選項">
+                ×
+              </button>
+            </div>
+          `;
+        }).join('') : `<span class="text-xs font-mono text-cyan-300">${escapeHtml(a.model || a.plan)}</span>`;
+
+        const crudControls = a.adjustable ? `
+          <div class="space-y-2.5 pt-2 border-t border-white/10">
+            <div>
+              <div class="flex items-center justify-between text-[11px] text-slate-400 mb-1">
+                <span>當前綁定模型 (下拉即切換):</span>
+                <button type="button" onclick="cStartRenameModel('${escapeHtml(a.id)}', '${escapeHtml(activeModel)}')" class="text-sky-400 hover:underline text-[10px]">✏️ 修改當前模型名稱</button>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <select onchange="cSwitchAgentModel('${escapeHtml(a.id)}', this.value)" class="flex-1 bg-[#070B14] border border-sky-500/30 rounded-lg px-2.5 py-1.5 text-xs font-mono text-emerald-300 focus:outline-none">
+                  ${optsHtml}
+                </select>
+                  <button type="button" onclick="cDeleteModelOption('${escapeHtml(a.id)}', '${escapeHtml(activeModel)}')" class="px-2.5 py-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-xs font-mono shrink-0" title="從清單刪除當前選中的模型">
+                  🗑️ 刪除
+                </button>
+              </div>
+            </div>
+
+            <!-- 內嵌改名輸入列 (點擊 ✏️ 時展開) -->
+            <div id="c-rename-box-${escapeHtml(a.id)}" class="hidden p-2 rounded-lg bg-sky-950/30 border border-sky-500/30 space-y-1.5">
+              <div class="text-[10px] text-sky-300 font-mono">修改模型名稱：</div>
+              <input id="c-rename-old-${escapeHtml(a.id)}" type="hidden" value="" />
+              <div class="flex items-center gap-1.5">
+                <input id="c-rename-new-${escapeHtml(a.id)}" type="text" onkeydown="if(event.key==='Enter'){event.preventDefault();cConfirmRenameModel('${escapeHtml(a.id)}');}" class="flex-1 bg-[#050811] border border-sky-500/40 rounded px-2 py-1 text-xs font-mono text-white" />
+                <button type="button" onclick="cConfirmRenameModel('${escapeHtml(a.id)}')" class="px-2.5 py-1 rounded bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs">確認修改</button>
+                <button type="button" onclick="document.getElementById('c-rename-box-${escapeHtml(a.id)}').classList.add('hidden')" class="px-2 py-1 rounded bg-white/5 text-slate-400 text-xs">取消</button>
+              </div>
+            </div>
+
+            <!-- 可用模型標籤牆 (點擊切換 / ✏️ 改名 / × 刪除) -->
+            <div>
+              <div class="text-[10px] text-slate-400 mb-1">模型清單 (點名稱直接切換 · 點 ✏️ 修改 · 點 × 刪除):</div>
+              <div class="flex flex-wrap gap-1.5">
+                ${pillsHtml}
+              </div>
+            </div>
+
+            <!-- 直接新增模型至此 Agent -->
+            <div class="flex items-center gap-1.5 pt-1">
+              <input id="c-agent-new-model-${escapeHtml(a.id)}" type="text" onkeydown="if(event.key==='Enter'){event.preventDefault();cAddModelForAgent('${escapeHtml(a.id)}');}" placeholder="輸入新模型名稱 (如 deepseek-chat)..." class="flex-1 bg-[#050811] border border-white/15 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400" />
+              <button type="button" onclick="cAddModelForAgent('${escapeHtml(a.id)}')" class="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/35 text-emerald-300 border border-emerald-500/40 text-xs font-bold shrink-0">
+                ＋ 新增模型
+              </button>
+            </div>
+          </div>
+        ` : `
+          <div class="pt-2 border-t border-white/10 text-xs font-mono text-slate-400">
+            架構模式: <span class="text-cyan-300 font-bold">${escapeHtml(modelRefLabel(activeModel || a.plan))}</span>
+          </div>
+        `;
+
+        const deleteAgentBtn = a.custom ? `
+          <button type="button" onclick="deleteCustomAgent('${escapeHtml(a.id)}')" class="px-2 py-0.5 rounded bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 text-[10px] font-mono">
+            🗑️ 移除自訂 Agent
+          </button>
+        ` : '';
+
+        return `
+          <div class="glass-panel p-5 rounded-2xl border ${isChecked ? 'border-emerald-500/40' : 'border-white/10'} space-y-3 transition flex flex-col justify-between">
+            <div class="space-y-3">
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                  <span class="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-white/5 text-slate-300 font-bold">${escapeHtml(a.tier)}</span>
+                  ${deleteAgentBtn}
+                </div>
+                <div class="flex items-center gap-2">
+                  <button type="button" onclick="cToggleAgent('${escapeHtml(a.id)}', ${isChecked ? 'false' : 'true'}); setTimeout(cLoadAgentsAndProvidersPage, 80);"
+                          class="px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition ${isChecked ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-white/5 text-slate-400 border border-white/10 hover:text-white'}">
+                    ${isChecked ? '✓ 已啟用參與派工' : '○ 待命 (點此啟用)'}
+                  </button>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400 text-lg shrink-0">
+                  <i class="fas ${escapeHtml(a.icon || 'fa-robot')}"></i>
+                </div>
+                <div class="min-w-0">
+                  <h4 class="text-white font-bold text-base truncate">${escapeHtml(a.name)}</h4>
+                  <p class="text-xs text-slate-400 truncate mt-0.5">${escapeHtml(a.desc)}</p>
+                </div>
+              </div>
+
+              <div class="bg-black/30 p-3.5 rounded-xl text-xs font-mono space-y-2">
+                ${crudControls}
+                <div class="text-slate-400 flex justify-between pt-2 border-t border-white/5 text-[11px]">
+                  <span>執行檔狀態:</span>
+                  <span class="text-slate-300 truncate max-w-[200px]">${escapeHtml(a.path || a.version || a.status)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    if (setupRes && setupRes.ok && provGrid) {
+      const setupData = await setupRes.json();
+      const providers = setupData.providers || [];
+      provGrid.innerHTML = providers.map(p => {
+        const modelsStr = Array.isArray(p.models) ? p.models.join(', ') : '';
+        return `
+          <div class="p-4 rounded-2xl bg-black/40 border ${p.configured ? 'border-emerald-500/35' : 'border-amber-500/30'} space-y-2.5 flex flex-col justify-between">
+            <div class="space-y-2">
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2 min-w-0">
+                  <span class="font-bold text-white text-sm truncate">${escapeHtml(p.label)}</span>
+                  ${p.custom ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-purple-500/20 text-purple-300 border border-purple-500/30">自訂服務商</span>' : ''}
+                </div>
+                <span class="px-2 py-0.5 rounded text-[10px] font-mono shrink-0 ${p.configured ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}">
+                  ${p.configured ? '✅ 已配置 (' + escapeHtml(p.masked) + ')' : '⚠️ 未設定'}
+                </span>
+              </div>
+              <div class="text-[11px] text-slate-400 font-mono">環境變數: <span class="text-sky-300">${escapeHtml(p.env)}</span> · 適用: ${escapeHtml(p.agents)}</div>
+              ${p.default_base_url ? `<div class="text-[11px] text-slate-400 font-mono truncate">Base URL: <span class="text-slate-300">${escapeHtml(p.default_base_url)}</span></div>` : ''}
+              ${modelsStr ? `<div class="text-[11px] text-emerald-300/90 font-mono truncate">綁定模型: ${escapeHtml(modelsStr)}</div>` : ''}
+
+              <div class="wizard-input-wrap flex items-center gap-1.5 pt-1">
+                <input type="password" data-c-prov-key="${escapeHtml(p.env)}" data-wizard-env="${escapeHtml(p.env)}"
+                       placeholder="${p.configured ? '目前: ' + escapeHtml(p.masked) + ' (輸入新 API Key 覆蓋)' : '在此貼上 ' + escapeHtml(p.env) + ' 金鑰...'}"
+                       class="flex-1 bg-[#050811] border border-white/15 rounded-lg px-2.5 py-1.5 font-mono text-xs text-emerald-300 placeholder-slate-500 focus:outline-none focus:border-sky-400" />
+                <button type="button" onclick="toggleWizardInputVis(this)" class="px-2 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white text-xs" title="顯示/隱藏金鑰">
+                  <i class="fas fa-eye"></i>
+                </button>
+              </div>
+              ${p.base_url_env ? `
+                <div class="flex items-center gap-1.5">
+                  <input type="text" data-c-prov-url="${escapeHtml(p.env)}" value="${escapeHtml(p.default_base_url || '')}"
+                         placeholder="API Base URL (${escapeHtml(p.base_url_env)})"
+                         class="flex-1 bg-[#050811] border border-white/10 rounded-lg px-2.5 py-1 font-mono text-[11px] text-slate-300 placeholder-slate-500 focus:outline-none focus:border-sky-400" />
+                </div>
+              ` : ''}
+            </div>
+
+            <div class="flex items-center justify-between gap-2 pt-2 border-t border-white/10">
+              <div class="flex items-center gap-1.5">
+                <button type="button" onclick="cEditExistingProvider('${escapeHtml(p.env)}', '${escapeHtml(p.label)}', '${escapeHtml(p.default_base_url || '')}', '${escapeHtml(p.base_url_env || '')}', '${escapeHtml(p.agents || '')}', '${escapeHtml(modelsStr)}')"
+                        class="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 text-[11px] font-mono transition">
+                  ✏️ 編輯詳情
+                </button>
+                <button type="button" onclick="cDeleteProvider('${escapeHtml(p.env)}', ${p.custom ? 'true' : 'false'})"
+                        class="px-2 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 text-rose-300 text-[11px] font-mono transition">
+                  🗑️ ${p.custom ? '刪除服務商' : '清除/隱藏'}
+                </button>
+              </div>
+              <button type="button" onclick="cSaveSingleProviderKey('${escapeHtml(p.env)}', '${escapeHtml(p.base_url_env || '')}')"
+                      class="px-3 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition">
+                💾 儲存金鑰
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
   } catch (_) {}
 }
 
@@ -2321,13 +3137,16 @@ document.addEventListener('DOMContentLoaded', () => {
   cCompactComposer();
   cUpdateComposerHint();
   cRenderConversation();
-  switchTab('command');
+  // 依網址決定起始頁：/agents、/database 直接進對應專頁，其餘為對話首頁
+  switchTab(cTabFromLocation());
+  window.addEventListener('popstate', () => switchTab(cTabFromLocation()));
 
   // Agent 勾選變動時回寫 composer chip 與右上 Agent 狀態面板
   document.addEventListener('change', e => {
     if (e.target && e.target.name === 'agent_target') {
       cSyncAgentChips();
       cRenderAgentStatusPanel();
+      if (typeof loadThinkingCapabilities === 'function') loadThinkingCapabilities();
     }
   });
   // ⌘/Ctrl+Enter 送出，一般 Enter 換行（避免打字或換行時誤觸直接送出執行）
@@ -2535,13 +3354,133 @@ _MANUS_CONSOLE_JS: Final[str] = """
 """
 
 
+# ── 獨立專頁的補充標記（首頁只留按鈕，管理操作都在專頁上完成） ─────────────
+# Agent 狀態專頁（上半）：即時狀態 + 模型新增/刪除/改名/切換/還原
+_PAGE_AGENTS_TOP: Final[str] = """
+        <div class="glass-panel p-4 rounded-2xl border border-white/10 space-y-3">
+          <div class="flex items-center gap-2 flex-wrap">
+            <h3 class="font-bold text-sm text-white">即時 Agent 狀態</h3>
+            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded" style="background:var(--m-sage-soft);color:var(--m-sage)"><span id="c-fleet-count-page">6</span>/6 在線</span>
+            <span class="text-[11px] text-slate-400">點選卡片可啟用／停用該 Agent 參與派工</span>
+          </div>
+          <div id="c-agent-status-list" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-1.5"></div>
+        </div>
+
+        <div id="c-model-crud-box" class="glass-panel p-4 rounded-2xl border border-white/10 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <h3 class="font-bold text-sm text-white">模型管理：新增 · 刪除 · 改名 · 切換</h3>
+            <button type="button" onclick="cResetAllModelsDefault()" class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-slate-300 transition">↺ 還原所有 Agent 預設模型</button>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <select id="c-model-crud-agent" class="bg-[#050811] border border-white/15 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-emerald-400" aria-label="新增模型的目標 Agent"><option value="all">全部 Agent</option></select>
+            <input id="c-model-crud-input" type="text" onkeydown="if(event.key==='Enter'){event.preventDefault();cAddModelOption();}" placeholder="輸入新模型名稱（如 deepseek-chat）" class="flex-1 min-w-[200px] bg-[#050811] border border-white/15 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400" />
+            <button type="button" onclick="cAddModelOption()" class="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/35 text-emerald-300 border border-emerald-500/40 text-xs font-bold shrink-0">＋ 新增模型</button>
+          </div>
+          <p class="text-[11px] text-slate-400">每張 Agent 卡片上也能直接新增、改名（✏️）、刪除（×）或點選切換模型，變更會立即寫入 .env。</p>
+        </div>
+"""
+
+# Agent 狀態專頁（下半）：服務商新增/編輯/刪除 + 拓撲與自訂 Agent
+_PAGE_AGENTS_BOTTOM: Final[str] = """
+        <div id="c-provider-form-box" class="glass-panel p-4 sm:p-5 rounded-2xl border border-white/10 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <h3 class="font-bold text-sm text-white">服務商管理：新增 / 編輯</h3>
+            <button type="button" onclick="cRestoreBuiltinProviders()" class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-slate-300 transition">↺ 還原預設服務商</button>
+          </div>
+          <div>
+            <div class="text-[11px] text-slate-400 mb-1.5">① 點選常用範本自動帶入欄位，或選「自訂服務商」手動輸入</div>
+            <div id="c-prov-presets" class="flex flex-wrap gap-2"></div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <label class="text-[11px] text-slate-400 space-y-1">服務商名稱
+              <input id="c-prov-label" type="text" placeholder="例如 DeepSeek 官方 API" class="w-full bg-[#050811] border border-white/15 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-400" /></label>
+            <label class="text-[11px] text-slate-400 space-y-1">金鑰環境變數名稱
+              <input id="c-prov-env" type="text" placeholder="例如 DEEPSEEK_API_KEY" class="w-full bg-[#050811] border border-white/15 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-sky-400" /></label>
+            <label class="text-[11px] text-slate-400 space-y-1 md:col-span-2">② API Key（留白則保留既有金鑰）
+              <span class="wizard-input-wrap flex items-center gap-1.5">
+                <input id="c-prov-key" type="password" autocomplete="off" placeholder="貼上 API Key…" class="flex-1 bg-[#050811] border border-white/15 rounded-lg px-2.5 py-1.5 text-xs font-mono text-emerald-300 placeholder-slate-500 focus:outline-none focus:border-sky-400" />
+                <button type="button" onclick="toggleWizardInputVis(this)" class="px-2 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white text-xs" title="顯示/隱藏金鑰"><i class="fas fa-eye"></i></button>
+              </span></label>
+            <label class="text-[11px] text-slate-400 space-y-1">Base URL
+              <input id="c-prov-url" type="text" placeholder="https://api.example.com/v1" class="w-full bg-[#050811] border border-white/15 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-sky-400" /></label>
+            <label class="text-[11px] text-slate-400 space-y-1">Base URL 環境變數名稱
+              <input id="c-prov-url-env" type="text" placeholder="例如 DEEPSEEK_BASE_URL" class="w-full bg-[#050811] border border-white/15 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-sky-400" /></label>
+            <label class="text-[11px] text-slate-400 space-y-1">適用 Agent 說明
+              <input id="c-prov-agents" type="text" placeholder="例如 OpenCode / Codex" class="w-full bg-[#050811] border border-white/15 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-400" /></label>
+            <label class="text-[11px] text-slate-400 space-y-1">③ 綁定模型（逗號分隔，會同步加進模型選單）
+              <input id="c-prov-models" type="text" placeholder="deepseek-chat, deepseek-reasoner" class="w-full bg-[#050811] border border-white/15 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-sky-400" /></label>
+            <label class="text-[11px] text-slate-400 space-y-1">模型加入哪個 Agent
+              <select id="c-prov-target-agent" class="w-full bg-[#050811] border border-white/15 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-sky-400"><option value="all">全部 Agent</option></select></label>
+          </div>
+          <div class="flex justify-end">
+            <button type="button" onclick="cUpsertProvider()" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition">💾 儲存服務商</button>
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <h3 class="font-bold text-sm text-white">已設定的服務商</h3>
+          <div id="c-providers-crud-grid" class="grid grid-cols-1 lg:grid-cols-2 gap-3"></div>
+        </div>
+
+        <details id="c-topology-collapse" class="m-collapse frost m-line rounded-2xl overflow-hidden">
+          <summary class="px-4 py-3 flex items-center gap-2 cursor-pointer">
+            <svg class="m-caret" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="text-sm font-semibold" style="color:var(--m-dim)">拓撲畫布 · 自訂 Agent 掛載</span>
+          </summary>
+          <div class="p-3 pt-0">{topology}</div>
+        </details>
+"""
+
+# 資料庫專頁：搜尋與類型篩選列
+_PAGE_DB_TOOLBAR: Final[str] = """
+        <div class="flex flex-wrap items-center gap-2">
+          <input id="c-artifact-search" type="search" oninput="cFilterArtifactsPage()" placeholder="搜尋檔名、路徑或類型…" autocomplete="off" class="flex-1 min-w-[220px] bg-[#050811] border border-white/15 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-400" />
+          <select id="c-artifact-badge" onchange="cFilterArtifactsPage(undefined, this.value)" class="bg-[#050811] border border-white/15 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-sky-400" aria-label="產物類型"><option value="all">全部類型</option></select>
+          <span class="text-[11px] font-mono text-slate-400">共 <span id="c-db-page-count">0</span> 筆</span>
+        </div>
+"""
+
+
+def _compose_views(views: str, topology: str) -> str:
+    """在 legacy 的專頁區塊中補上服務商/模型管理表單與資料庫搜尋列。"""
+    # 資料庫：搜尋列插在產物清單之前
+    views = views.replace(
+        '<div id="artifacts-grid"',
+        _PAGE_DB_TOOLBAR + '        <div id="artifacts-grid"',
+        1,
+    )
+    # Agent 專頁：狀態與模型管理插在卡片牆之前
+    views = views.replace(
+        '<div id="agents-fleet-grid"',
+        _PAGE_AGENTS_TOP + '        <div id="agents-fleet-grid"',
+        1,
+    )
+    # 「新增自訂 Agent」按鈕：不再跳回首頁，直接在專頁展開自訂面板
+    views = views.replace(
+        "switchTab('command'); document.getElementById('custom-agent-panel').classList.remove('hidden');",
+        "cAddAgent();",
+    )
+    # Agent 專頁（下半）：緊接在 view-agents 區塊結尾 </section> 之前
+    marker = '<section id="view-wizard"'
+    idx = views.find(marker)
+    if idx != -1:
+        close_idx = views.rfind('</section>', 0, idx)
+        if close_idx != -1:
+            views = (
+                views[:close_idx]
+                + _PAGE_AGENTS_BOTTOM.replace('{topology}', topology)
+                + views[close_idx:]
+            )
+    return views
+
+
 def render_workbench_html_c() -> str:
     """Render the 3-column 7-panel Workbench layout (左3: 歷史談話/資料庫/額度設定 | 中2: 對話串/輸入框 | 右2: Agent狀態/Using檔案)."""
     workspace = _rebalance(_slice("workspace"))
     topology = _rebalance(_slice("topology"))
     composer_block = _rebalance(_slice("composer"))
     result = _slice("result")
-    views = _slice("views")
+    views = _compose_views(_slice("views"), topology)
     drawers = _slice("drawers")
 
     body = f"""<body class="font-sans antialiased h-screen flex overflow-hidden m-scroll">
@@ -2554,7 +3493,7 @@ def render_workbench_html_c() -> str:
      中上區塊 4：對話串 (Main Conversation Thread)
      ═══════════════════════════════════════════════════════════════ -->
 <main id="c-main" class="flex-1 overflow-y-auto m-scroll">
-  <div class="max-w-4xl mx-auto px-4 sm:px-6 py-4">
+  <div id="c-main-container" class="max-w-4xl mx-auto px-4 sm:px-6 py-4">
 
     <section id="view-command" class="tab-content block space-y-3">
       <!-- 中央 = 對話串（你的指令 → Agent 協同結果 → 追問） -->
@@ -2593,48 +3532,25 @@ def render_workbench_html_c() -> str:
      ═══════════════════════════════════════════════════════════════ -->
 <aside id="c-drawer" class="c-drawer bg-ink-800/90 backdrop-blur flex flex-col h-full">
 
-  <!-- 右上區塊 6：Agent 狀態 (Agent Status) -->
-  <div class="flex-1 min-h-0 flex flex-col border-b m-line">
+  <!-- 右上：執行流程明細。Agent 狀態／模型／服務商已移到獨立專頁，首頁只留入口按鈕 -->
+  <div class="shrink-0 flex flex-col border-b m-line">
     <div class="c-zone-header">
       <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" style="color:var(--m-sage)" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="18" r="2"/><path d="M12 7v4m0 0-5 5m5-5 5 5" stroke-linecap="round"/></svg>
-      <span class="c-zone-title">Agent 狀態</span>
-      <span class="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded" style="background:var(--m-sage-soft);color:var(--m-sage)">
-        <span class="w-1.5 h-1.5 rounded-full m-live" style="background:var(--m-sage)"></span>
-        <span id="c-fleet-count">6</span>/6 在線
-      </span>
+      <span class="c-zone-title">執行流程</span>
       <div class="flex-1"></div>
-      <span id="c-exec-timer" class="font-mono text-[10px] px-1.5 py-0.5 rounded shrink-0"
-            style="background:var(--m-mist-soft);color:var(--m-mist)">0.0s</span>
-      <button type="button" onclick="cAddAgent()" class="px-2 py-0.5 rounded text-[10px] m-btn-ghost shrink-0" title="新增或設定 Agent">＋自訂</button>
+      <button type="button" onclick="cOpenPage('agents')" class="px-2 py-0.5 rounded text-[10px] m-btn-ghost shrink-0 whitespace-nowrap" title="進入 Agent 狀態、模型與服務商管理專頁">🤖 Agent 狀態 ↗</button>
       <button type="button" onclick="cToggleDrawer(false)" class="w-6 h-6 shrink-0 rounded-md m-btn-ghost grid place-items-center xl:hidden" aria-label="關閉右側欄">
         <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg>
       </button>
     </div>
 
-    <div class="px-3 py-1.5 border-b m-line flex items-center justify-between gap-2 text-[11px]" style="background:var(--m-panel-2)">
-      <span id="c-exec-status-text" class="truncate" style="color:var(--m-dim)">待命就緒 · 點擊下方節點可啟用/停用參與派工</span>
-    </div>
-
-    <div id="c-drawer-body" class="flex-1 overflow-y-auto m-scroll p-2.5 space-y-2">
-      <!-- 即時 Agent 狀態清單 -->
-      <div id="c-agent-status-list" class="space-y-1.5"></div>
-
-      <!-- 執行流程與延遲明細 -->
+    <div id="c-drawer-body" class="max-h-[42vh] overflow-y-auto m-scroll p-2.5">
       <details class="m-collapse frost m-line rounded-xl overflow-hidden" id="c-exec-detail-collapse">
         <summary class="px-3 py-2 flex items-center gap-2 hover:bg-white/[.02] transition cursor-pointer">
           <svg class="m-caret" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
           <span class="text-[11px] font-semibold" style="color:var(--m-dim)">7 角色流水線與延遲明細</span>
         </summary>
         <div class="p-2.5 pt-0 space-y-2">{result}</div>
-      </details>
-
-      <!-- Agent 拓撲與模型進階設定 -->
-      <details class="m-collapse frost m-line rounded-xl overflow-hidden" id="c-topology-collapse">
-        <summary class="px-3 py-2 flex items-center gap-2 hover:bg-white/[.02] transition cursor-pointer">
-          <svg class="m-caret" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          <span class="text-[11px] font-semibold" style="color:var(--m-dim)">拓撲畫布 · 模型切換 · 自訂 Agent</span>
-        </summary>
-        <div class="p-2.5 pt-0">{topology}</div>
       </details>
     </div>
   </div>

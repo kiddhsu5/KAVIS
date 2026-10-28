@@ -22,9 +22,19 @@ class TestHistory:
 
     def test_truncates_long_fields(self, tmp_path: Path, monkeypatch):
         monkeypatch.setenv("KHAVIS_LOG_DIR", str(tmp_path))
-        bot_history.record({"prompt": "A" * 5000})
+        bot_history.record(
+            {
+                "prompt": "A" * 5000,
+                "consensus": "B" * 5000,
+                "result": "C" * 5000,
+                "review_details": "D" * 5000,
+                "error": "E" * 5000,
+            }
+        )
         row = bot_history.tail(1)[0]
-        assert len(row["prompt"]) < 2100
+        for key in ("prompt", "consensus", "result", "review_details", "error"):
+            assert len(row[key]) == 2001
+            assert row[key].endswith("…")
 
     def test_tail_missing_file(self, tmp_path: Path, monkeypatch):
         monkeypatch.setenv("KHAVIS_LOG_DIR", str(tmp_path / "nope"))

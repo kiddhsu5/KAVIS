@@ -7,14 +7,35 @@ from __future__ import annotations
 
 import io
 import json
+import os
+
+import pytest
 
 from scripts.status_server import Handler
+from web import workbench as _wb_module
 from web.workbench import (
     get_agent_fleet_status,
     list_deliverable_artifacts,
     read_artifact_content,
     render_workbench_html,
 )
+
+
+@pytest.fixture(autouse=True)
+def _isolate_workbench_settings(tmp_path, monkeypatch):
+    """測試期間不得改到真實的 .env 與 config/workbench_catalog.json。
+
+    模型切換、服務商新增/刪除都會寫入這兩個檔案；改寫到 tmp_path，
+    並在結束時還原 os.environ，避免污染使用者的實際設定。
+    """
+    monkeypatch.setattr(_wb_module, "_CATALOG_PATH", tmp_path / "workbench_catalog.json")
+    monkeypatch.setattr(_wb_module, "_persist_env_updates", lambda updates: None)
+    monkeypatch.setenv("CLAUDE_DISPATCH_MODEL", "gemini4")
+    monkeypatch.setenv("CODEX_DISPATCH_MODEL", "kimi-k3.1-pro")
+    saved_env = dict(os.environ)
+    yield
+    os.environ.clear()
+    os.environ.update(saved_env)
 
 
 def test_render_workbench_html() -> None:
@@ -32,6 +53,10 @@ def test_render_workbench_html() -> None:
     assert "GPT GO" in html_content
     assert "model-select-claude" in html_content
     assert "model-settings-panel" in html_content
+    assert "attachment-input" in html_content
+    assert "thinking-mode" in html_content
+    assert "loadThinkingCapabilities" in html_content
+    assert "thinking_parameter" in html_content
 
 
 def test_get_agent_fleet_status() -> None:
@@ -46,7 +71,9 @@ def test_get_agent_fleet_status() -> None:
     assert "khavis" in ids
 
     claude_node = next(a for a in fleet if a["id"] == "claude")
-    assert claude_node["model"] == "MiniMax-M3.1-Flash"
+    assert claude_node["model"] == "gemini-4-argon"
+    codex_node = next(a for a in fleet if a["id"] == "codex")
+    assert codex_node["model"] == "kimi-k3.1-pro"
 
     khavis_node = next(a for a in fleet if a["id"] == "khavis")
     assert khavis_node["installed"] is True
@@ -172,7 +199,7 @@ def test_manus_console_routes_are_protected_and_proxy_tasks(monkeypatch) -> None
     assert json.loads(follow_up.responses[0][1])["task_id"] == "task-123"
 
 
-def test_status_server_workbench_endpoints() -> None:
+def test_status_server_workbench_endpoints(monkeypatch) -> None:
     # 0. GET /  (一頁式宣傳與 Console Token 登入入口頁)
     h_root = DummyStatusHandler("/")
     h_root.do_GET()
@@ -202,8 +229,37 @@ def test_status_server_workbench_endpoints() -> None:
     for zone_label in ("歷史談話", "資料庫", "額度、設定", "對話串", "輸入框", "Agent 狀態", "Using 檔案"):
         assert zone_label in wb_body
     assert 'id="c-agent-status-list"' in wb_body
-    assert 'id="c-db-list"' in wb_body
+    # 首頁只留「Agent 狀態」「資料庫」按鈕，管理操作都搬到獨立專頁
+    assert 'id="c-db-list"' not in wb_body
+    assert "cOpenPage('agents')" in wb_body
+    assert "cOpenPage('artifacts')" in wb_body
+    # 專頁上必須真的有可操作的表單（新增服務商、模型新增/刪除、資料庫搜尋）
+    for element_id in (
+        "c-provider-form-box",
+        "c-prov-label",
+        "c-prov-env",
+        "c-prov-key",
+        "c-prov-models",
+        "c-prov-presets",
+        "c-providers-crud-grid",
+        "c-model-crud-agent",
+        "c-model-crud-input",
+        "c-artifact-search",
+        "c-db-page-count",
+        "c-main-container",
+        "c-composer-wrap",
+    ):
+        assert f'id="{element_id}"' in wb_body, element_id
+        assert wb_body.count(f'id="{element_id}"') == 1, f"duplicate id: {element_id}"
     assert 'id="c-using-files-host"' in wb_body
+
+    # 1a. Agent 狀態與資料庫必須可直接深連結開啟，不能只依賴 SPA 歷史狀態。
+    for deep_link in ("/agents", "/database"):
+        h_page = DummyStatusHandler(deep_link)
+        h_page.do_GET()
+        assert h_page.responses[0][0] == 200
+        assert "text/html" in h_page.responses[0][2]
+        assert 'id="c-main-container"' in h_page.responses[0][1].decode("utf-8")
 
     # 1b. GET /workbench-legacy  (改版前介面，保留作為回退路徑)
     h_legacy = DummyStatusHandler("/workbench-legacy")
@@ -233,6 +289,28 @@ def test_status_server_workbench_endpoints() -> None:
     data = json.loads(body.decode("utf-8"))
     assert data["ok"] is True
     assert len(data["agents"]) >= 6
+
+    monkeypatch.setattr(
+        _wb_module,
+        "get_workbench_capabilities",
+        lambda: {
+            "ok": True,
+            "agents": {
+                "codex": {
+                    "model": "kimi-k3.1-pro",
+                    "thinking_modes": ["high", "xhigh"],
+                    "thinking_parameter": "reasoning_effort",
+                }
+            },
+            "providers": [],
+            "model_options": {},
+        },
+    )
+    h_caps = DummyStatusHandler("/api/workbench/capabilities")
+    h_caps.do_GET()
+    assert h_caps.responses[0][0] == 200
+    caps_data = json.loads(h_caps.responses[0][1].decode("utf-8"))
+    assert caps_data["agents"]["codex"]["thinking_modes"] == ["high", "xhigh"]
 
     # 4. POST /api/workbench/dispatch with empty prompt -> 400
     h_post_empty = DummyStatusHandler("/api/workbench/dispatch", method="POST", body=b'{"prompt":""}')
@@ -270,6 +348,23 @@ def test_status_server_workbench_endpoints() -> None:
         assert len(res_data["results"]) == 1
         assert res_data["results"][0]["backend"] == "minimax"
 
+    # 5a. Invalid thinking mode syntax and sensitive attachment are rejected.
+    h_bad_thinking = DummyStatusHandler(
+        "/api/workbench/dispatch",
+        method="POST",
+        body=b'{"prompt":"test","thinking_mode":"high;rm -rf /"}',
+    )
+    h_bad_thinking.do_POST()
+    assert h_bad_thinking.responses[0][0] == 400
+
+    h_bad_attachment = DummyStatusHandler(
+        "/api/workbench/dispatch",
+        method="POST",
+        body=b'{"prompt":"test","attachments":[{"name":".env","data_base64":"aGVsbG8="}]}',
+    )
+    h_bad_attachment.do_POST()
+    assert h_bad_attachment.responses[0][0] == 400
+
     # 6. GET & POST /api/workbench/models (adjustable model settings)
     h_mod_get = DummyStatusHandler("/api/workbench/models")
     h_mod_get.do_GET()
@@ -298,7 +393,7 @@ def test_status_server_workbench_endpoints() -> None:
     h_mod_reset.do_POST()
     assert h_mod_reset.responses[0][0] == 200
     mod_reset = json.loads(h_mod_reset.responses[0][1].decode("utf-8"))
-    assert mod_reset["models"]["claude"] == "MiniMax-M3.1-Flash"
+    assert mod_reset["models"]["claude"] == "gemini-4-argon"
     assert mod_reset["models"]["antigravity"] == "antigravity-pro"
 
 
@@ -403,6 +498,10 @@ def test_setup_wizard_endpoint() -> None:
     assert "providers" in setup_data
     assert "cli_tools" in setup_data
     assert "deploy_commands" in setup_data
+    juapi = next(p for p in setup_data["providers"] if p["env"] == "JUAPI_API_KEY")
+    assert juapi["label"] == "JUAPI TokenRouter API Key"
+    assert juapi["base_url_env"] == "JUAPI_BASE_URL"
+    assert juapi["models"] == ["gemini-4-argon", "kimi-k3.1-pro"]
 
 
 def test_collaborative_orchestrator_relay_and_next_actions() -> None:
@@ -507,4 +606,3 @@ def test_agent_skills_and_result_review_split(tmp_path) -> None:
     assert "c-review-collapse" in html_c
     assert "opencode" in html_c
     assert "zcode" not in html_c.lower()
-

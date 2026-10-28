@@ -22,10 +22,10 @@
 1. **🖥️ 圖形化全功能智慧工作台 (`/workbench`)**
    - 內建互動式 **SVG 即時派工拓撲圖 (Interactive Dispatch Topology)**、**7 角色協同進度軸 (LangGraph 7-Role Stepper)**、**環形配額儀表 (Radial Quota Gauges)** 與 **各節點延遲橫條圖 (Latency Comparison Chart)**。
 2. **🤖 5 大主流 CLI Agent 並發調度 + 動態模型切換**
-   - **Claude Code (`claude`)**：預設驅動 **`MiniMax-M3.1-Flash`**（MiniMax Token Plan），支援於 Web 介面即時切換模型。
-   - **OpenAI Codex (`codex`)**：預設驅動 **`glm-5.3-flashx`**（GLM Coding Plan）或 `gpt-5-codex`。
+   - **Claude Code (`claude`)**：預設驅動 **`gemini-4-argon`**，模型選項以供應商 `/models` 查詢結果為準。
+   - **OpenAI Codex (`codex`)**：預設驅動 **`kimi-k3.1-pro`**（配置 JUAPI TokenRouter 時走 JUAPI）。
    - **Google Antigravity (`antigravity` / `agy`)**：預設驅動 **`antigravity-pro`**，負責全域自主 Agentic 開發。
-   - **MiniMax Code (`minimax` / `mcode`)**：預設驅動 **`MiniMax-M3.1`**。
+   - **MiniMax Code (`minimax` / `mcode`)**：預設驅動 **`MiniMax-M3.1-Flash`**。
    - **OpenCode (`opencode`)**：預設驅動 **`glm-5.3-flashx`**，開源跨模型終端編碼 CLI。
    - **🛠️ 實作型 Agent Skills (`core/agent_skills.py`)**：內建 9 大自主執行技能（`run_shell`, `write_file`, `edit_file`, `read_file`, `list_dir`, `search_code`, `git_ops`, `run_tests`, `scaffold_project`）與多輪連續執行機制，確保 Agent 親自動手寫檔、設定 Git 遠端與跑通測試，而非只給建議。
 3. **🔌 用戶自訂 Agent 動態擴充機制 (`core/custom_agents.py`)**

@@ -21,10 +21,10 @@
 
 - **🖥️ Graphical Multi-Agent Command Center (`/workbench`)**: Interactive SVG dispatch topology, LangGraph 7-Role progress stepper, radial quota gauges, latency comparison bar charts, and live artifact preview drawer.
 - **🤖 5 Built-in CLI Agents + Dynamic Model Switching**:
-  - **Claude Code (`claude`)** — Default model: `MiniMax-M3.1-Flash` (MiniMax Token Plan)
-  - **OpenAI Codex (`codex`)** — Default model: `glm-5.3-flashx` (GLM Coding Plan)
+  - **Claude Code (`claude`)** — Default model: `gemini-4-argon` (provider-qualified model catalogue)
+  - **OpenAI Codex (`codex`)** — Default model: `kimi-k3.1-pro` (JUAPI TokenRouter when configured)
   - **Google Antigravity (`antigravity` / `agy`)** — Default model: `antigravity-pro`
-  - **MiniMax Code (`minimax` / `mcode`)** — Default model: `MiniMax-M3.1`
+  - **MiniMax Code (`minimax` / `mcode`)** — Default model: `MiniMax-M3.1-Flash`
   - **OpenCode (`opencode`)** — Default model: `glm-5.3-flashx`
 - **🛠️ Autonomous Agent Skills (`core/agent_skills.py`)**: Built-in executable skills (`run_shell`, `write_file`, `edit_file`, `read_file`, `list_dir`, `search_code`, `git_ops`, `run_tests`, `scaffold_project`) with multi-round execution so agents actively write code, configure git remotes, and run tests instead of only giving advice.
 - **🔌 User-Defined Custom Agents (`core/custom_agents.py`)**: Register your own CLI tools (**Aider**, **OpenCode**, **Block Goose**, **DeepSeek/Qwen**, or custom scripts/HTTP endpoints) with 1 click in `/workbench`.

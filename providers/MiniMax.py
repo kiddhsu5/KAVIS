@@ -21,7 +21,7 @@ from ._openai_base import OpenAIChatPlugin
 
 DEFAULT_ENDPOINT = "https://api.MiniMax.chat/v1"
 DEFAULT_MODEL = "MiniMax-M3.1-Flash"
-DEFAULT_MODELS = ["MiniMax-M3.1-Flash", "MiniMax-M3.1", "MiniMax-M3"]
+DEFAULT_MODELS = ["MiniMax-M3.1-Flash", "MiniMax-M3"]
 
 # Historical env var name. Not PEP-8 uppercase, but it is a public contract:
 # it is documented in .env.example. Renaming it would silently break every
