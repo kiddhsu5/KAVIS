@@ -884,7 +884,7 @@ def get_agent_fleet_status() -> list[dict[str, Any]]:
         if a["id"] == "khavis":
             a["installed"] = True
             a["path"] = "internal://langgraph/7-roles"
-            a["version"] = "v0.4.0 (LangGraph 7 Roles)"
+            a["version"] = "v0.5.0 (LangGraph 7 Roles)"
             a["status"] = "ready"
             continue
 

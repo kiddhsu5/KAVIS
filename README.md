@@ -4,7 +4,7 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org)
-[![Status](https://img.shields.io/badge/status-v0.4.0-emerald.svg)](#roadmap)
+[![Status](https://img.shields.io/badge/status-v0.5.0-emerald.svg)](#roadmap)
 [![Live Demo](https://img.shields.io/badge/Live_Demo-khavis.khorus.tech-0EA5E9)](https://khavis.khorus.tech)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
@@ -17,7 +17,7 @@
     └────────────────────────────────────────────────────────────────────┘
 ```
 
-### 🌟 New in v0.4.0: Unified Graphical Workbench (`/workbench`)
+### 🌟 New in v0.5.0: Provider-aware Unified Workbench (`/workbench`)
 
 - **🖥️ Graphical Multi-Agent Command Center (`/workbench`)**: Interactive SVG dispatch topology, LangGraph 7-Role progress stepper, radial quota gauges, latency comparison bar charts, and live artifact preview drawer.
 - **🤖 5 Built-in CLI Agents + Dynamic Model Switching**:
@@ -163,6 +163,22 @@ khavis doctor          # config + which pools are usable
 khavis doctor --deep   # ...and actually call each one to prove it
 ```
 
+### Try the zero-quota demo (no keys required)
+
+The release includes a deterministic walkthrough of the failure path: mock cloud
+pools return 429 responses, the quota tracker marks exhaustion, the webhook
+receiver captures alerts, and an Ollama-style local pool continues the task.
+It does not call the network, consume provider quota, or require an Ollama
+service:
+
+```bash
+python3 examples/zero_quota_demo.py --json
+```
+
+The JSON summary should report `successful_requests` equal to `requests`, a
+positive `local_fallbacks` count, and `quota_exhausted: true`. This is the
+recommended first smoke test after cloning the repository.
+
 `health_check()` only checks that a key, an endpoint and a model name are
 configured — it never opens a socket. An expired key, a spent quota or a
 retired model all pass it. `--deep` makes one real minimal request per pool and
@@ -234,7 +250,7 @@ docker run -d \
   --name khavis \
   -p 8080:8080 \
   -v $(pwd)/config:/app/config \
-  ghcr.io/kiddhsu5/khavis:0.1.0
+  ghcr.io/kiddhsu5/khavis:0.5.0
 ```
 
 The image ships with all provider plugins pre-installed. Mount your `config/` directory to persist keys and routing rules.
@@ -466,7 +482,7 @@ Register it in `pools.yaml`, add capability tags, submit a PR. Full walkthrough 
 - [x] **v0.2.0** — Token-aware cost budgets (per request / per session) via `core/budget.py` + `config/budgets.yaml`.
 - [x] **v0.3.0** — Built-in RAG connector (`core/rag.py`, Chroma/Qdrant/pgvector).
 - [x] **v0.4.0** — OpenAI-compatible drop-in server mode (`khavis-serve`, replaces `litellm` for many users).
-- [ ] **v0.5.0** — First-class fine-tuned model registry with hot-swap.
+- [x] **v0.5.0** — Provider-qualified model catalog, live capabilities, attachments, thinking controls, and zero-quota demo.
 - [x] **v0.6.0 (partial)** — Web dashboard for pool health + dispatch history (`/dashboard`). Quota charts still open.
 - [x] **v0.7.0** — Per-request audit log (`config/audit.jsonl`) with cost, latency, pool, capability, outcome.
 - [x] **v1.0.0** — Stable plugin API (`docs/PLUGIN_API.md`), SemVer guarantees.

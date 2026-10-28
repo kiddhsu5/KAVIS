@@ -4,7 +4,7 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org)
-[![Status](https://img.shields.io/badge/status-v0.4.0-emerald.svg)](#roadmap)
+[![Status](https://img.shields.io/badge/status-v0.5.0-emerald.svg)](#roadmap)
 [![Live Demo](https://img.shields.io/badge/Live_Demo-khavis.khorus.tech-0EA5E9)](https://khavis.khorus.tech)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
@@ -17,7 +17,7 @@
     └────────────────────────────────────────────────────────────────────┘
 ```
 
-### 🌟 v0.4.0 核心亮點 (Unified Graphical Workbench & Multi-CLI Orchestration)
+### 🌟 v0.5.0 核心亮點 (Provider-aware Workbench & Zero-quota Operations)
 
 1. **🖥️ 圖形化全功能智慧工作台 (`/workbench`)**
    - 內建互動式 **SVG 即時派工拓撲圖 (Interactive Dispatch Topology)**、**7 角色協同進度軸 (LangGraph 7-Role Stepper)**、**環形配額儀表 (Radial Quota Gauges)** 與 **各節點延遲橫條圖 (Latency Comparison Chart)**。
@@ -145,6 +145,16 @@ khavis doctor          # 設定檔 + 哪些 pool 可用
 khavis doctor --deep   # ...並實際呼叫每個 pool 來證明
 ```
 
+### 執行零額度 Demo（不需要金鑰）
+
+Release 內附一個可重現的故障流程：模擬雲端 pool 回傳 429、額度追蹤器標記耗盡、Webhook 收到告警，再由 Ollama 風格的本地 mock pool 接手任務。它不會呼叫外部網路、不消耗任何供應商額度，也不要求先啟動 Ollama：
+
+```bash
+python3 examples/zero_quota_demo.py --json
+```
+
+正常輸出會看到 `successful_requests` 等於 `requests`、`local_fallbacks` 大於 0，以及 `quota_exhausted: true`。這是 clone 專案後最推薦先執行的 smoke test。
+
 `health_check()` 只檢查「key、endpoint、模型名有沒有設定」,**完全不會開任何連線**。
 所以過期的 key、用完的額度、已下架的模型全部都會通過它。`--deep` 會對每個 pool
 實際發一個最小請求,告訴你哪些是真的能用。
@@ -229,7 +239,7 @@ docker run -d \
   --name khavis \
   -p 8080:8080 \
   -v $(pwd)/config:/app/config \
-  ghcr.io/kiddhsu5/khavis:0.1.0
+  ghcr.io/kiddhsu5/khavis:0.5.0
 ```
 
 映像檔已預載所有 provider plugin。把 `config/` 目錄掛載進去,即可持久保存 key 與 routing 規則。
@@ -460,7 +470,7 @@ class MyProvider(ProviderPlugin):
 - [ ] **v0.2.0** —— 每次請求 / 每個 session 的 token-aware 成本預算。
 - [x] **v0.3.0** —— 內建 RAG 連接器(`core/rag.py`)。
 - [x] **v0.4.0** —— 相容 OpenAI 的 drop-in server(`khavis-serve`)。
-- [x] **v0.5.0** —— 正式支援 fine-tuned 模型註冊表與熱切換。
+- [x] **v0.5.0** —— 供應商限定模型目錄、即時能力查詢、附件、thinking 控制與零額度 Demo。
 - [x] **v0.6.0** —— 即時監控 pool 健康與額度的 Web UI(`/dashboard`)。
 - [x] **v1.0.0** —— 穩定的 plugin API(`docs/PLUGIN_API.md`)。
 

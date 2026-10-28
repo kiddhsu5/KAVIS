@@ -1,4 +1,4 @@
-"""OpenAI-compatible drop-in server (v0.4.0).
+"""OpenAI-compatible drop-in server (v0.5.0).
 
 Exposes the khavis router as a standard OpenAI Chat Completions API so
 Cursor / Cline / any OpenAI SDK can point ``base_url`` at us and get
@@ -364,7 +364,7 @@ def create_app() -> Any:
     if FastAPI is None:  # pragma: no cover
         raise RuntimeError("fastapi is required for khavis-serve — pip install -e .[bot]")
 
-    app = FastAPI(title="K.H.A.V.I.S. OpenAI-compatible API", version="0.4.0")
+    app = FastAPI(title="K.H.A.V.I.S. OpenAI-compatible API", version="0.5.0")
     state: dict[str, Any] = {}
     # Read once at build time so a request can never observe a half-set key.
     api_key = _api_key()

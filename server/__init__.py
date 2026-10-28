@@ -1,1 +1,1 @@
-"""OpenAI-compatible drop-in server package (v0.4.0)."""
+"""OpenAI-compatible drop-in server package (v0.5.0)."""

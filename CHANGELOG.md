@@ -232,7 +232,7 @@ routing semantics may still evolve before v0.2.0. Anything documented as
 ### Known limitations
 
 - Web UI is not yet shipped — use `GET /v1/pools` for now.
-- Fine-tuned model registry is not yet shipped (planned for v0.5.0).
+- Fine-tuned model registry was not part of that release and remains a future roadmap item.
 - OpenTelemetry exporter ships as an optional extra, not bundled.
 
 ## [0.0.x] — Internal pre-releases

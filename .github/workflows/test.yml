@@ -65,6 +65,9 @@ jobs:
       - name: Run plugin smoke test
         run: python scripts/test_plugins.py
 
+      - name: Run zero-quota demo without provider secrets
+        run: python examples/zero_quota_demo.py --json
+
       - name: Upload coverage to Codecov
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == env.PYTHON_VERSION
         uses: codecov/codecov-action@v4
@@ -153,7 +156,7 @@ jobs:
           print('bare install ok')
           "
 
-      - name: `server` extra must provide a working khavis-serve
+      - name: "`server` extra must provide a working khavis-serve"
         run: |
           /tmp/wheelenv/bin/python -m pip install 'khavis[server] @ file://$PWD/'$(ls dist/*.whl | xargs -n1 basename)
           /tmp/wheelenv/bin/khavis-serve --help
@@ -175,4 +178,3 @@ jobs:
           assert t.is_available('Y') is False
           print('failover ok')
           "
-

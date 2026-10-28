@@ -55,10 +55,10 @@ pip install khavis
 khavis --version
 ```
 
-You should see something like:
+You should see:
 
 ```
-khavis 1.0.0
+khavis 0.5.0
 ```
 
 ### Installing from source (contributors)

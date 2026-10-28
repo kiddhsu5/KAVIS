@@ -78,7 +78,11 @@ Write a single Python file under `providers/`, register it in `pools.yaml`, tag 
 
 ### 7. Does K.H.A.V.I.S. support fine-tuned models?
 
-In v0.1.0, fine-tuned models are supported via per-pool `options.model` overrides — set the model name in `pools.yaml` to your fine-tuned ID and the provider plugin will request it. A first-class fine-tuned registry with hot-swap is planned for **v0.5.0**.
+Fine-tuned models are supported via per-pool `options.model` overrides — set the
+model name in `pools.yaml` to your fine-tuned ID and the provider plugin will
+request it. v0.5.0 also adds provider-qualified model references and live model
+capability discovery; a separate first-class fine-tuned registry with hot-swap
+is still a future roadmap item.
 
 ### 8. Can I run K.H.A.V.I.S. without any cloud provider?
 
@@ -150,7 +154,10 @@ The audit log format is append-only; old lines remain readable after upgrade.
 
 ### 18. What's on the roadmap?
 
-See the [README roadmap](../README.md#roadmap). Highlights: cost budgeting (v0.2.0), built-in RAG (v0.3.0), OpenAI-compatible server mode (v0.4.0), web UI (v0.6.0), stable v1.0 API.
+See the [README roadmap](../README.md#roadmap). Highlights: cost budgeting
+(v0.2.0), built-in RAG (v0.3.0), OpenAI-compatible server mode (v0.4.0),
+provider-aware Workbench and zero-quota demo (v0.5.0), web UI (v0.6.0), and a
+stable v1.0 API.
 
 ---
 
