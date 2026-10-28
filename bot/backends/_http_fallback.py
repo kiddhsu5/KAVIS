@@ -58,15 +58,18 @@ _TOOL_PROTOCOL_INSTRUCTION = """
 AGENT_SYSTEM_PROMPTS: dict[str, str] = {
     "antigravity": (
         "你是 Google Antigravity (AGY)，部署於雲端主機、具備自主架構規劃、系統維運與全棧程式碼實作能力的 Action-First Agentic CLI 助手。"
-        "你發現任何問題都會立即呼叫工具動手修復與驗證，絕不只給空泛建議。請預設使用繁體中文回答。" + _TOOL_PROTOCOL_INSTRUCTION
+        "你發現任何問題都會立即呼叫工具動手修復與驗證，絕不只給空泛建議。請預設使用繁體中文回答。"
+        + _TOOL_PROTOCOL_INSTRUCTION
     ),
     "codex": (
         "你是 OpenAI Codex CLI 實作型助手，專精於高精度系統架構、直接撰寫與重構程式碼、建立 GitHub Actions CI 與自動化測試。"
-        "你總是以實際寫出程式碼並跑通測試為準則，絕不只給建議。請預設使用繁體中文回答。" + _TOOL_PROTOCOL_INSTRUCTION
+        "你總是以實際寫出程式碼並跑通測試為準則，絕不只給建議。請預設使用繁體中文回答。"
+        + _TOOL_PROTOCOL_INSTRUCTION
     ),
     "minimax": (
         "你是 MiniMax Code (MiniMax-M3.1-Flash) 極速編碼實作 CLI 助手，擅長繁體中文技術文件撰寫、腳本建立與高效率代碼落地。"
-        "你總是主動呼叫工具完成檔案建立與修改。請預設使用繁體中文回答。" + _TOOL_PROTOCOL_INSTRUCTION
+        "你總是主動呼叫工具完成檔案建立與修改。請預設使用繁體中文回答。"
+        + _TOOL_PROTOCOL_INSTRUCTION
     ),
     "opencode": (
         "你是 opencode (GLM-5.3-FlashX) 開源全能終端編碼 CLI 助手，擅長快速專案腳手架建立、Git 遠端設定、演算法實現與測試驗證。"
@@ -78,7 +81,8 @@ AGENT_SYSTEM_PROMPTS: dict[str, str] = {
     ),
     "khavis": (
         "你是 K.H.A.V.I.S. 7 角色多 Agent 協同實作團隊 (Planner / Coder A / Coder B / Debater / Critic / Verifier / Learner)。"
-        "請整合規劃、親自動手呼叫工具實作與最終驗證，以繁體中文輸出最完整的綜合交付成果。" + _TOOL_PROTOCOL_INSTRUCTION
+        "請整合規劃、親自動手呼叫工具實作與最終驗證，以繁體中文輸出最完整的綜合交付成果。"
+        + _TOOL_PROTOCOL_INSTRUCTION
     ),
 }
 
@@ -86,7 +90,9 @@ _TOOL_CALL_RE = re.compile(
     r"(?:<+/?tool_call>\s*)?(\{\s*\"tool\"\s*:\s*\"(?:run_shell|write_file|edit_file|read_file|list_dir|search_code|git_ops|run_tests|scaffold_project)\"[\s\S]*?\})\s*(?:<+/+?tool_call>|$)",
     re.DOTALL,
 )
-_TAGGED_TOOL_CALL_RE = re.compile(r"<+/?tool_call>\s*(\{[\s\S]*?\})\s*(?:<+/+?tool_call>|$)", re.DOTALL)
+_TAGGED_TOOL_CALL_RE = re.compile(
+    r"<+/?tool_call>\s*(\{[\s\S]*?\})\s*(?:<+/+?tool_call>|$)", re.DOTALL
+)
 
 
 def _extract_tool_calls(text: str) -> list[str]:
@@ -108,6 +114,7 @@ def _strip_tool_calls(text: str) -> str:
     cleaned = re.sub(r"<+/+?tool_call>", "", cleaned)
     return cleaned.strip()
 
+
 # Block destructive host-wiping commands while allowing normal ops/diagnostics
 _DANGEROUS_CMD_RE = re.compile(
     r"(?:\brm\s+-[rf]{1,2}\s+/(?:\s|$)|:\(\)\s*\{|\bmkfs\b|\bdd\s+if=.*of=/dev/|\bshutdown\b|\breboot\b)",
@@ -117,7 +124,13 @@ _DANGEROUS_CMD_RE = re.compile(
 
 def has_any_upstream_key() -> bool:
     """Return True if at least one upstream API key is present in os.environ."""
-    for k in ("MINIMAX_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY", "ZHIPUAI_API_KEY", "GLM_API_KEY"):
+    for k in (
+        "MINIMAX_API_KEY",
+        "OPENAI_API_KEY",
+        "OPENROUTER_API_KEY",
+        "ZHIPUAI_API_KEY",
+        "GLM_API_KEY",
+    ):
         val = os.environ.get(k, "").strip()
         if val and not val.startswith("your_"):
             return True
@@ -166,13 +179,17 @@ def _format_with_logs(executed_logs: list[str], body_text: str) -> str:
     cleaned = _strip_tool_calls(body_text or "")
     if not executed_logs:
         return cleaned or (body_text or "").strip()
-    trimmed_logs = [lg[:1200] + ("\n...[輸出已精簡]" if len(lg) > 1200 else "") for lg in executed_logs]
+    trimmed_logs = [
+        lg[:1200] + ("\n...[輸出已精簡]" if len(lg) > 1200 else "") for lg in executed_logs
+    ]
     log_block = (
         "⚡ **【自主工具執行紀錄 (Autonomous Execution Log)】**\n```text\n"
         + "\n\n".join(trimmed_logs)
         + "\n```"
     )
-    main_body = cleaned or "✅ 已完成雲端主機與專案工作區指令實測（展開下方審查明細可查看完整終端機輸出）。"
+    main_body = (
+        cleaned or "✅ 已完成雲端主機與專案工作區指令實測（展開下方審查明細可查看完整終端機輸出）。"
+    )
     return f"{main_body}\n\n<!-- KHAVIS_REVIEW_SPLIT -->\n{log_block}"
 
 
@@ -336,7 +353,15 @@ def _single_turn_upstream(
     errors: list[str] = []
 
     # 1. If GLM key is configured and model explicitly asks for glm, try GLM first
-    if glm_key and not glm_key.startswith("your_") and (provider_env == "ZHIPUAI_API_KEY" or "glm" in model_id.lower() or agent_name == "opencode"):
+    if (
+        glm_key
+        and not glm_key.startswith("your_")
+        and (
+            provider_env == "ZHIPUAI_API_KEY"
+            or "glm" in model_id.lower()
+            or agent_name == "opencode"
+        )
+    ):
         for glm_url in (
             "https://open.bigmodel.cn/api/coding/paas/v4/chat/completions",
             "https://open.bigmodel.cn/api/paas/v4/chat/completions",
@@ -358,7 +383,11 @@ def _single_turn_upstream(
 
     # 2. MiniMax Token Plan (Anthropic-compatible endpoint on minimaxi.com)
     if minimax_key and not minimax_key.startswith("your_"):
-        mm_model = model_id if provider_env == "MINIMAX_API_KEY" or "minimax" in model_id.lower() else "MiniMax-M2.7"
+        mm_model = (
+            model_id
+            if provider_env == "MINIMAX_API_KEY" or "minimax" in model_id.lower()
+            else "MiniMax-M2.7"
+        )
         res = _try_minimax_anthropic(
             api_key=minimax_key,
             model=mm_model,
@@ -391,7 +420,11 @@ def _single_turn_upstream(
 
     # 3. OpenAI GPT GO Platform API
     if openai_key and not openai_key.startswith("your_"):
-        oa_model = model_id if provider_env == "OPENAI_API_KEY" or model_id.startswith("gpt-") else "gpt-4o-mini"
+        oa_model = (
+            model_id
+            if provider_env == "OPENAI_API_KEY" or model_id.startswith("gpt-")
+            else "gpt-4o-mini"
+        )
         res_oa = _try_openai_compat(
             url="https://api.openai.com/v1/chat/completions",
             api_key=openai_key,
@@ -472,7 +505,11 @@ def _try_minimax_anthropic(
                 if isinstance(b, dict) and b.get("type") == "text"
             ]
             if not texts and blocks:
-                texts = [str(b.get("text") or b.get("thinking") or "") for b in blocks if isinstance(b, dict)]
+                texts = [
+                    str(b.get("text") or b.get("thinking") or "")
+                    for b in blocks
+                    if isinstance(b, dict)
+                ]
             text = "\n".join(t for t in texts if t).strip()
             usage = raw.get("usage") or {}
             if text:

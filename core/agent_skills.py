@@ -92,7 +92,9 @@ SKILL_DEFINITIONS: list[dict[str, str]] = [
 
 
 def _resolve_safe_path(work_dir: Path, rel_path: str) -> Path | None:
-    target = (work_dir / rel_path).resolve() if not os.path.isabs(rel_path) else Path(rel_path).resolve()
+    target = (
+        (work_dir / rel_path).resolve() if not os.path.isabs(rel_path) else Path(rel_path).resolve()
+    )
     if not str(target).startswith(str(work_dir)) and not str(target).startswith("/tmp"):
         return None
     return target
@@ -170,7 +172,11 @@ def execute_skill(call_obj: dict[str, Any], cwd: str | None = None) -> str:
         rel_path = str(call_obj.get("path") or "").strip()
         if not rel_path:
             return "[Error] Missing file path"
-        target = (work_dir / rel_path).resolve() if not os.path.isabs(rel_path) else Path(rel_path).resolve()
+        target = (
+            (work_dir / rel_path).resolve()
+            if not os.path.isabs(rel_path)
+            else Path(rel_path).resolve()
+        )
         if target.name.startswith(".env") or target.suffix in {".pem", ".key"}:
             return "[Blocked] Cannot read secret key/env files"
         try:
@@ -188,7 +194,11 @@ def execute_skill(call_obj: dict[str, Any], cwd: str | None = None) -> str:
             return f"[Error] Directory not found: {rel_path}"
         entries: list[str] = []
         for root, dirs, files in os.walk(target):
-            dirs[:] = [d for d in sorted(dirs) if d not in {".git", "__pycache__", ".pytest_cache", "node_modules", ".venv"}]
+            dirs[:] = [
+                d
+                for d in sorted(dirs)
+                if d not in {".git", "__pycache__", ".pytest_cache", "node_modules", ".venv"}
+            ]
             rel_root = Path(root).relative_to(work_dir)
             prefix = "" if str(rel_root) == "." else f"{rel_root}/"
             for f in sorted(files):
@@ -208,57 +218,129 @@ def execute_skill(call_obj: dict[str, Any], cwd: str | None = None) -> str:
         except re.error:
             rx = re.compile(re.escape(pattern), re.IGNORECASE)
         for root, dirs, files in os.walk(work_dir):
-            dirs[:] = [d for d in sorted(dirs) if d not in {".git", "__pycache__", ".pytest_cache", "node_modules", ".venv"}]
+            dirs[:] = [
+                d
+                for d in sorted(dirs)
+                if d not in {".git", "__pycache__", ".pytest_cache", "node_modules", ".venv"}
+            ]
             for fname in sorted(files):
                 fpath = Path(root) / fname
                 if fpath.suffix in {".pyc", ".png", ".jpg", ".sqlite", ".db"}:
                     continue
                 try:
-                    for lineno, line in enumerate(fpath.read_text(encoding="utf-8", errors="ignore").splitlines(), 1):
+                    for lineno, line in enumerate(
+                        fpath.read_text(encoding="utf-8", errors="ignore").splitlines(), 1
+                    ):
                         if rx.search(line):
                             rel = fpath.relative_to(work_dir)
                             matches.append(f"{rel}:{lineno}: {line.strip()[:140]}")
                             if len(matches) >= 50:
-                                return "[Search Results]\n" + "\n".join(matches) + "\n...[truncated]"
+                                return (
+                                    "[Search Results]\n" + "\n".join(matches) + "\n...[truncated]"
+                                )
                 except Exception:  # noqa: BLE001
                     continue
-        return "[Search Results]\n" + ("\n".join(matches) if matches else f"No matches for {pattern!r}")
+        return "[Search Results]\n" + (
+            "\n".join(matches) if matches else f"No matches for {pattern!r}"
+        )
 
     if tool == "git_ops":
         action = str(call_obj.get("action") or "status").strip().lower()
-        remote_url = str(call_obj.get("remote_url") or "https://github.com/kiddhsu5/KHAVIS.git").strip()
+        remote_url = str(
+            call_obj.get("remote_url") or "https://github.com/kiddhsu5/KHAVIS.git"
+        ).strip()
         if action == "ensure_remote":
-            chk = subprocess.run(["git", "remote", "-v"], cwd=str(work_dir), capture_output=True, text=True, check=False)
+            chk = subprocess.run(
+                ["git", "remote", "-v"],
+                cwd=str(work_dir),
+                capture_output=True,
+                text=True,
+                check=False,
+            )
             if "origin" not in (chk.stdout or ""):
-                subprocess.run(["git", "remote", "add", "origin", remote_url], cwd=str(work_dir), capture_output=True, text=True, check=False)
+                subprocess.run(
+                    ["git", "remote", "add", "origin", remote_url],
+                    cwd=str(work_dir),
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
             else:
-                subprocess.run(["git", "remote", "set-url", "origin", remote_url], cwd=str(work_dir), capture_output=True, text=True, check=False)
-            chk2 = subprocess.run(["git", "remote", "-v"], cwd=str(work_dir), capture_output=True, text=True, check=False)
+                subprocess.run(
+                    ["git", "remote", "set-url", "origin", remote_url],
+                    cwd=str(work_dir),
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+            chk2 = subprocess.run(
+                ["git", "remote", "-v"],
+                cwd=str(work_dir),
+                capture_output=True,
+                text=True,
+                check=False,
+            )
             return f"[OK] Configured git remote origin:\n{(chk2.stdout or '').strip()}"
         if action == "remote":
-            res = subprocess.run(["git", "remote", "-v"], cwd=str(work_dir), capture_output=True, text=True, check=False)
+            res = subprocess.run(
+                ["git", "remote", "-v"],
+                cwd=str(work_dir),
+                capture_output=True,
+                text=True,
+                check=False,
+            )
             return f"[git remote -v]\n{(res.stdout or '').strip() or '(no remote configured)'}"
         if action == "diff":
-            res = subprocess.run(["git", "status", "--short"], cwd=str(work_dir), capture_output=True, text=True, check=False)
+            res = subprocess.run(
+                ["git", "status", "--short"],
+                cwd=str(work_dir),
+                capture_output=True,
+                text=True,
+                check=False,
+            )
             return f"[git status --short]\n{(res.stdout or '').strip() or '(clean)'}"
-        res = subprocess.run(["git", "status", "-sb"], cwd=str(work_dir), capture_output=True, text=True, check=False)
-        rem = subprocess.run(["git", "remote", "-v"], cwd=str(work_dir), capture_output=True, text=True, check=False)
+        res = subprocess.run(
+            ["git", "status", "-sb"], cwd=str(work_dir), capture_output=True, text=True, check=False
+        )
+        rem = subprocess.run(
+            ["git", "remote", "-v"], cwd=str(work_dir), capture_output=True, text=True, check=False
+        )
         return f"[git status]\n{(res.stdout or '').strip()}\n[git remote]\n{(rem.stdout or '').strip() or '(none)'}"
 
     if tool == "run_tests":
         target_arg = str(call_obj.get("target") or "").strip()
         cmd = f"python3 -m pytest -q {target_arg}".strip()
-        proc = subprocess.run(cmd, shell=True, cwd=str(work_dir), capture_output=True, text=True, timeout=25, check=False)
+        proc = subprocess.run(
+            cmd,
+            shell=True,
+            cwd=str(work_dir),
+            capture_output=True,
+            text=True,
+            timeout=25,
+            check=False,
+        )
         out = "\n".join(p for p in [(proc.stdout or "").strip(), (proc.stderr or "").strip()] if p)
         if proc.returncode != 0 and "No module named pytest" in out:
-            proc = subprocess.run("python3 -m unittest discover -v", shell=True, cwd=str(work_dir), capture_output=True, text=True, timeout=25, check=False)
-            out = "\n".join(p for p in [(proc.stdout or "").strip(), (proc.stderr or "").strip()] if p)
+            proc = subprocess.run(
+                "python3 -m unittest discover -v",
+                shell=True,
+                cwd=str(work_dir),
+                capture_output=True,
+                text=True,
+                timeout=25,
+                check=False,
+            )
+            out = "\n".join(
+                p for p in [(proc.stdout or "").strip(), (proc.stderr or "").strip()] if p
+            )
         return f"[Test Runner: exit_code={proc.returncode}]\n{out[:3000]}"
 
     if tool == "scaffold_project":
         from core.workspace_manager import ensure_project_completeness
 
-        remote_url = str(call_obj.get("remote_url") or "https://github.com/kiddhsu5/KHAVIS.git").strip()
+        remote_url = str(
+            call_obj.get("remote_url") or "https://github.com/kiddhsu5/KHAVIS.git"
+        ).strip()
         created = ensure_project_completeness(work_dir, remote_url=remote_url)
         return f"[OK] Project completeness verified in {work_dir}. Created/Updated: {', '.join(created) if created else 'all files already up-to-date'}"
 

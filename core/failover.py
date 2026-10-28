@@ -65,7 +65,9 @@ def find_local_fallback_pool(router: Any, exclude: Any = ()) -> Any:
             candidates.append(plugin)
 
     # Prefer Mac over Surface or other hosts
-    candidates.sort(key=lambda p: 0 if "mac" in p.name.lower() else (1 if "surface" in p.name.lower() else 2))
+    candidates.sort(
+        key=lambda p: 0 if "mac" in p.name.lower() else (1 if "surface" in p.name.lower() else 2)
+    )
     for pool in candidates:
         if tracker.is_available(pool.name):
             return pool
@@ -116,11 +118,7 @@ def call_with_failover(
     # ------------------------------------------------------------------
     # 1. Pre-flight: Check for high complexity or explicit agent delegation
     # ------------------------------------------------------------------
-    allow_escalation = (
-        auto_escalate_agents is not False
-        and escalation_enabled()
-        and pinned is None
-    )
+    allow_escalation = auto_escalate_agents is not False and escalation_enabled() and pinned is None
     if allow_escalation and messages:
         from core.escalation import (  # noqa: PLC0415
             dispatch_to_agent_team,
@@ -150,8 +148,7 @@ def call_with_failover(
             tracker.record_failure(plugin.name, exc)
             raise
         res_headers = (
-            result.get("_headers")
-            or getattr(result, "headers", None)
+            result.get("_headers") or getattr(result, "headers", None)
             if isinstance(result, dict)
             else None
         )
@@ -197,11 +194,9 @@ def call_with_failover(
     # ------------------------------------------------------------------
     # 2. Post-failure: Escalate to multi-agent team on quota exhaustion
     # ------------------------------------------------------------------
-    should_escalate_exhaustion = (
-        auto_escalate_agents is True
-        or os.environ.get("KHAVIS_AUTO_ESCALATE_ON_EXHAUSTION", "0").strip().lower()
-        in {"1", "true", "yes", "on"}
-    )
+    should_escalate_exhaustion = auto_escalate_agents is True or os.environ.get(
+        "KHAVIS_AUTO_ESCALATE_ON_EXHAUSTION", "0"
+    ).strip().lower() in {"1", "true", "yes", "on"}
     if should_escalate_exhaustion and messages:
         try:
             from core.escalation import dispatch_to_agent_team  # noqa: PLC0415
@@ -221,9 +216,8 @@ def call_with_failover(
     # 3. Last Line of Defense: Fall back to local Ollama model
     # ------------------------------------------------------------------
     should_local_fallback = (
-        (local_fallback if local_fallback is not None else local_fallback_enabled())
-        and messages
-    )
+        local_fallback if local_fallback is not None else local_fallback_enabled()
+    ) and messages
     if should_local_fallback:
         local_pool = find_local_fallback_pool(router, exclude=tried)
         if local_pool is not None:
@@ -234,7 +228,9 @@ def call_with_failover(
                         result["khavis"] = {}
                     result["khavis"]["degraded_to_local"] = True
                     result["khavis"]["fallback_reason"] = (
-                        "all_cloud_pools_exhausted" if last_exc is not None else "no_healthy_cloud_pool"
+                        "all_cloud_pools_exhausted"
+                        if last_exc is not None
+                        else "no_healthy_cloud_pool"
                     )
                 try:
                     from core.alerting import get_alert_manager  # noqa: PLC0415

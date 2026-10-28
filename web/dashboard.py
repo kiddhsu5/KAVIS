@@ -287,7 +287,11 @@ def render_dashboard_html(
         tok_str = f"{rem_tok:,}" if rem_tok is not None else "—"
         bal_str = f"${balance_usd:.2f}" if balance_usd is not None else "—"
 
-        timer_html = f'<span class="countdown" data-reset-at="{reset_at}">{int(reset_s)}s</span>' if reset_s > 0 else '<span class="countdown ready">—</span>'
+        timer_html = (
+            f'<span class="countdown" data-reset-at="{reset_at}">{int(reset_s)}s</span>'
+            if reset_s > 0
+            else '<span class="countdown ready">—</span>'
+        )
 
         return (
             "<tr>"

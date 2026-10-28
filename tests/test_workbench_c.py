@@ -88,9 +88,29 @@ REQUIRED_DOM_IDS = (
 REQUIRED_TABS = ("command", "artifacts", "quotas", "agents", "wizard")
 
 _VOID = {
-    "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta",
-    "param", "source", "track", "wbr", "path", "circle", "line", "rect",
-    "polyline", "polygon", "ellipse", "use", "stop",
+    "area",
+    "base",
+    "br",
+    "col",
+    "embed",
+    "hr",
+    "img",
+    "input",
+    "link",
+    "meta",
+    "param",
+    "source",
+    "track",
+    "wbr",
+    "path",
+    "circle",
+    "line",
+    "rect",
+    "polyline",
+    "polygon",
+    "ellipse",
+    "use",
+    "stop",
 }
 
 
@@ -173,9 +193,7 @@ def test_c_page_does_not_redefine_legacy_dom_ids() -> None:
     """
     html = render_workbench_html_c()
     legacy_ids = set(re.findall(r'id="([^"]+)"', _WORKBENCH_PAGE_HEAD))
-    c_ids = {
-        i for i in re.findall(r'id="(c-[^"]+)"', html)
-    }
+    c_ids = {i for i in re.findall(r'id="(c-[^"]+)"', html)}
     assert c_ids, "expected the C page to define its own c-* ids"
     # every c-* id must be unique to the C page
     assert not (c_ids & legacy_ids)
@@ -237,7 +255,7 @@ def test_c_page_next_step_and_followup_are_wired() -> None:
     """The next-step flow depends on these legacy globals staying reachable."""
     html = render_workbench_html_c()
     for needle in (
-        "runNextStepAction",        # rendered by legacy submitDispatch
+        "runNextStepAction",  # rendered by legacy submitDispatch
         "submitFollowup",
         "followup-inline-input",
         "latestNextActions",
@@ -260,9 +278,7 @@ def _run_node_harness(script_name: str, page_html: str) -> subprocess.CompletedP
     with tempfile.TemporaryDirectory() as tmp:
         page = Path(tmp) / "page.html"
         page.write_text(page_html, encoding="utf-8")
-        return subprocess.run(
-            [node, str(harness), str(page)], capture_output=True, text=True
-        )
+        return subprocess.run([node, str(harness), str(page)], capture_output=True, text=True)
 
 
 def test_c_page_scripts_are_syntactically_valid() -> None:

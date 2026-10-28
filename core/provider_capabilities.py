@@ -85,7 +85,12 @@ def _normalise_parameter(key: str) -> str:
     lowered = key.strip().lower().replace("-", "_")
     if lowered in {"thinking_modes", "thinking_levels", "thinking_options"}:
         return "thinking"
-    if lowered in {"reasoning_modes", "reasoning_levels", "reasoning_efforts", "supported_reasoning_efforts"}:
+    if lowered in {
+        "reasoning_modes",
+        "reasoning_levels",
+        "reasoning_efforts",
+        "supported_reasoning_efforts",
+    }:
         return "reasoning_effort"
     if lowered in {"effort_levels", "effort_options"}:
         return "effort"
@@ -187,7 +192,9 @@ def _models_endpoint(base_url: str, env_name: str) -> str:
     return base if lower.endswith("/models") else f"{base}/models"
 
 
-def _fetch_provider(spec: dict[str, Any], values: dict[str, str], timeout_s: float) -> dict[str, Any]:
+def _fetch_provider(
+    spec: dict[str, Any], values: dict[str, str], timeout_s: float
+) -> dict[str, Any]:
     env_name = str(spec.get("env") or "").strip()
     key = values.get(env_name, "").strip()
     if not key and env_name == "ZHIPUAI_API_KEY":
@@ -275,7 +282,9 @@ def discover_provider_capabilities(
         if env_name:
             unique[env_name] = dict(spec)
     with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, min(8, len(unique)))) as pool:
-        futures = [pool.submit(_fetch_provider, spec, merged, timeout_s) for spec in unique.values()]
+        futures = [
+            pool.submit(_fetch_provider, spec, merged, timeout_s) for spec in unique.values()
+        ]
         return [future.result() for future in futures]
 
 
@@ -304,7 +313,10 @@ def build_agent_capabilities(
             matched_provider, matched_model = matches[0] if matches else (None, None)
         resolved_ref = active_ref
         if matched_model:
-            resolved_ref = str(matched_model.get("ref") or format_model_ref(matched_model.get("provider_env"), model_name))
+            resolved_ref = str(
+                matched_model.get("ref")
+                or format_model_ref(matched_model.get("provider_env"), model_name)
+            )
         output[agent_id] = {
             "model": model_name,
             "model_ref": resolved_ref,
@@ -315,8 +327,13 @@ def build_agent_capabilities(
             "provider_env": matched_provider.get("env") if matched_provider else None,
             "provider_label": matched_provider.get("label") if matched_provider else None,
             "provider_status": matched_provider.get("status") if matched_provider else "unknown",
-            "thinking_modes": list(matched_model.get("thinking_modes") or []) if matched_model else [],
-            "thinking_parameter": (matched_model.get("thinking_parameter") if matched_model else "reasoning_effort") or "reasoning_effort",
+            "thinking_modes": list(matched_model.get("thinking_modes") or [])
+            if matched_model
+            else [],
+            "thinking_parameter": (
+                matched_model.get("thinking_parameter") if matched_model else "reasoning_effort"
+            )
+            or "reasoning_effort",
             "thinking_supported": bool(matched_model and matched_model.get("thinking_supported")),
             "source": matched_provider.get("source") if matched_provider else "provider:/models",
         }
@@ -381,7 +398,11 @@ def build_model_catalog(
 
         options = list(dynamic_options.get(agent_id) or [])
         if not options:
-            options = [str(item).strip() for item in (fallback_options or {}).get(agent_id, []) if str(item).strip()]
+            options = [
+                str(item).strip()
+                for item in (fallback_options or {}).get(agent_id, [])
+                if str(item).strip()
+            ]
         if active_ref not in options:
             options.insert(0, active_ref)
         deduped: list[str] = []

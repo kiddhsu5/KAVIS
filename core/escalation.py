@@ -92,7 +92,9 @@ def evaluate_task_complexity(
     target_threshold = (
         threshold
         if threshold is not None
-        else float(os.environ.get("KHAVIS_AGENT_COMPLEXITY_THRESHOLD", str(DEFAULT_COMPLEXITY_THRESHOLD)))
+        else float(
+            os.environ.get("KHAVIS_AGENT_COMPLEXITY_THRESHOLD", str(DEFAULT_COMPLEXITY_THRESHOLD))
+        )
     )
 
     # 2. Text heuristics
@@ -157,7 +159,9 @@ def extract_task_prompt(messages: list[dict[str, Any]]) -> str:
         content = msg.get("content", "")
         if isinstance(content, list):
             content = " ".join(
-                p.get("text", "") for p in content if isinstance(p, dict) and p.get("type") == "text"
+                p.get("text", "")
+                for p in content
+                if isinstance(p, dict) and p.get("type") == "text"
             )
         content_str = str(content).strip()
         if not content_str:
@@ -289,7 +293,9 @@ def dispatch_to_agent_team(
 
     from agents.graph import run_team  # noqa: PLC0415
 
-    log.info("[escalation] invoking LangGraph multi-agent team for reason: %s (session: %s)", reason, sid)
+    log.info(
+        "[escalation] invoking LangGraph multi-agent team for reason: %s (session: %s)", reason, sid
+    )
     state = run_team(task=task, session_id=sid)
     response = format_agent_team_response(
         state,

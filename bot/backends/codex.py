@@ -68,7 +68,11 @@ class CodexBackend(Backend):
         if model_id:
             args += ["-m", model_id]
         thinking_mode = envelope.thinking_mode
-        if thinking_mode and thinking_mode.lower() != "auto" and re.fullmatch(r"[A-Za-z0-9_.:-]{1,64}", thinking_mode):
+        if (
+            thinking_mode
+            and thinking_mode.lower() != "auto"
+            and re.fullmatch(r"[A-Za-z0-9_.:-]{1,64}", thinking_mode)
+        ):
             args += ["-c", f"model_reasoning_effort={thinking_mode}"]
         # Try JSON output first; fall back to plain text if the flag is rejected.
         args += ["--json"]
@@ -88,10 +92,14 @@ class CodexBackend(Backend):
         juapi_key = os.environ.get("JUAPI_API_KEY")
         glm_key = os.environ.get("ZHIPUAI_API_KEY") or os.environ.get("GLM_API_KEY")
         minimax_key = os.environ.get("MINIMAX_API_KEY")
-        if juapi_key and (provider_env == "JUAPI_API_KEY" or (not provider_env and _uses_juapi_model(model_lower))):
+        if juapi_key and (
+            provider_env == "JUAPI_API_KEY" or (not provider_env and _uses_juapi_model(model_lower))
+        ):
             env["OPENAI_API_KEY"] = juapi_key
             env["OPENAI_BASE_URL"] = _juapi_openai_base_url()
-        elif glm_key and ("glm" in model_lower or "flashx" in model_lower or "codegeex" in model_lower):
+        elif glm_key and (
+            "glm" in model_lower or "flashx" in model_lower or "codegeex" in model_lower
+        ):
             env["OPENAI_API_KEY"] = glm_key
             if "OPENAI_BASE_URL" not in env:
                 env["OPENAI_BASE_URL"] = "https://open.bigmodel.cn/api/paas/v4"
@@ -193,7 +201,11 @@ class CodexBackend(Backend):
         if model_id:
             args += ["-m", model_id]
         thinking_mode = envelope.thinking_mode
-        if thinking_mode and thinking_mode.lower() != "auto" and re.fullmatch(r"[A-Za-z0-9_.:-]{1,64}", thinking_mode):
+        if (
+            thinking_mode
+            and thinking_mode.lower() != "auto"
+            and re.fullmatch(r"[A-Za-z0-9_.:-]{1,64}", thinking_mode)
+        ):
             args += ["-c", f"model_reasoning_effort={thinking_mode}"]
         args += ["--", envelope.prompt]
         try:

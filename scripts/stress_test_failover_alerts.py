@@ -233,6 +233,7 @@ def run_e2e_stress_test(
     alert_mgr = AlertManager(webhook_url=webhook_url, cooldown_s=0.5, enabled=True)
     alert_mgr.clear()
     import core.alerting  # noqa: PLC0415
+
     core.alerting._MANAGER = alert_mgr
 
     # Clear quota tracker for fresh state
@@ -278,7 +279,9 @@ def run_e2e_stress_test(
 
     def send_task(request_idx: int) -> dict[str, Any]:
         t0 = time.time()
-        msgs = [{"role": "user", "content": f"Task #{request_idx}: Process real-time data payload."}]
+        msgs = [
+            {"role": "user", "content": f"Task #{request_idx}: Process real-time data payload."}
+        ]
         try:
             used_plugin, resp, attempts = call_with_failover(
                 router,
@@ -337,13 +340,15 @@ def run_e2e_stress_test(
     print(" 📊 K.H.A.V.I.S. E2E STRESS TEST TELEMETRY REPORT")
     print("=" * 70)
     print(f"Total Requests Dispatched     : {num_requests}")
-    print(f"Successful Requests           : {successful_requests} ({successful_requests/num_requests*100:.1f}%)")
+    print(
+        f"Successful Requests           : {successful_requests} ({successful_requests / num_requests * 100:.1f}%)"
+    )
     print(f"Failed Requests (Outages)     : {num_requests - successful_requests} (0.0% expected)")
     print(f"Total Cloud Pool Calls (429)  : {cloud_calls}")
     print(f"Local Ollama Fallbacks Taken  : {local_fallbacks} (100% of exhausted tasks recovered)")
     print(f"Local Ollama Pool Invocations : {local_calls}")
     print(f"Total Test Duration           : {total_duration:.2f}s")
-    print(f"Average Request Latency       : {avg_latency*1000:.1f}ms")
+    print(f"Average Request Latency       : {avg_latency * 1000:.1f}ms")
     print(f"Webhooks Received             : {len(received_alerts)}")
 
     print("\n--- Failed Requests Details ---")
@@ -361,17 +366,25 @@ def run_e2e_stress_test(
     print("\n--- Intercepted Webhook Alerts Samples ---")
     for i, a in enumerate(received_alerts[:5], 1):
         alert_body = a.get("khavis_alert", {})
-        print(f"  [{i}] Level: {alert_body.get('level', 'N/A').upper():<8} | Event: {alert_body.get('event_type'):<15} | Pool: {alert_body.get('pool_name')}")
+        print(
+            f"  [{i}] Level: {alert_body.get('level', 'N/A').upper():<8} | Event: {alert_body.get('event_type'):<15} | Pool: {alert_body.get('pool_name')}"
+        )
         print(f"      Message: {alert_body.get('message')}")
 
     print("=" * 70)
 
     # Verification assertions
-    assert successful_requests == num_requests, f"Expected 100% success rate, got {successful_requests}/{num_requests}"
-    assert local_fallbacks > 0, "Expected local Ollama fallback to be activated after cloud exhaustion"
+    assert successful_requests == num_requests, (
+        f"Expected 100% success rate, got {successful_requests}/{num_requests}"
+    )
+    assert local_fallbacks > 0, (
+        "Expected local Ollama fallback to be activated after cloud exhaustion"
+    )
     assert len(received_alerts) > 0, "Expected webhook alerts to be received"
 
-    print("✅ ALL E2E CRITERIA VERIFIED: Zero-downtime Ollama safeguard and Webhook alerts functional!\n")
+    print(
+        "✅ ALL E2E CRITERIA VERIFIED: Zero-downtime Ollama safeguard and Webhook alerts functional!\n"
+    )
 
     return {
         "num_requests": num_requests,

@@ -12,9 +12,9 @@ The following versions of K.H.A.V.I.S. currently receive security updates. We st
 
 | Version | Supported          | Notes |
 |---------|--------------------|-------|
-| 0.1.x   | :white_check_mark: | Active development — patches shipped within 30 days |
-| 0.0.x   | :x:                | Pre-release — please upgrade to 0.1.0 |
-| < 0.1.0 | :x:                | Never publicly released |
+| 0.5.x   | :white_check_mark: | Active development — patches shipped within 30 days |
+| 0.4.x   | :white_check_mark: | Security fixes backported |
+| < 0.4.0 | :x:                | Please upgrade to 0.5.0 |
 
 > 我們採用 [Semantic Versioning](https://semver.org/):major version bumps indicate breaking changes, patch versions are reserved for bug fixes and security updates.
 
@@ -29,7 +29,7 @@ We offer **two private channels** for disclosure. Use whichever you are most com
 ### Channel 1: GitHub Security Advisories (preferred)
 
 開啟一個 private security advisory:
-1. 前往 https://github.com/kiddhsu5/K.H.A.V.I.S./security/advisories/new
+1. 前往 https://github.com/kiddhsu5/KHAVIS/security/advisories/new
 2. 填寫漏洞詳情 (影響範圍、重現步驟、概念驗證)
 3. 提交後只有 maintainer 與 GitHub 信任的通報者會看到內容
 
@@ -217,10 +217,10 @@ In return, we will:
 
 Security fixes are published through:
 
-1. **PyPI** — `pip install --upgrade K.H.A.V.I.S.`
-2. **GitHub Releases** — tagged with `v0.1.x` and security advisory linked
-3. **Docker Hub** — `:0.1.x` and `:latest` tags updated
-4. **GHCR** — same tags
+1. **PyPI** — `pip install --upgrade khavis`
+2. **GitHub Releases** — tagged with `v0.5.x` and security advisory linked
+3. **Docker Hub** — `:0.5.x` and `:latest` tags updated
+4. **GHCR** — same tags (`ghcr.io/kiddhsu5/khavis`)
 5. **CHANGELOG.md** — under a `[Security]` subsection
 
 Watch this repo (click "Watch" → "Custom" → "Security alerts") to receive GitHub Security Advisory notifications.
@@ -230,7 +230,7 @@ Watch this repo (click "Watch" → "Custom" → "Security alerts") to receive Gi
 ## Contact
 
 - **Private disclosure:** kiddhsu5@users.noreply.github.com (PGP available)
-- **GitHub Security Advisories:** https://github.com/kiddhsu5/K.H.A.V.I.S./security/advisories/new
-- **General questions:** open a Discussion at https://github.com/kiddhsu5/K.H.A.V.I.S./discussions
+- **GitHub Security Advisories:** https://github.com/kiddhsu5/KHAVIS/security/advisories/new
+- **General questions:** open a Discussion at https://github.com/kiddhsu5/KHAVIS/discussions
 
 Thanks for keeping K.H.A.V.I.S. and its users safe.

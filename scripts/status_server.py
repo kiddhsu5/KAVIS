@@ -105,7 +105,10 @@ def _validate_attachment_name(raw_name: object) -> str:
     name = str(raw_name or "").strip()
     if not name or name in {".", ".."} or "/" in name or "\\" in name:
         raise ValueError("附件檔名無效或包含路徑")
-    if name in _BLOCKED_ATTACHMENT_NAMES or Path(name).suffix.lower() in _BLOCKED_ATTACHMENT_SUFFIXES:
+    if (
+        name in _BLOCKED_ATTACHMENT_NAMES
+        or Path(name).suffix.lower() in _BLOCKED_ATTACHMENT_SUFFIXES
+    ):
         raise ValueError(f"不允許上傳敏感附件：{name}")
     if len(name) > 180 or any(ord(ch) < 32 for ch in name):
         raise ValueError("附件檔名過長或包含控制字元")
@@ -132,13 +135,17 @@ def _store_dispatch_attachments(payload: dict[str, Any], shared_dir: Path) -> li
         if not encoded:
             raise ValueError(f"附件沒有內容：{name}")
         if len(encoded) > ((_MAX_ATTACHMENT_BYTES + 2) * 4 // 3) + 16:
-            raise ValueError(f"附件超過單檔 {_MAX_ATTACHMENT_BYTES // (1024 * 1024)} MB 限制：{name}")
+            raise ValueError(
+                f"附件超過單檔 {_MAX_ATTACHMENT_BYTES // (1024 * 1024)} MB 限制：{name}"
+            )
         try:
             content = base64.b64decode(encoded, validate=True)
         except Exception as exc:  # noqa: BLE001
             raise ValueError(f"附件 Base64 內容無效：{name}") from exc
         if len(content) > _MAX_ATTACHMENT_BYTES:
-            raise ValueError(f"附件超過單檔 {_MAX_ATTACHMENT_BYTES // (1024 * 1024)} MB 限制：{name}")
+            raise ValueError(
+                f"附件超過單檔 {_MAX_ATTACHMENT_BYTES // (1024 * 1024)} MB 限制：{name}"
+            )
         total_bytes += len(content)
         if total_bytes > _MAX_ATTACHMENT_TOTAL_BYTES:
             raise ValueError(f"附件總量不能超過 {_MAX_ATTACHMENT_TOTAL_BYTES // (1024 * 1024)} MB")
@@ -146,7 +153,9 @@ def _store_dispatch_attachments(payload: dict[str, Any], shared_dir: Path) -> li
 
     if not decoded:
         return []
-    target_dir = shared_dir / ".khavis_attachments" / f"dispatch-{int(time.time())}-{secrets.token_hex(6)}"
+    target_dir = (
+        shared_dir / ".khavis_attachments" / f"dispatch-{int(time.time())}-{secrets.token_hex(6)}"
+    )
     target_dir.mkdir(parents=True, exist_ok=False)
     target_root = target_dir.resolve()
     refs: list[dict[str, str]] = []
@@ -173,7 +182,9 @@ def _attachment_prompt_context(refs: list[dict[str, str]]) -> str:
         "\n\n【本輪對話附件】",
         "以下附件已由 K.H.A.V.I.S. 儲存到共用工作區，請依任務需要讀取或分析；不要猜測附件內容：",
     ]
-    lines.extend(f"- {item['name']} ({item['type']}, {item['size']} bytes): {item['path']}" for item in refs)
+    lines.extend(
+        f"- {item['name']} ({item['type']}, {item['size']} bytes): {item['path']}" for item in refs
+    )
     return "\n".join(lines)
 
 
@@ -472,7 +483,10 @@ class Handler(BaseHTTPRequestHandler):
                 {
                     "ok": False,
                     "detail": "訪客唯讀展示模式：請先於「雲端指令台」輸入 Console Token 解鎖派工與設定寫入權限",
-                    "error": {"code": "unauthorized", "detail": "Console token required for write/dispatch"},
+                    "error": {
+                        "code": "unauthorized",
+                        "detail": "Console token required for write/dispatch",
+                    },
                 },
             )
             return False
@@ -486,7 +500,10 @@ class Handler(BaseHTTPRequestHandler):
         if content_len < 0 or content_len > 30000:
             self._send_json(
                 413,
-                {"ok": False, "error": {"code": "payload_too_large", "detail": "Request body is too large"}},
+                {
+                    "ok": False,
+                    "error": {"code": "payload_too_large", "detail": "Request body is too large"},
+                },
             )
             return None
         try:
@@ -494,13 +511,19 @@ class Handler(BaseHTTPRequestHandler):
         except (UnicodeDecodeError, json.JSONDecodeError):
             self._send_json(
                 400,
-                {"ok": False, "error": {"code": "invalid_json", "detail": "Request body must be JSON"}},
+                {
+                    "ok": False,
+                    "error": {"code": "invalid_json", "detail": "Request body must be JSON"},
+                },
             )
             return None
         if not isinstance(payload, dict):
             self._send_json(
                 400,
-                {"ok": False, "error": {"code": "invalid_json", "detail": "JSON body must be an object"}},
+                {
+                    "ok": False,
+                    "error": {"code": "invalid_json", "detail": "JSON body must be an object"},
+                },
             )
             return None
         return payload
@@ -573,8 +596,14 @@ class Handler(BaseHTTPRequestHandler):
                 message = payload.get("message")
                 profile = payload.get("agent_profile", "standard")
                 interactive = payload.get("interactive_mode", True)
-                if not isinstance(message, str) or not isinstance(profile, str) or not isinstance(interactive, bool):
-                    raise ValueError("message, agent_profile and interactive_mode have invalid types")
+                if (
+                    not isinstance(message, str)
+                    or not isinstance(profile, str)
+                    or not isinstance(interactive, bool)
+                ):
+                    raise ValueError(
+                        "message, agent_profile and interactive_mode have invalid types"
+                    )
                 result = ManusClient().create_task(
                     message,
                     agent_profile=profile,
@@ -587,7 +616,9 @@ class Handler(BaseHTTPRequestHandler):
             if len(parts) == 5 and parts[2] == "tasks" and parts[4] == "messages":
                 message = payload.get("message")
                 profile = payload.get("agent_profile")
-                if not isinstance(message, str) or (profile is not None and not isinstance(profile, str)):
+                if not isinstance(message, str) or (
+                    profile is not None and not isinstance(profile, str)
+                ):
                     raise ValueError("message and agent_profile have invalid types")
                 result = ManusClient().send_message(parts[3], message, agent_profile=profile)
                 self._send_json(
@@ -599,9 +630,13 @@ class Handler(BaseHTTPRequestHandler):
                     },
                 )
                 return
-            self._send_json(404, {"ok": False, "error": {"code": "not_found", "detail": "Not found"}})
+            self._send_json(
+                404, {"ok": False, "error": {"code": "not_found", "detail": "Not found"}}
+            )
         except ValueError as exc:
-            self._send_json(400, {"ok": False, "error": {"code": "invalid_argument", "detail": str(exc)}})
+            self._send_json(
+                400, {"ok": False, "error": {"code": "invalid_argument", "detail": str(exc)}}
+            )
         except Exception as exc:  # noqa: BLE001 - convert upstream failures to safe JSON
             self._send_manus_exception(exc)
 
@@ -714,7 +749,11 @@ class Handler(BaseHTTPRequestHandler):
                 src = str(
                     item.get("consensus_source")
                     or item.get("backend")
-                    or (",".join(item.get("backends", [])) if isinstance(item.get("backends"), list) else "")
+                    or (
+                        ",".join(item.get("backends", []))
+                        if isinstance(item.get("backends"), list)
+                        else ""
+                    )
                     or item.get("phase")
                     or "K.H.A.V.I.S. Pipeline"
                 ).replace(_legacy_cli, "opencode")
@@ -722,7 +761,11 @@ class Handler(BaseHTTPRequestHandler):
                 backends = (
                     ["opencode" if str(b) == _legacy_cli else str(b) for b in raw_backends]
                     if isinstance(raw_backends, list)
-                    else (["opencode" if str(raw_backends) == _legacy_cli else str(raw_backends)] if raw_backends else [])
+                    else (
+                        ["opencode" if str(raw_backends) == _legacy_cli else str(raw_backends)]
+                        if raw_backends
+                        else []
+                    )
                 )
                 formatted.append(
                     {
@@ -740,8 +783,12 @@ class Handler(BaseHTTPRequestHandler):
                         # ts 是記錄的唯一識別：舊紀錄的 handle 只到秒，
                         # 同秒的兩筆任務會被誤併成同一個對話串。
                         "ts": float(item.get("ts") or 0.0),
-                        "consensus": _redact(str(item.get("consensus") or "").replace(_legacy_cli, "opencode"))[:12000],
-                        "review_details": _redact(str(item.get("review_details") or "").replace(_legacy_cli, "opencode"))[:12000],
+                        "consensus": _redact(
+                            str(item.get("consensus") or "").replace(_legacy_cli, "opencode")
+                        )[:12000],
+                        "review_details": _redact(
+                            str(item.get("review_details") or "").replace(_legacy_cli, "opencode")
+                        )[:12000],
                     }
                 )
             self._send(
@@ -893,7 +940,9 @@ class Handler(BaseHTTPRequestHandler):
             from web.workbench import update_workbench_models_config  # noqa: PLC0415
 
             try:
-                updated = update_workbench_models_config(payload if isinstance(payload, dict) else {})
+                updated = update_workbench_models_config(
+                    payload if isinstance(payload, dict) else {}
+                )
             except ValueError as exc:
                 self._send(
                     400,
@@ -951,7 +1000,10 @@ class Handler(BaseHTTPRequestHandler):
                     custom_list = [enrich_custom_agent_status(a) for a in load_custom_agents()]
                     self._send(
                         200,
-                        json.dumps({"ok": True, "deleted": True, "custom_agents": custom_list}, ensure_ascii=False).encode(),
+                        json.dumps(
+                            {"ok": True, "deleted": True, "custom_agents": custom_list},
+                            ensure_ascii=False,
+                        ).encode(),
                         "application/json; charset=utf-8",
                     )
                     return
@@ -1009,7 +1061,9 @@ class Handler(BaseHTTPRequestHandler):
             if content_len <= 0 or content_len > 35 * 1024 * 1024:
                 self._send(
                     413,
-                    json.dumps({"ok": False, "detail": "dispatch body 超過 35 MB 限制"}, ensure_ascii=False).encode(),
+                    json.dumps(
+                        {"ok": False, "detail": "dispatch body 超過 35 MB 限制"}, ensure_ascii=False
+                    ).encode(),
                     "application/json; charset=utf-8",
                 )
                 return
@@ -1020,8 +1074,15 @@ class Handler(BaseHTTPRequestHandler):
                 payload = {}
 
             prompt = str(payload.get("prompt") or "").strip()
-            raw_agents = payload.get("agents") or payload.get("targets") or payload.get("agent") or ["khavis"]
-            agents = [str(raw_agents)] if isinstance(raw_agents, str) else [str(a) for a in raw_agents]
+            raw_agents = (
+                payload.get("agents")
+                or payload.get("targets")
+                or payload.get("agent")
+                or ["khavis"]
+            )
+            agents = (
+                [str(raw_agents)] if isinstance(raw_agents, str) else [str(a) for a in raw_agents]
+            )
             capability = payload.get("capability") or None
             raw_models = payload.get("agent_models")
             agent_models = raw_models if isinstance(raw_models, dict) else {}
@@ -1030,19 +1091,25 @@ class Handler(BaseHTTPRequestHandler):
             if thinking_mode and not re.fullmatch(r"[A-Za-z0-9_.:-]{1,64}", thinking_mode):
                 self._send(
                     400,
-                    json.dumps({"ok": False, "detail": "thinking_mode 格式無效"}, ensure_ascii=False).encode(),
+                    json.dumps(
+                        {"ok": False, "detail": "thinking_mode 格式無效"}, ensure_ascii=False
+                    ).encode(),
                     "application/json; charset=utf-8",
                 )
                 return
             if thinking_parameter and not re.fullmatch(r"[A-Za-z0-9_]{1,64}", thinking_parameter):
                 self._send(
                     400,
-                    json.dumps({"ok": False, "detail": "thinking_parameter 格式無效"}, ensure_ascii=False).encode(),
+                    json.dumps(
+                        {"ok": False, "detail": "thinking_parameter 格式無效"}, ensure_ascii=False
+                    ).encode(),
                     "application/json; charset=utf-8",
                 )
                 return
             isolation_mode = str(payload.get("isolation_mode") or "").strip().lower() or None
-            project_name = str(payload.get("project") or payload.get("project_id") or "").strip() or None
+            project_name = (
+                str(payload.get("project") or payload.get("project_id") or "").strip() or None
+            )
             collab_mode = str(payload.get("collab_mode") or "auto_loop").strip().lower()
             previous_context = (
                 payload.get("previous_context")
@@ -1087,17 +1154,32 @@ class Handler(BaseHTTPRequestHandler):
 
             load_env(PROJECT_ROOT / ".env")
             ws_cfg = load_workspace_config()
-            eff_mode = isolation_mode if isolation_mode in ("shared", "worktree") else str(ws_cfg.get("isolation_mode", "shared"))
+            eff_mode = (
+                isolation_mode
+                if isolation_mode in ("shared", "worktree")
+                else str(ws_cfg.get("isolation_mode", "shared"))
+            )
             eff_project = project_name or str(ws_cfg.get("active_project", "shared-app"))
 
             agent_cwds: dict[str, Path] = {}
-            all_known_ids = {"claude", "codex", "antigravity", "minimax", "opencode", *(str(a) for a in agents)}
+            all_known_ids = {
+                "claude",
+                "codex",
+                "antigravity",
+                "minimax",
+                "opencode",
+                *(str(a) for a in agents),
+            }
             for aid in all_known_ids:
                 if aid == "khavis":
                     continue
-                agent_cwds[aid] = prepare_agent_cwd(aid, isolation_mode=eff_mode, project_name=eff_project)
+                agent_cwds[aid] = prepare_agent_cwd(
+                    aid, isolation_mode=eff_mode, project_name=eff_project
+                )
 
-            shared_dir = prepare_agent_cwd("shared", isolation_mode="shared", project_name=eff_project)
+            shared_dir = prepare_agent_cwd(
+                "shared", isolation_mode="shared", project_name=eff_project
+            )
             try:
                 attachment_refs = _store_dispatch_attachments(payload, shared_dir)
             except ValueError as exc:
@@ -1137,11 +1219,15 @@ class Handler(BaseHTTPRequestHandler):
                 cid = str(custom_cfg.get("id") or "").strip()
                 if not cid:
                     continue
-                c_cwd = agent_cwds.get(cid) or prepare_agent_cwd(cid, isolation_mode=eff_mode, project_name=eff_project)
+                c_cwd = agent_cwds.get(cid) or prepare_agent_cwd(
+                    cid, isolation_mode=eff_mode, project_name=eff_project
+                )
                 agent_cwds[cid] = c_cwd
                 backends[cid] = CustomAgentBackend(
                     custom_cfg,
-                    model=str(agent_models.get(cid) or custom_cfg.get("default_model") or "").strip(),
+                    model=str(
+                        agent_models.get(cid) or custom_cfg.get("default_model") or ""
+                    ).strip(),
                     cwd=str(c_cwd),
                 )
 
@@ -1179,7 +1265,8 @@ class Handler(BaseHTTPRequestHandler):
                     "prompt": prompt,
                     "backends": list(agents),
                     "collab_mode": orch["collab_mode"],
-                    "consensus_source": orch["consensus_source"] or ", ".join(str(a) for a in agents),
+                    "consensus_source": orch["consensus_source"]
+                    or ", ".join(str(a) for a in agents),
                     "project": eff_project,
                     "isolation_mode": eff_mode,
                     "thread": thread_id,

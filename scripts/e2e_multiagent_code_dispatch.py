@@ -81,7 +81,7 @@ Generated collaboratively by:
 - Architecture : Claude Code (bound to Gemini 4)
 - Core Logic   : OpenAI Codex (driven by GLM 5.3 FlashX)
 - Test Suite   : MiniMax Code (driven by MiniMax-M3.1-Flash)
-Timestamp: {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())}
+Timestamp: {time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())}
 """
 
 from __future__ import annotations
@@ -96,9 +96,15 @@ from typing import Any, Callable, Coroutine
     for res in report.results:
         backend_name = res.backend.upper()
         model_name = res.model or "default"
-        sections.append("\n# =============================================================================")
-        sections.append(f"# [{backend_name}] Generated Section (Model: {model_name}, Latency: {res.latency_ms}ms)")
-        sections.append("# =============================================================================")
+        sections.append(
+            "\n# ============================================================================="
+        )
+        sections.append(
+            f"# [{backend_name}] Generated Section (Model: {model_name}, Latency: {res.latency_ms}ms)"
+        )
+        sections.append(
+            "# ============================================================================="
+        )
         if res.ok and res.text:
             sections.append(res.text.strip())
         else:
@@ -261,7 +267,9 @@ async def main() -> None:
 
     for res in report.results:
         status_flag = "✓ 成功" if res.ok else "! 需關注"
-        print(f"[{status_flag}] Agent: {res.backend:10s} | 模型: {res.model or 'default':20s} | 延遲: {res.latency_ms}ms")
+        print(
+            f"[{status_flag}] Agent: {res.backend:10s} | 模型: {res.model or 'default':20s} | 延遲: {res.latency_ms}ms"
+        )
         if res.error:
             print(f"       訊息: {res.error[:100]}")
 

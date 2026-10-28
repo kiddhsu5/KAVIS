@@ -3464,11 +3464,11 @@ def _compose_views(views: str, topology: str) -> str:
     marker = '<section id="view-wizard"'
     idx = views.find(marker)
     if idx != -1:
-        close_idx = views.rfind('</section>', 0, idx)
+        close_idx = views.rfind("</section>", 0, idx)
         if close_idx != -1:
             views = (
                 views[:close_idx]
-                + _PAGE_AGENTS_BOTTOM.replace('{topology}', topology)
+                + _PAGE_AGENTS_BOTTOM.replace("{topology}", topology)
                 + views[close_idx:]
             )
     return views
@@ -3629,10 +3629,10 @@ def render_workbench_html_c() -> str:
 {body}
 
   <script>
-{ _WORKBENCH_CLIENT_JS }
+{_WORKBENCH_CLIENT_JS}
   </script>
-{ _LEGACY_CAPTURE_JS }
-{ _C_EXTRA_JS }
+{_LEGACY_CAPTURE_JS}
+{_C_EXTRA_JS}
   <script>
 {_MANUS_CONSOLE_JS}
   </script>

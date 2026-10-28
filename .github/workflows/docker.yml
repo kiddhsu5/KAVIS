@@ -12,7 +12,8 @@ permissions:
   packages: write
 
 env:
-  IMAGE_NAME: K.H.A.V.I.S.
+  IMAGE_NAME: khavis
+  DOCKERHUB_ENABLED: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
 
 jobs:
   build:
@@ -34,7 +35,7 @@ jobs:
         with:
           images: |
             ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}
-            docker.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}
+            name=docker.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }},enable=${{ env.DOCKERHUB_ENABLED }}
           tags: |
             type=ref,event=branch
             type=ref,event=tag
@@ -43,7 +44,7 @@ jobs:
           flavor: |
             latest=auto
           labels: |
-            org.opencontainers.image.title=K.H.A.V.I.S.
+            org.opencontainers.image.title=KHAVIS
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.licenses=Apache-2.0
 
@@ -56,7 +57,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Login to Docker Hub
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && env.DOCKERHUB_ENABLED == 'true'
         uses: docker/login-action@v3
         with:
           registry: docker.io

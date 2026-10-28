@@ -116,7 +116,9 @@ class DummyStatusHandler(Handler):
         self.wfile = io.BytesIO()
         self.responses: list[tuple[int, bytes, str]] = []
 
-    def _send(self, status: int, body: bytes, content_type: str = "text/plain; charset=utf-8") -> None:
+    def _send(
+        self, status: int, body: bytes, content_type: str = "text/plain; charset=utf-8"
+    ) -> None:
         self.responses.append((status, body, content_type))
 
 
@@ -226,7 +228,15 @@ def test_status_server_workbench_endpoints(monkeypatch) -> None:
     assert "manus-console" in wb_body
     assert "manusCreateTask" in wb_body
     assert "X-KHAVIS-Console-Token" in wb_body
-    for zone_label in ("歷史談話", "資料庫", "額度、設定", "對話串", "輸入框", "Agent 狀態", "Using 檔案"):
+    for zone_label in (
+        "歷史談話",
+        "資料庫",
+        "額度、設定",
+        "對話串",
+        "輸入框",
+        "Agent 狀態",
+        "Using 檔案",
+    ):
         assert zone_label in wb_body
     assert 'id="c-agent-status-list"' in wb_body
     # 首頁只留「Agent 狀態」「資料庫」按鈕，管理操作都搬到獨立專頁
@@ -313,7 +323,9 @@ def test_status_server_workbench_endpoints(monkeypatch) -> None:
     assert caps_data["agents"]["codex"]["thinking_modes"] == ["high", "xhigh"]
 
     # 4. POST /api/workbench/dispatch with empty prompt -> 400
-    h_post_empty = DummyStatusHandler("/api/workbench/dispatch", method="POST", body=b'{"prompt":""}')
+    h_post_empty = DummyStatusHandler(
+        "/api/workbench/dispatch", method="POST", body=b'{"prompt":""}'
+    )
     h_post_empty.do_POST()
     assert len(h_post_empty.responses) == 1
     status, body, _ = h_post_empty.responses[0]
@@ -562,7 +574,10 @@ def test_agent_skills_and_result_review_split(tmp_path) -> None:
     from web.workbench_c import render_workbench_html_c
 
     # 1. Test scaffold_project, edit_file, git_ops, run_tests
-    out_scaf = execute_skill({"tool": "scaffold_project", "remote_url": "https://github.com/kiddhsu5/KHAVIS.git"}, cwd=str(tmp_path))
+    out_scaf = execute_skill(
+        {"tool": "scaffold_project", "remote_url": "https://github.com/kiddhsu5/KHAVIS.git"},
+        cwd=str(tmp_path),
+    )
     assert "[OK]" in out_scaf
     assert (tmp_path / "README.md").is_file()
     assert (tmp_path / "LICENSE").is_file()
@@ -575,7 +590,12 @@ def test_agent_skills_and_result_review_split(tmp_path) -> None:
     assert "https://github.com/kiddhsu5/KHAVIS.git" in out_git
 
     out_edit = execute_skill(
-        {"tool": "edit_file", "path": "README.md", "target": "專案簡介", "replacement": "專案核心簡介"},
+        {
+            "tool": "edit_file",
+            "path": "README.md",
+            "target": "專案簡介",
+            "replacement": "專案核心簡介",
+        },
         cwd=str(tmp_path),
     )
     assert "[OK]" in out_edit

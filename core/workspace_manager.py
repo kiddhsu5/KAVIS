@@ -102,7 +102,7 @@ def _build_default_readme(name: str) -> str:
         "## 4. 使用範例 (Usage Example)\n"
         "```python\n"
         "from examples.quickstart_example import run_workflow_demo\n\n"
-        "result = run_workflow_demo(task=\"檢查專案完整性與測試狀態\")\n"
+        'result = run_workflow_demo(task="檢查專案完整性與測試狀態")\n'
         "print(result)\n"
         "```\n\n"
         "## 5. 貢獻指南 (Contributing)\n"
@@ -125,13 +125,19 @@ def ensure_project_completeness(
     updated: list[str] = []
 
     readme_path = proj_dir / "README.md"
-    if not readme_path.exists() or len(readme_path.read_text(encoding="utf-8", errors="ignore").splitlines()) < 12 or "opencode" not in readme_path.read_text(encoding="utf-8", errors="ignore"):
+    if (
+        not readme_path.exists()
+        or len(readme_path.read_text(encoding="utf-8", errors="ignore").splitlines()) < 12
+        or "opencode" not in readme_path.read_text(encoding="utf-8", errors="ignore")
+    ):
         readme_path.write_text(_build_default_readme(name), encoding="utf-8")
         updated.append("README.md")
 
     gitignore_path = proj_dir / ".gitignore"
     if not gitignore_path.exists():
-        gitignore_path.write_text(".worktrees/\n__pycache__/\n*.pyc\n.pytest_cache/\n.DS_Store\n", encoding="utf-8")
+        gitignore_path.write_text(
+            ".worktrees/\n__pycache__/\n*.pyc\n.pytest_cache/\n.DS_Store\n", encoding="utf-8"
+        )
         updated.append(".gitignore")
 
     license_path = proj_dir / "LICENSE"
@@ -139,7 +145,7 @@ def ensure_project_completeness(
         license_path.write_text(
             "Apache License\nVersion 2.0, January 2004\nhttp://www.apache.org/licenses/\n\n"
             "Copyright 2026 K.H.A.V.I.S. Contributors\n\n"
-            "Licensed under the Apache License, Version 2.0 (the \"License\");\n"
+            'Licensed under the Apache License, Version 2.0 (the "License");\n'
             "you may not use this file except in compliance with the License.\n",
             encoding="utf-8",
         )
@@ -166,10 +172,10 @@ def ensure_project_completeness(
         run_sh.write_text(
             "#!/usr/bin/env bash\n"
             "set -euo pipefail\n"
-            "cd \"$(dirname \"$0\")/..\"\n"
-            "echo \"[1/2] Running quickstart example...\"\n"
+            'cd "$(dirname "$0")/.."\n'
+            'echo "[1/2] Running quickstart example..."\n'
             "python3 examples/quickstart_example.py\n"
-            "echo \"[2/2] Running automated unit tests...\"\n"
+            'echo "[2/2] Running automated unit tests..."\n'
             "python3 -m unittest discover -s tests -v\n",
             encoding="utf-8",
         )
@@ -186,7 +192,7 @@ def ensure_project_completeness(
             '"""Quickstart usage example for K.H.A.V.I.S. shared workspace."""\n\n'
             "from __future__ import annotations\n\n"
             "from typing import Any\n\n\n"
-            "def run_workflow_demo(task: str = \"verify workspace\") -> dict[str, Any]:\n"
+            'def run_workflow_demo(task: str = "verify workspace") -> dict[str, Any]:\n'
             '    """Run a sample task and return structured status."""\n'
             "    return {\n"
             '        "ok": True,\n'
@@ -196,7 +202,7 @@ def ensure_project_completeness(
             "    }\n\n\n"
             'if __name__ == "__main__":\n'
             "    info = run_workflow_demo()\n"
-            '    print(f"[KHAVIS Example] status={info[\'status\']} agents={len(info[\'agents\'])}")\n',
+            "    print(f\"[KHAVIS Example] status={info['status']} agents={len(info['agents'])}\")\n",
             encoding="utf-8",
         )
         updated.append("examples/quickstart_example.py")
@@ -218,7 +224,7 @@ def ensure_project_completeness(
             "    def test_project_files_exist(self) -> None:\n"
             "        root = Path(__file__).resolve().parent.parent\n"
             '        for rel in ("README.md", "LICENSE", "CONTRIBUTING.md", "scripts/run.sh"):\n'
-            "            self.assertTrue((root / rel).exists(), f\"Missing {rel}\")\n\n\n"
+            '            self.assertTrue((root / rel).exists(), f"Missing {rel}")\n\n\n'
             'if __name__ == "__main__":\n'
             "    unittest.main()\n",
             encoding="utf-8",
@@ -268,7 +274,10 @@ def ensure_project_completeness(
         _run_git(proj_dir, ["config", "user.name", "KHAVIS Workspace"])
         _run_git(proj_dir, ["config", "user.email", "workspace@khavis.local"])
         _run_git(proj_dir, ["add", "-A"])
-        _run_git(proj_dir, ["commit", "--allow-empty", "-m", "chore: initialize complete project workspace"])
+        _run_git(
+            proj_dir,
+            ["commit", "--allow-empty", "-m", "chore: initialize complete project workspace"],
+        )
 
     return updated
 
@@ -395,7 +404,10 @@ def list_project_files(proj_dir: Path) -> list[dict[str, Any]]:
         if not p.is_file():
             continue
         rel = p.relative_to(proj_dir)
-        if any(part.startswith(".git") or part == ".worktrees" or part == "__pycache__" for part in rel.parts):
+        if any(
+            part.startswith(".git") or part == ".worktrees" or part == "__pycache__"
+            for part in rel.parts
+        ):
             continue
         try:
             st = p.stat()
@@ -405,7 +417,9 @@ def list_project_files(proj_dir: Path) -> list[dict[str, Any]]:
                     "rel_path": str(rel),
                     "path": str(p),
                     "size_bytes": st.st_size,
-                    "size": f"{max(0.1, round(st.st_size / 1024, 1))} KB" if st.st_size >= 100 else f"{st.st_size} B",
+                    "size": f"{max(0.1, round(st.st_size / 1024, 1))} KB"
+                    if st.st_size >= 100
+                    else f"{st.st_size} B",
                     "mtime": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(st.st_mtime)),
                 }
             )
@@ -420,9 +434,7 @@ def get_workspace_status(project_name: str | None = None) -> dict[str, Any]:
     proj_dir = ensure_project_initialized(project_name)
     active_name = proj_dir.name
 
-    projects = sorted(
-        d.name for d in root.iterdir() if d.is_dir() and not d.name.startswith(".")
-    )
+    projects = sorted(d.name for d in root.iterdir() if d.is_dir() and not d.name.startswith("."))
     branch_proc = _run_git(proj_dir, ["rev-parse", "--abbrev-ref", "HEAD"])
     branch = (branch_proc.stdout or "main").strip() or "main"
 
@@ -474,7 +486,9 @@ def configure_workspace(payload: dict[str, Any]) -> dict[str, Any]:
     if action in ("merge", "merge_worktree"):
         agent_id = str(payload.get("agent") or payload.get("agent_id") or "").strip()
         auto_commit = bool(payload.get("auto_commit", True))
-        return merge_worktree_to_shared(agent_id, project_name=project_name or None, auto_commit=auto_commit)
+        return merge_worktree_to_shared(
+            agent_id, project_name=project_name or None, auto_commit=auto_commit
+        )
 
     if action in ("commit", "commit_shared"):
         msg = str(payload.get("message") or "").strip()
@@ -535,7 +549,9 @@ def merge_worktree_to_shared(
 def commit_shared_workspace(message: str = "", project_name: str | None = None) -> dict[str, Any]:
     """Commit all current changes in the shared project directory as a baseline snapshot."""
     proj_dir = ensure_project_initialized(project_name)
-    commit_msg = (message or "").strip() or f"snapshot: shared workspace update ({time.strftime('%Y-%m-%d %H:%M:%S')})"
+    commit_msg = (
+        message or ""
+    ).strip() or f"snapshot: shared workspace update ({time.strftime('%Y-%m-%d %H:%M:%S')})"
     _run_git(proj_dir, ["add", "-A"])
     proc = _run_git(proj_dir, ["commit", "-m", commit_msg])
     state = get_workspace_status(proj_dir.name)

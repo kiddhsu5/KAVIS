@@ -159,7 +159,7 @@ def render_landing_html(
         <div class="lg:col-span-7 space-y-6">
           <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.04] border border-white/10 text-xs font-mono text-slate-300">
             <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span>Multi-Agent CLI Workbench · 12-Pool BYOK Router · Zero Quota Interruption</span>
+            <span>Multi-Agent CLI Workbench · 24-Pool BYOK Router · Zero Quota Interruption</span>
           </div>
 
           <h1 class="text-3xl sm:text-5xl font-black tracking-tight leading-[1.15] text-white">
@@ -171,7 +171,7 @@ def render_landing_html(
 
           <p class="text-sm sm:text-base text-slate-300 leading-relaxed max-w-2xl">
             同時訂閱了 Claude、OpenAI、Google Antigravity、MiniMax 與智譜 GLM Coding Plan？
-            <strong>KHAVIS</strong> 將五大主流編碼 CLI、Manus 雲端規劃與 12 個模型池收斂進同一個莫蘭迪圖形化工作台。支援<strong>自動閉環、接力、互評、並發</strong>四種協同模式，內建 <strong>Git Worktree 自動隔離與視覺化 Diff 合併</strong>，徹底終結 429 配額中斷與多 Agent 改檔衝突。
+            <strong>KHAVIS</strong> 將五大主流編碼 CLI、Manus 雲端規劃與 24 個模型池收斂進同一個莫蘭迪圖形化工作台。支援<strong>自動閉環、接力、互評、並發</strong>四種協同模式，內建 <strong>Git Worktree 自動隔離與視覺化 Diff 合併</strong>，徹底終結 429 配額中斷與多 Agent 改檔衝突。
           </p>
 
           <!-- 支援的 CLI 徽章列 -->

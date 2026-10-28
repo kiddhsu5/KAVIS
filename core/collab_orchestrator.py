@@ -57,7 +57,9 @@ def _clean_execution_log_out_of_main(text: str) -> tuple[str, str]:
     return before, after
 
 
-def _split_result_and_review(raw_text: str, results: list[BackendResult], critique_summary: str) -> tuple[str, str]:
+def _split_result_and_review(
+    raw_text: str, results: list[BackendResult], critique_summary: str
+) -> tuple[str, str]:
     """Split synthesized text into (clean_final_result, collapsible_review_details)."""
     text = _strip_tool_calls(raw_text or "").strip()
     review_parts: list[str] = []
@@ -78,7 +80,11 @@ def _split_result_and_review(raw_text: str, results: list[BackendResult], critiq
             break
 
     # If the LLM put Section 1 (Review) before Section 2 (Final Deliverable), flip them so Result is main!
-    if not extracted_review and "【🏆 最終完成交付成果】" in text and "【🔍 多 Agent 交叉審查" in text:
+    if (
+        not extracted_review
+        and "【🏆 最終完成交付成果】" in text
+        and "【🔍 多 Agent 交叉審查" in text
+    ):
         idx_review = text.find("【🔍 多 Agent 交叉審查")
         idx_final = text.find("【🏆 最終完成交付成果】")
         if 0 <= idx_review < idx_final:
@@ -89,7 +95,9 @@ def _split_result_and_review(raw_text: str, results: list[BackendResult], critiq
     if not main_result:
         for r in results:
             if r.ok and r.text:
-                cand_main, _ = _clean_execution_log_out_of_main(r.text.split("<!-- KHAVIS_REVIEW_SPLIT -->")[0])
+                cand_main, _ = _clean_execution_log_out_of_main(
+                    r.text.split("<!-- KHAVIS_REVIEW_SPLIT -->")[0]
+                )
                 if cand_main:
                     main_result = cand_main
                     break
@@ -106,9 +114,13 @@ def _split_result_and_review(raw_text: str, results: list[BackendResult], critiq
         agent_lines = ["### 🤖 各 Agent 節點執行與審查明細"]
         for r in results:
             status_icon = "✅" if r.ok else "❌"
-            clean_r, _ = _clean_execution_log_out_of_main((r.text or r.error or "").split("<!-- KHAVIS_REVIEW_SPLIT -->")[0])
+            clean_r, _ = _clean_execution_log_out_of_main(
+                (r.text or r.error or "").split("<!-- KHAVIS_REVIEW_SPLIT -->")[0]
+            )
             snip = re.sub(r"\s+", " ", (clean_r or r.text or r.error or "").strip())[:260]
-            agent_lines.append(f"- {status_icon} **`{r.backend}`** (`{r.model or 'auto'}` · `{r.latency_ms}ms`): {snip}")
+            agent_lines.append(
+                f"- {status_icon} **`{r.backend}`** (`{r.model or 'auto'}` · `{r.latency_ms}ms`): {snip}"
+            )
         review_parts.append("\n".join(agent_lines))
 
     return main_result, "\n\n".join(review_parts).strip()
@@ -136,18 +148,21 @@ def build_contextual_prompt(
         f"▶ 上一輪指令：{prev_prompt}\n"
         f"▶ 上一輪交付成果摘要：\n{prev_consensus}\n"
         "========================================\n"
-        f"【本輪下一步指令 (Current Next-Step Instruction)】\n{base}"
-        + _ACTION_MANDATE
+        f"【本輪下一步指令 (Current Next-Step Instruction)】\n{base}" + _ACTION_MANDATE
     )
 
 
-def generate_next_step_actions(prompt: str, consensus: str, changed_files: list[Any]) -> list[dict[str, str]]:
+def generate_next_step_actions(
+    prompt: str, consensus: str, changed_files: list[Any]
+) -> list[dict[str, str]]:
     """Generate 4 context-aware one-click Next-Step actions based on the completed task."""
     actions: list[dict[str, str]] = []
     lower_p = (prompt + " " + (consensus or "")[:600]).lower()
 
     if changed_files:
-        file_names = ", ".join(str(f.get("path") if isinstance(f, dict) else f) for f in changed_files[:3])
+        file_names = ", ".join(
+            str(f.get("path") if isinstance(f, dict) else f) for f in changed_files[:3]
+        )
         actions.append(
             {
                 "label": "🧪 自動執行測試與驗收剛才變更的檔案",
@@ -155,7 +170,10 @@ def generate_next_step_actions(prompt: str, consensus: str, changed_files: list[
                 "mode": "auto_loop",
             }
         )
-    if any(k in lower_p for k in ("ssh", "tailscale", "nginx", "systemd", "port", "系統", "通道", "主機", "服務")):
+    if any(
+        k in lower_p
+        for k in ("ssh", "tailscale", "nginx", "systemd", "port", "系統", "通道", "主機", "服務")
+    ):
         actions.append(
             {
                 "label": "🛠️ 依據上述診斷結果自動執行優化或修復設定",
@@ -255,7 +273,9 @@ async def run_collaborative_workflow(
                     {
                         "stage": f"第 {idx + 1} 棒接力 ({r.backend})",
                         "agent": r.backend,
-                        "role": "先鋒實作" if idx == 0 else ("終棒驗收與整合" if idx == len(agents) - 1 else "接棒深化與互檢"),
+                        "role": "先鋒實作"
+                        if idx == 0
+                        else ("終棒驗收與整合" if idx == len(agents) - 1 else "接棒深化與互檢"),
                         "ok": r.ok,
                         "latency_ms": step_ms,
                         "summary": (r.text or r.error or "")[:500],
@@ -263,7 +283,9 @@ async def run_collaborative_workflow(
                 )
 
         ok_results = [r for r in results if r.ok and r.text]
-        consensus_text = ok_results[-1].text if ok_results else (results[-1].error if results else "")
+        consensus_text = (
+            ok_results[-1].text if ok_results else (results[-1].error if results else "")
+        )
         consensus_source = f"relay ({' → '.join(agents)})"
         critique_summary = (
             f"已完成 {len(agents)} 棒順序接力流水線（{' → '.join(agents)}）："
@@ -309,7 +331,9 @@ async def run_collaborative_workflow(
             or not has_any_upstream_key()
         ):
             consensus_text = report.consensus or (ok_results[0].text if ok_results else "")
-            consensus_source = report.consensus_source or (ok_results[0].backend if ok_results else "")
+            consensus_source = report.consensus_source or (
+                ok_results[0].backend if ok_results else ""
+            )
             critique_summary = "各 Agent 已並發獨立完成執行。"
         else:
             # ------------------------------------------------------------------
@@ -322,7 +346,9 @@ async def run_collaborative_workflow(
                 snippet = (r.text or "").strip()
                 if len(snippet) > 2500:
                     snippet = snippet[:2500] + "\n...[截斷]"
-                candidates_dump.append(f"=== Agent #{idx + 1} [{r.backend} ({r.model})] 實作與執行結果 ===\n{snippet}")
+                candidates_dump.append(
+                    f"=== Agent #{idx + 1} [{r.backend} ({r.model})] 實作與執行結果 ===\n{snippet}"
+                )
 
             diff_now = collect_directory_diff(shared_dir)
             diff_snippet = str(diff_now.get("diff") or "").strip()[:1500]
@@ -332,7 +358,11 @@ async def run_collaborative_workflow(
                 f"使用者的原始任務為：\n「{prompt}」\n\n"
                 "剛才各個 Agent 已經完成第一階段執行與分析，結果如下：\n\n"
                 + "\n\n".join(candidates_dump)
-                + (f"\n\n目前共用專案資料夾的 Git Diff 變更：\n{diff_snippet}\n" if diff_snippet else "")
+                + (
+                    f"\n\n目前共用專案資料夾的 Git Diff 變更：\n{diff_snippet}\n"
+                    if diff_snippet
+                    else ""
+                )
                 + "\n\n請嚴格依照以下順序輸出乾淨、人類易讀的繁體中文報告（**嚴禁輸出任何 `<tool_call>` 或工具 JSON，務必先呈現最終交付成果，再放交叉審查比較**）：\n"
                 "1. **【🏆 最終完成交付成果】**：直接針對使用者的問題，呈現最完整、結構清晰、可立即閱讀與使用的最終解答、設定建議、執行指令或實作成果摘要。\n"
                 "<!-- KHAVIS_REVIEW_SPLIT -->\n"
@@ -360,9 +390,7 @@ async def run_collaborative_workflow(
                     if mode == "auto_loop"
                     else f"critique ({' ⚔️ '.join(r.backend for r in ok_results)})"
                 )
-                critique_summary = (
-                    f"已完成 {len(ok_results)} 個 Agent 的交叉檢查、相互批評與自動補強驗證（耗時 {stage2_ms} ms）。"
-                )
+                critique_summary = f"已完成 {len(ok_results)} 個 Agent 的交叉檢查、相互批評與自動補強驗證（耗時 {stage2_ms} ms）。"
                 collaboration_steps.append(
                     {
                         "stage": "階段 2 & 3：交叉檢查、相互批評與最終收斂",
@@ -378,7 +406,9 @@ async def run_collaborative_workflow(
                 consensus_source = report.consensus_source or ok_results[0].backend
                 critique_summary = "已由多 Agent 並發完成並選取最佳執行結果。"
 
-    clean_consensus, review_details = _split_result_and_review(consensus_text, results, critique_summary)
+    clean_consensus, review_details = _split_result_and_review(
+        consensus_text, results, critique_summary
+    )
 
     # Collect per-agent workspace diffs
     results_dump: list[dict[str, Any]] = []

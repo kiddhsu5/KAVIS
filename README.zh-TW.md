@@ -1,6 +1,6 @@
 # K.H.A.V.I.S.
 
-> **跨廠牌 AI 編碼 CLI 與 12 個 LLM 模型池的統一智慧指揮中心 — 具備多訂閱配額感知、共用工作區 / Git Worktree 隔離、自訂 Agent 擴充與零額度中斷。**
+> **跨廠牌 AI 編碼 CLI 與 24 個 LLM 模型池的統一智慧指揮中心 — 具備多訂閱配額感知、共用工作區 / Git Worktree 隔離、自訂 Agent 擴充與零額度中斷。**
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org)
@@ -13,7 +13,7 @@
 ```
     ┌────────────────────────────────────────────────────────────────────┐
     │                          K.H.A.V.I.S.                              │
-    │   五大主流 CLI + 自訂 Agent · 十二個模型池 · 圖形化工作台 · 零額度中斷   │
+    │   五大主流 CLI + 自訂 Agent · 二十四個模型池 · 圖形化工作台 · 零額度中斷 │
     └────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -86,8 +86,8 @@ In production at — 個人 / 團隊實際部署，歡迎 PR 加入。
 
 ## 功能特色
 
-- ✓ **內建 12 個 LLM 池** —— MiniMax-M3、GLM-5.3、Gemini Flash/Pro、NVIDIA Cloud、ByteDance Volcano Ark(3 個子模型)、OpenRouter Free、OpenAI Platform API、Anthropic Claude API、Ollama(本地 + Surface)。
-- ✓ **基於能力 (capability) 的路由** —— 宣告一個能力(`code`、`vision`、`long-context`、`cheap`、`local`),router 會挑出最合適的模型。
+- ✓ **內建 24 個 LLM 池** —— MiniMax-M3、MiMo-Code、GLM-5.3、Google Gemini、NVIDIA Cloud、ByteDance Volcano Ark（DeepSeek ×2 + GLM）、OpenRouter Free、OpenAI Platform API、Anthropic Claude API、Ollama（Mac + Surface），以及 11 個 OpenAI 相容長尾池（Groq、Mistral、Cohere、xAI、Together、Fireworks、Perplexity、Moonshot、Qwen、DeepSeek、HuggingFace）。
+- ✓ **基於能力 (capability) 的路由** —— 宣告一個能力標籤（`程式碼`、`推理`、`長文`、`速度優先`、`工具調用`、`中文`、`英文`…），router 會依權重挑出最合適的健康模型池。
 - ✓ **可插拔的 provider 系統** —— 把一個 Python 檔丟進 `providers/`,就會被自動發現。
 - ✓ **YAML-first 設定** —— 沒有 UI、沒有資料庫,全部都是可以用 git diff 的檔案。
 - ✓ **熱重載 (Hot reload)** —— 編輯 `capabilities.yaml`,router 就會即時套用。
@@ -115,10 +115,10 @@ In production at — 個人 / 團隊實際部署，歡迎 PR 加入。
             │                      │                       │
             ▼                      ▼                       ▼
    ┌──────────────────────────────────────────────────────────────┐
-   │              Provider Plugin Pool (12 providers)              │
-   │  MiniMax-M3 · GLM-5.3 · Gemini Flash/Pro ·                     │
+   │              Provider Plugin Pool (24 pools)                  │
+   │  MiniMax-M3 · MiMo-Code · GLM-5.3 · Google Gemini ·           │
    │  NVIDIA Cloud · Volcano Ark (×3) · OpenRouter Free · Ollama   │
-   │  OpenAI Platform API (BYOK) · Anthropic Claude API (BYOK)     │
+   │  OpenAI / Claude (BYOK) · 11 OpenAI-compatible long-tail      │
    └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -355,20 +355,26 @@ plugin = router.select("速度優先")
 
 ## 支援的供應商
 
-| Pool ID                    | Provider                       | Capability 標籤                        | 備註                                |
-|----------------------------|--------------------------------|----------------------------------------|--------------------------------------|
-| `MiniMax-M3`               | MiniMax                        | general, code                          | 高吞吐、低延遲                      |
-| `glm53`                    | Zhipu GLM-5.3                  | reasoning, code, long-context          | 強健的中文支援                      |
-| `gemini-flash`             | Google Gemini Flash            | cheap, vision, long-context            | Google 最快的 tier                  |
-| `gemini-pro`               | Google Gemini Pro              | reasoning, vision, long-context        | 更深的推理                          |
-| `nvidia-cloud`             | NVIDIA Cloud (NIM)             | code, reasoning                        | GPU 加速推論                        |
-| `volcano-ark-deepseek`     | ByteDance Volcano Ark (DeepSeek)| code, reasoning                       | 子模型                              |
-| `volcano-ark-qwen`         | ByteDance Volcano Ark (Qwen)   | general, code                          | 子模型                              |
-| `volcano-ark-doubao`       | ByteDance Volcano Ark (Doubao) | general, vision                        | 子模型                              |
-| `openrouter-free`          | OpenRouter 免費層              | cheap, general                         | 聚合器 fallback                     |
-| `openai-api`               | OpenAI Platform API *(BYOK)*   | code, reasoning, tools                 | gpt-5 系列,需另外申請 API 帳號      |
-| `claude-api`               | Anthropic Claude API *(BYOK)*  | reasoning, tools, long-context         | Sonnet 5 / Opus 4.5 / Haiku 4.5      |
-| `ollama-local`             | Ollama(本地)                  | local, private                         | 跑在你自己的機器上                  |
+Pool 名稱即為 `config/pools.yaml` 與 `config/capabilities.yaml` 中實際使用的識別名稱：
+
+| Pool ID                    | Provider                        | Capability 標籤                      | 備註                                 |
+|----------------------------|---------------------------------|--------------------------------------|--------------------------------------|
+| `MiniMax-M3`               | MiniMax                         | 中文, 英文, 推理, 工具調用            | 高吞吐、低延遲                       |
+| `MiMo-Code`                | Xiaomi MiMo token plan          | 中文, 程式碼, 推理                    | Anthropic Messages API 介面          |
+| `GLM-5.3`                  | Zhipu GLM                       | 中文, 英文, 推理, 程式碼, 工具調用     | 強健的中文與程式碼支援               |
+| `Google-Gemini`            | Google Gemini (flash/pro)       | 英文, 推理, 長文                      | 支援 `-latest` 模型別名              |
+| `NVIDIA-Cloud`             | NVIDIA Cloud (NIM)              | 英文, 程式碼, 推理                    | GPU 加速推論                         |
+| `DeepSeek-V4-Pro`          | ByteDance Volcano Ark           | 中文, 英文, 推理, 程式碼, 工具調用     | 共用單一 BYTEDANCE 金鑰之子池        |
+| `DeepSeek-V4.1-Flash`      | ByteDance Volcano Ark           | 中文, 英文, 速度優先, 推理            | 子模型池                             |
+| `GLM-5.3-Flash`            | ByteDance Volcano Ark           | 中文, 英文, 速度優先                  | 子模型池                             |
+| `OpenRouter-Free`          | OpenRouter 免費層               | 英文                                 | 聚合器 fallback                      |
+| `OpenAI-API`               | OpenAI Platform API *(BYOK)*    | 英文, 程式碼, 推理, 工具調用           | 與 ChatGPT 訂閱分開計費              |
+| `Claude-API`               | Anthropic Claude API *(BYOK)*   | 英文, 程式碼, 推理, 工具調用, 長文     | 與 Claude Code 訂閱分開計費          |
+| `Ollama-Mac`               | Ollama (LAN / Tailscale)        | 英文, 中文, Embedding, 速度優先       | 本地主機推論                         |
+| `Ollama-Surface`           | Ollama (LAN / Tailscale)        | 英文, 中文, Embedding, 速度優先       | 第二台本地節點                       |
+
+另內建 11 個 OpenAI 相容長尾池（透過 `providers/openai_compat.py` 統一載入）：
+`Groq-Llama`、`Mistral-Large`、`Cohere-Command`、`xAI-Grok`、`Together-Llama`、`Fireworks-Llama`、`Perplexity-Sonar`、`Moonshot-Kimi`、`Qwen-DashScope`、`DeepSeek-Official`、`HuggingFace-Inference` —— **總計 24 個模型池**。
 
 每個 pool 都是 `providers/` 下的獨立 plugin。想新增自己的,請見 [`docs/PLUGIN_DEVELOPMENT.md`](docs/PLUGIN_DEVELOPMENT.md)。
 
@@ -417,26 +423,25 @@ K.H.A.V.I.S. 透過兩個 YAML 檔(以及選用的環境變數)設定:
 | `config/agents.yaml` *(選用)*     | 多代理 pipeline 定義                            |
 | `.env`                            | 機密 —— 永遠不要 commit                            |
 
-`capabilities.yaml` 範例:
+`capabilities.yaml` 範例（實際 schema —— 每個 capability 標籤對應有序的 pool 清單與權重）:
 
 ```yaml
 capabilities:
-  code:
-    prefer: [MiniMax-M3, volcano-ark-deepseek, glm53]
-    fallback: [nvidia-cloud, openrouter-free]
-    max_cost_usd: 0.01
+  - capability: "程式碼"
+    pools:
+      - "GLM-5.3"
+      - "DeepSeek-V4-Pro"
+      - "NVIDIA-Cloud"
+      - "OpenAI-API"
+    weight: 1.2
 
-  vision:
-    prefer: [gemini-pro, gemini-flash, volcano-ark-doubao]
-
-  local:
-    prefer: [ollama-local]
-    fallback: [glm53]   # 僅在你同意 local→cloud 時啟用
-
-routing:
-  retry_on: [429, 503, timeout]
-  max_retries: 3
-  cooldown_seconds: 60
+  - capability: "速度優先"
+    pools:
+      - "Google-Gemini"
+      - "DeepSeek-V4.1-Flash"
+      - "OpenRouter-Free"
+      - "Ollama-Mac"
+    weight: 1.0
 ```
 
 完整設定請見 [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md)。
@@ -449,14 +454,21 @@ routing:
 
 ```python
 # providers/my_provider.py
-from khavis.plugins import ProviderPlugin, ChatResponse
+from providers.base import ProviderPlugin
 
 
 class MyProvider(ProviderPlugin):
-    name = "my-provider"
+    provider_id = "acme"
 
-    def chat(self, messages, **kwargs) -> ChatResponse:
-        # 你的實作
+    def __init__(self, **kwargs):
+        super().__init__(
+            name="Acme-1",
+            capabilities=["英文", "程式碼"],
+            **kwargs,
+        )
+
+    def chat(self, messages, **kwargs) -> dict:
+        # 回傳 {"choices": [...], "model": ..., "usage": {...}}
         ...
 ```
 
@@ -466,13 +478,15 @@ class MyProvider(ProviderPlugin):
 
 ## Roadmap
 
-- [x] **v0.1.0** —— 核心 router、registry、12 個 pool(含 OpenAI + Claude BYOK)、capability routing、稽核日誌。
-- [ ] **v0.2.0** —— 每次請求 / 每個 session 的 token-aware 成本預算。
-- [x] **v0.3.0** —— 內建 RAG 連接器(`core/rag.py`)。
-- [x] **v0.4.0** —— 相容 OpenAI 的 drop-in server(`khavis-serve`)。
+- [x] **v0.1.0** —— 核心 router、registry、plugin pools（含 OpenAI + Claude BYOK）、capability routing。
+- [x] **v0.2.0** —— 每次請求 / 每個 session 的 token-aware 成本預算（`core/budget.py` + `config/budgets.yaml`）。
+- [x] **v0.3.0** —— 內建 RAG 連接器（`core/rag.py`，支援 Chroma/Qdrant/pgvector）。
+- [x] **v0.4.0** —— 相容 OpenAI 的 drop-in server（`khavis-serve`）。
 - [x] **v0.5.0** —— 供應商限定模型目錄、即時能力查詢、附件、thinking 控制與零額度 Demo。
-- [x] **v0.6.0** —— 即時監控 pool 健康與額度的 Web UI(`/dashboard`)。
-- [x] **v1.0.0** —— 穩定的 plugin API(`docs/PLUGIN_API.md`)。
+- [x] **v0.6.0** —— 即時監控 pool 健康與派工歷史的 Web UI（`/workbench`、`/dashboard`）。
+- [x] **v0.7.0** —— 逐次請求稽核日誌（`config/audit.jsonl`），記錄成本、延遲、pool、capability 與結果。
+- [x] **v1.0.0** —— 穩定的 plugin API（`docs/PLUGIN_API.md`）與 SemVer 保證。
+- [ ] **Streaming** —— `ProviderPlugin` 原生 `stream()` generator API 與完整 SSE passthrough。
 
 有想法嗎?開個 issue,或在 [discussion board](https://github.com/kiddhsu5/KHAVIS/discussions) 投票。
 

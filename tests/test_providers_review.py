@@ -124,7 +124,9 @@ class TestOpenAIBase:
         p = GLMPlugin(api_key="k")
         call = {"id": "c1", "type": "function", "function": {"name": "f", "arguments": "{}"}}
         with patch.object(p, "_get_client") as gc:
-            _plain_openai_client(gc).chat.completions.create.return_value = _ok(None, tool_calls=[call])
+            _plain_openai_client(gc).chat.completions.create.return_value = _ok(
+                None, tool_calls=[call]
+            )
             out = p.chat(PING)
         assert out["choices"][0]["message"]["content"] == ""
         assert out["choices"][0]["message"]["tool_calls"] == [call]

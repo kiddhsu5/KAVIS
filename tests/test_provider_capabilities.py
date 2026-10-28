@@ -66,7 +66,9 @@ def test_capabilities_use_provider_returned_modes_and_map_active_model() -> None
 
 
 def test_unconfigured_provider_is_auto_only_without_network_call() -> None:
-    specs = [{"env": "JUAPI_API_KEY", "label": "JUAPI", "default_base_url": "https://provider.test/v1"}]
+    specs = [
+        {"env": "JUAPI_API_KEY", "label": "JUAPI", "default_base_url": "https://provider.test/v1"}
+    ]
     with patch("urllib.request.urlopen") as open_url:
         providers = discover_provider_capabilities(specs, {})
     assert providers[0]["status"] == "not_configured"
@@ -77,7 +79,10 @@ def test_unconfigured_provider_is_auto_only_without_network_call() -> None:
 def test_same_model_id_keeps_provider_namespace() -> None:
     assert format_model_ref("JUAPI_API_KEY", "gemini-4-argon") == "JUAPI_API_KEY::gemini-4-argon"
     assert format_model_ref("GOOGLE_API_KEY", "gemini-4-argon") == "GOOGLE_API_KEY::gemini-4-argon"
-    assert format_model_ref("JUAPI_API_KEY", "models/gemini-4-argon") == "JUAPI_API_KEY::gemini-4-argon"
+    assert (
+        format_model_ref("JUAPI_API_KEY", "models/gemini-4-argon")
+        == "JUAPI_API_KEY::gemini-4-argon"
+    )
     assert parse_model_ref("JUAPI_API_KEY::gemini-4-argon") == ("JUAPI_API_KEY", "gemini-4-argon")
     assert parse_model_ref("gemini-4-argon") == (None, "gemini-4-argon")
 
@@ -108,7 +113,10 @@ def test_model_catalog_distinguishes_duplicate_provider_models() -> None:
         "GOOGLE_API_KEY::gemini-4-argon",
     ]
     assert catalog["active_model_refs"]["claude"] == "gemini-4-argon"
-    assert catalog["catalog"]["JUAPI_API_KEY::gemini-4-argon"]["display_name"] == "JUAPI · gemini-4-argon"
+    assert (
+        catalog["catalog"]["JUAPI_API_KEY::gemini-4-argon"]["display_name"]
+        == "JUAPI · gemini-4-argon"
+    )
 
 
 def test_attachment_storage_blocks_traversal_and_sensitive_files(tmp_path: Path) -> None:

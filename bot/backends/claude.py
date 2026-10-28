@@ -65,7 +65,11 @@ class ClaudeBackend(Backend):
         # ``--`` ends option parsing so a prompt such as "--help" or
         # "--dangerously-skip-permissions" is never read as a CLI flag.
         thinking_mode = envelope.thinking_mode
-        if thinking_mode and thinking_mode.lower() != "auto" and re.fullmatch(r"[A-Za-z0-9_.:-]{1,64}", thinking_mode):
+        if (
+            thinking_mode
+            and thinking_mode.lower() != "auto"
+            and re.fullmatch(r"[A-Za-z0-9_.:-]{1,64}", thinking_mode)
+        ):
             args += ["--effort", thinking_mode]
         args += ["--", envelope.prompt]
 
@@ -81,7 +85,9 @@ class ClaudeBackend(Backend):
         juapi_key = os.environ.get("JUAPI_API_KEY")
         minimax_key = os.environ.get("MINIMAX_API_KEY")
         glm_key = os.environ.get("ZHIPUAI_API_KEY") or os.environ.get("GLM_API_KEY")
-        if juapi_key and (provider_env == "JUAPI_API_KEY" or (not provider_env and _uses_juapi_model(model_lower))):
+        if juapi_key and (
+            provider_env == "JUAPI_API_KEY" or (not provider_env and _uses_juapi_model(model_lower))
+        ):
             env["ANTHROPIC_API_KEY"] = juapi_key
             env["ANTHROPIC_AUTH_TOKEN"] = juapi_key
             env["ANTHROPIC_BASE_URL"] = _juapi_anthropic_base_url()
@@ -115,9 +121,7 @@ class ClaudeBackend(Backend):
             )
             try:
                 eff_timeout = min(self._timeout, 10) if run_cwd else self._timeout
-                stdout_b, stderr_b = await asyncio.wait_for(
-                    proc.communicate(), timeout=eff_timeout
-                )
+                stdout_b, stderr_b = await asyncio.wait_for(proc.communicate(), timeout=eff_timeout)
                 rc = proc.returncode if proc.returncode is not None else -1
                 stdout = stdout_b.decode(errors="replace").strip()
                 stderr = stderr_b.decode(errors="replace").strip()

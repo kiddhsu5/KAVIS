@@ -2,7 +2,7 @@
 
 Thanks for being here. K.H.A.V.I.S. is small enough that any single PR is appreciated, and big enough that every contributor matters.
 
-This document covers the *how*. For the *what*, see the [open issues](https://github.com/kiddhsu5/K.H.A.V.I.S./issues) and the [roadmap in the README](README.md#roadmap).
+This document covers the *how*. For the *what*, see the [open issues](https://github.com/kiddhsu5/KHAVIS/issues) and the [roadmap in the README](README.md#roadmap).
 
 ---
 
@@ -24,8 +24,8 @@ Be kind. Disagree on the merits. Assume good faith. We follow the [Contributor C
 ## Development setup
 
 ```bash
-git clone https://github.com/kiddhsu5/K.H.A.V.I.S..git
-cd khavis
+git clone https://github.com/kiddhsu5/KHAVIS.git
+cd KHAVIS
 python3.11 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 pre-commit install
@@ -231,8 +231,8 @@ We follow [Semantic Versioning](https://semver.org/):
 
 ## Where to ask for help
 
-- **General questions**: [GitHub Discussions](https://github.com/kiddhsu5/K.H.A.V.I.S./discussions).
-- **Bug reports**: [GitHub Issues](https://github.com/kiddhsu5/K.H.A.V.I.S./issues) with the bug report template.
+- **General questions**: [GitHub Discussions](https://github.com/kiddhsu5/KHAVIS/discussions).
+- **Bug reports**: [GitHub Issues](https://github.com/kiddhsu5/KHAVIS/issues) with the bug report template.
 - **Security**: see `SECURITY.md` — do not file public issues for vulnerabilities.
 
 ---

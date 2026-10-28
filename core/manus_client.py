@@ -82,9 +82,7 @@ class ManusClient:
         self._validate_message(message)
         self._validate_profile(agent_profile)
         payload = {
-            "message": {
-                "content": [{"type": "text", "text": message, "visibility": "visible"}]
-            },
+            "message": {"content": [{"type": "text", "text": message, "visibility": "visible"}]},
             "agent_profile": agent_profile,
             "interactive_mode": bool(interactive_mode),
             "share_visibility": "private",
@@ -120,9 +118,7 @@ class ManusClient:
         self._validate_message(message)
         payload: dict[str, Any] = {
             "task_id": task_id,
-            "message": {
-                "content": [{"type": "text", "text": message, "visibility": "visible"}]
-            },
+            "message": {"content": [{"type": "text", "text": message, "visibility": "visible"}]},
         }
         if agent_profile is not None:
             self._validate_profile(agent_profile)
@@ -208,7 +204,9 @@ class ManusClient:
                 request_id = str(data.get("request_id") or "") or None
         except (UnicodeDecodeError, json.JSONDecodeError):
             pass
-        safe_message = re.sub(r"(?i)(api[_-]?key|authorization|bearer)\s*[=:]\s*\S+", "[redacted]", message)
+        safe_message = re.sub(
+            r"(?i)(api[_-]?key|authorization|bearer)\s*[=:]\s*\S+", "[redacted]", message
+        )
         if status_code == 401:
             safe_message = "Manus API rejected the server credential"
             code = "manus_unauthorized"
@@ -236,7 +234,9 @@ class ManusClient:
     @staticmethod
     def _validate_profile(agent_profile: str) -> None:
         if agent_profile not in _ALLOWED_PROFILES:
-            raise ManusAPIError("unsupported agent_profile", status_code=400, code="invalid_argument")
+            raise ManusAPIError(
+                "unsupported agent_profile", status_code=400, code="invalid_argument"
+            )
 
     @staticmethod
     def _validate_task_id(task_id: str) -> str:

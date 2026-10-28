@@ -327,13 +327,17 @@ def query_upstream_balance(plugin: Any, timeout: float = 5.0) -> dict[str, Any] 
                     "provider": "openrouter",
                 }
         except Exception as exc:  # noqa: BLE001
-            log.debug("OpenRouter balance query failed for %s: %r", getattr(plugin, "name", ""), exc)
+            log.debug(
+                "OpenRouter balance query failed for %s: %r", getattr(plugin, "name", ""), exc
+            )
 
     # 2. General check_quota method fallback
     if hasattr(plugin, "check_quota") and callable(plugin.check_quota):
         try:
             res = plugin.check_quota()
-            if isinstance(res, dict) and (res.get("remaining") is not None or res.get("balance") is not None):
+            if isinstance(res, dict) and (
+                res.get("remaining") is not None or res.get("balance") is not None
+            ):
                 return {
                     "remaining_tokens": _parse_int(res.get("remaining")),
                     "total_tokens": _parse_int(res.get("total")),

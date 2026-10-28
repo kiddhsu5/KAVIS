@@ -184,7 +184,11 @@ class CustomAgentBackend(Backend):
         api_key_env = str(self._spec.get("api_key_env") or "").strip()
         api_key = (
             (os.environ.get(api_key_env) if api_key_env else None)
-            or (os.environ.get("ZHIPUAI_API_KEY") if "glm" in model_lower or "codegeex" in model_lower else None)
+            or (
+                os.environ.get("ZHIPUAI_API_KEY")
+                if "glm" in model_lower or "codegeex" in model_lower
+                else None
+            )
             or os.environ.get("MINIMAX_API_KEY")
             or os.environ.get("ZHIPUAI_API_KEY")
             or os.environ.get("OPENAI_API_KEY")

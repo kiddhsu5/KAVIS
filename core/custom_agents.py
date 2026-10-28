@@ -50,7 +50,9 @@ def register_or_update_custom_agent(payload: dict[str, Any]) -> dict[str, Any]:
     """Validate and register (or update) a user-defined custom agent."""
     agent_id = str(payload.get("id") or "").strip().lower()
     if not _AGENT_ID_RE.match(agent_id):
-        raise ValueError("Agent ID 必須為 2~32 個小寫英數字、底線或連字號 (例如: aider, opencode, my-agent)")
+        raise ValueError(
+            "Agent ID 必須為 2~32 個小寫英數字、底線或連字號 (例如: aider, opencode, my-agent)"
+        )
     if agent_id in RESERVED_AGENT_IDS:
         raise ValueError(f"Agent ID '{agent_id}' 為系統內建保留代號，請使用其他代號")
 
@@ -60,18 +62,22 @@ def register_or_update_custom_agent(payload: dict[str, Any]) -> dict[str, Any]:
         agent_type = "cli"
 
     binary = str(payload.get("binary") or agent_id).strip()[:120]
-    args_template = str(
-        payload.get("args_template") or "--model {model} -- {prompt}"
-    ).strip()[:240]
+    args_template = str(payload.get("args_template") or "--model {model} -- {prompt}").strip()[:240]
     model = str(payload.get("model") or "MiniMax-M3.1-Flash").strip()
     if not _MODEL_RE.match(model):
         raise ValueError(f"無效的模型名稱: {model!r}")
 
     raw_options = payload.get("options")
     if isinstance(raw_options, list):
-        options = [str(x).strip() for x in raw_options if str(x).strip() and _MODEL_RE.match(str(x).strip())]
+        options = [
+            str(x).strip()
+            for x in raw_options
+            if str(x).strip() and _MODEL_RE.match(str(x).strip())
+        ]
     elif isinstance(raw_options, str):
-        options = [x.strip() for x in raw_options.split(",") if x.strip() and _MODEL_RE.match(x.strip())]
+        options = [
+            x.strip() for x in raw_options.split(",") if x.strip() and _MODEL_RE.match(x.strip())
+        ]
     else:
         options = []
     if model not in options:
@@ -83,7 +89,9 @@ def register_or_update_custom_agent(payload: dict[str, Any]) -> dict[str, Any]:
     api_key_env = str(payload.get("api_key_env") or "MINIMAX_API_KEY").strip()[:64]
     base_url = str(payload.get("base_url") or "").strip()[:200]
     system_prompt = str(payload.get("system_prompt") or "").strip()[:500]
-    desc = str(payload.get("desc") or f"用戶自訂 Agent ({agent_type.upper()}: {binary})").strip()[:120]
+    desc = str(payload.get("desc") or f"用戶自訂 Agent ({agent_type.upper()}: {binary})").strip()[
+        :120
+    ]
     icon = str(payload.get("icon") or "fa-plug").strip()[:32]
     color = str(payload.get("color") or "#EC4899").strip()[:16]
 

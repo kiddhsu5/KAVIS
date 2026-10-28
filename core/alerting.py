@@ -44,7 +44,9 @@ class AlertEvent:
     """Structured event for a quota, circuit, or fallback alert."""
 
     pool_name: str
-    event_type: str  # "low_quota", "rate_limit_429", "circuit_open", "pool_exhausted", "local_fallback"
+    event_type: (
+        str  # "low_quota", "rate_limit_429", "circuit_open", "pool_exhausted", "local_fallback"
+    )
     level: str  # "info", "warning", "error", "critical"
     message: str
     details: dict[str, Any] = field(default_factory=dict)
@@ -92,8 +94,14 @@ class AlertManager:
                 log.warning("Failed to parse %s: %r", cfg_file, exc)
 
         webhook = os.environ.get("KHAVIS_WEBHOOK_URL") or data.get("webhook_url")
-        cooldown = float(os.environ.get("KHAVIS_ALERT_COOLDOWN_S", data.get("cooldown_s", DEFAULT_ALERT_COOLDOWN_S)))
-        raw_enabled = os.environ.get("KHAVIS_ALERTING", str(data.get("enabled", True))).strip().lower()
+        cooldown = float(
+            os.environ.get(
+                "KHAVIS_ALERT_COOLDOWN_S", data.get("cooldown_s", DEFAULT_ALERT_COOLDOWN_S)
+            )
+        )
+        raw_enabled = (
+            os.environ.get("KHAVIS_ALERTING", str(data.get("enabled", True))).strip().lower()
+        )
         enabled = raw_enabled not in {"0", "false", "no", "off"}
 
         return cls(webhook_url=webhook, cooldown_s=cooldown, enabled=enabled)
@@ -176,7 +184,9 @@ class AlertManager:
             if resp.status_code < 400:
                 log.info("Alert webhook delivered successfully for %s", event.pool_name)
                 return True
-            log.warning("Alert webhook delivery failed: HTTP %s (%s)", resp.status_code, resp.text[:200])
+            log.warning(
+                "Alert webhook delivery failed: HTTP %s (%s)", resp.status_code, resp.text[:200]
+            )
             return False
         except Exception as exc:  # noqa: BLE001
             log.warning("Alert webhook exception for %s: %r", event.pool_name, exc)

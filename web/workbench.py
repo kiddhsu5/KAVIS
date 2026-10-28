@@ -115,9 +115,15 @@ def _load_workbench_catalog() -> dict[str, Any]:
         if not isinstance(data, dict):
             return {"model_options": {}, "custom_providers": [], "deleted_providers": []}
         return {
-            "model_options": data.get("model_options") if isinstance(data.get("model_options"), dict) else {},
-            "custom_providers": data.get("custom_providers") if isinstance(data.get("custom_providers"), list) else [],
-            "deleted_providers": data.get("deleted_providers") if isinstance(data.get("deleted_providers"), list) else [],
+            "model_options": data.get("model_options")
+            if isinstance(data.get("model_options"), dict)
+            else {},
+            "custom_providers": data.get("custom_providers")
+            if isinstance(data.get("custom_providers"), list)
+            else [],
+            "deleted_providers": data.get("deleted_providers")
+            if isinstance(data.get("deleted_providers"), list)
+            else [],
         }
     except Exception:  # noqa: BLE001
         return {"model_options": {}, "custom_providers": [], "deleted_providers": []}
@@ -126,7 +132,9 @@ def _load_workbench_catalog() -> dict[str, Any]:
 def _save_workbench_catalog(catalog: dict[str, Any]) -> None:
     try:
         _CATALOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-        _CATALOG_PATH.write_text(json.dumps(catalog, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        _CATALOG_PATH.write_text(
+            json.dumps(catalog, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
     except OSError:
         pass
 
@@ -174,9 +182,9 @@ def get_workbench_models_config() -> dict[str, Any]:
         default_val = spec["default"]
         current = _canonical_model_setting(
             (
-            os.environ.get(env_key, "").strip()
-            or env_file_vars.get(env_key, "").strip()
-            or default_val
+                os.environ.get(env_key, "").strip()
+                or env_file_vars.get(env_key, "").strip()
+                or default_val
             ),
             default_val,
         )
@@ -226,7 +234,9 @@ def _persist_env_updates(updates_by_env: dict[str, str]) -> None:
     new_lines: list[str] = []
     for raw in lines:
         stripped = raw.strip()
-        check_line = stripped[len("export ") :].strip() if stripped.startswith("export ") else stripped
+        check_line = (
+            stripped[len("export ") :].strip() if stripped.startswith("export ") else stripped
+        )
         if check_line and not check_line.startswith("#") and "=" in check_line:
             k, _, _ = check_line.partition("=")
             k = k.strip()
@@ -307,7 +317,11 @@ def update_workbench_models_config(payload: dict[str, Any]) -> dict[str, Any]:
             target_ids = list(AGENT_MODEL_SPECS.keys()) if target_agent == "all" else [target_agent]
             for aid in target_ids:
                 if aid in AGENT_MODEL_SPECS:
-                    opts = [m for m in list(cur_options.get(aid) or AGENT_MODEL_SPECS[aid]["options"]) if m != model_name]
+                    opts = [
+                        m
+                        for m in list(cur_options.get(aid) or AGENT_MODEL_SPECS[aid]["options"])
+                        if m != model_name
+                    ]
                     if not opts:
                         opts = [AGENT_MODEL_SPECS[aid]["default"]]
                     model_options_map[aid] = opts
@@ -335,7 +349,10 @@ def update_workbench_models_config(payload: dict[str, Any]) -> dict[str, Any]:
             target_ids = list(AGENT_MODEL_SPECS.keys()) if target_agent == "all" else [target_agent]
             for aid in target_ids:
                 if aid in AGENT_MODEL_SPECS:
-                    opts = [new_model if m == old_model else m for m in list(cur_options.get(aid) or AGENT_MODEL_SPECS[aid]["options"])]
+                    opts = [
+                        new_model if m == old_model else m
+                        for m in list(cur_options.get(aid) or AGENT_MODEL_SPECS[aid]["options"])
+                    ]
                     if new_model not in opts:
                         opts.insert(0, new_model)
                     # deduplicate preserving order
@@ -353,11 +370,16 @@ def update_workbench_models_config(payload: dict[str, Any]) -> dict[str, Any]:
                 else:
                     for ca in custom_list:
                         if str(ca.get("id") or "") == aid:
-                            opts = [new_model if m == old_model else m for m in list(ca.get("options") or [])]
+                            opts = [
+                                new_model if m == old_model else m
+                                for m in list(ca.get("options") or [])
+                            ]
                             if new_model not in opts:
                                 opts.insert(0, new_model)
                             ca["options"] = opts
-                            if ca.get("model") == old_model or bool(payload.get("set_active", True)):
+                            if ca.get("model") == old_model or bool(
+                                payload.get("set_active", True)
+                            ):
                                 ca["model"] = new_model
                             custom_changed = True
 
@@ -485,17 +507,16 @@ def _get_all_provider_specs() -> list[dict[str, Any]]:
             continue
         if env_k in seen_envs:
             # Override built-in metadata if customized
-            specs = [
-                {**s, **cp, "env": env_k} if s["env"] == env_k else s
-                for s in specs
-            ]
+            specs = [{**s, **cp, "env": env_k} if s["env"] == env_k else s for s in specs]
         else:
             specs.append(
                 {
                     "env": env_k,
                     "label": str(cp.get("label") or env_k),
                     "agents": str(cp.get("agents") or "通用 / 自訂服務商"),
-                    "base_url_env": str(cp.get("base_url_env") or f"{env_k.replace('_API_KEY', '')}_BASE_URL"),
+                    "base_url_env": str(
+                        cp.get("base_url_env") or f"{env_k.replace('_API_KEY', '')}_BASE_URL"
+                    ),
                     "default_base_url": str(cp.get("default_base_url") or cp.get("base_url") or ""),
                     "models": list(cp.get("models") or []),
                     "custom": True,
@@ -524,9 +545,14 @@ def get_setup_wizard_status() -> dict[str, Any]:
         k = spec["env"]
         raw_val = os.environ.get(k, "").strip() or env_vars.get(k, "").strip()
         if not raw_val and k == "ANTIGRAVITY_API_KEY":
-            raw_val = os.environ.get("GOOGLE_API_KEY", "").strip() or env_vars.get("GOOGLE_API_KEY", "").strip()
+            raw_val = (
+                os.environ.get("GOOGLE_API_KEY", "").strip()
+                or env_vars.get("GOOGLE_API_KEY", "").strip()
+            )
         if not raw_val and k == "ZHIPUAI_API_KEY":
-            raw_val = os.environ.get("GLM_API_KEY", "").strip() or env_vars.get("GLM_API_KEY", "").strip()
+            raw_val = (
+                os.environ.get("GLM_API_KEY", "").strip() or env_vars.get("GLM_API_KEY", "").strip()
+            )
 
         base_url_env = str(spec.get("base_url_env") or "").strip()
         active_base_url = (
@@ -610,7 +636,9 @@ def get_workbench_capabilities() -> dict[str, Any]:
         _AGENT_PROVIDER_ENVS,
     )
     for agent_id, capability in agents.items():
-        capability["model_ref"] = model_catalog["active_model_refs"].get(agent_id, capability.get("model_ref", ""))
+        capability["model_ref"] = model_catalog["active_model_refs"].get(
+            agent_id, capability.get("model_ref", "")
+        )
     return {
         "ok": True,
         "agents": agents,
@@ -632,27 +660,44 @@ def update_setup_wizard_config(payload: dict[str, Any]) -> dict[str, Any]:
         raw_env = str(payload.get("env") or "").strip().upper()
         if not raw_env and label:
             slug = re.sub(r"[^A-Za-z0-9]+", "_", label).strip("_").upper() or "CUSTOM"
-            raw_env = f"{slug}_API_KEY" if not slug.endswith("_KEY") and not slug.endswith("_TOKEN") else slug
+            raw_env = (
+                f"{slug}_API_KEY"
+                if not slug.endswith("_KEY") and not slug.endswith("_TOKEN")
+                else slug
+            )
         if not raw_env or not _ENV_KEY_RE.match(raw_env):
             raise ValueError(f"Invalid provider env key: {raw_env!r}")
         if not label:
             label = raw_env
 
         base_url = str(payload.get("base_url") or payload.get("default_base_url") or "").strip()
-        base_url_env = str(payload.get("base_url_env") or f"{raw_env.replace('_API_KEY', '')}_BASE_URL").strip().upper()
+        base_url_env = (
+            str(payload.get("base_url_env") or f"{raw_env.replace('_API_KEY', '')}_BASE_URL")
+            .strip()
+            .upper()
+        )
         agents_desc = str(payload.get("agents") or "所有 CLI / HTTP Agent 節點").strip()
         api_key_val = str(payload.get("api_key") or "").strip()
 
         raw_models = payload.get("models")
         if isinstance(raw_models, str):
-            provider_models = [m.strip() for m in raw_models.split(",") if m.strip() and _MODEL_NAME_RE.match(m.strip())]
+            provider_models = [
+                m.strip()
+                for m in raw_models.split(",")
+                if m.strip() and _MODEL_NAME_RE.match(m.strip())
+            ]
         elif isinstance(raw_models, list):
-            provider_models = [str(m).strip() for m in raw_models if str(m).strip() and _MODEL_NAME_RE.match(str(m).strip())]
+            provider_models = [
+                str(m).strip()
+                for m in raw_models
+                if str(m).strip() and _MODEL_NAME_RE.match(str(m).strip())
+            ]
         else:
             provider_models = []
 
         custom_providers: list[dict[str, Any]] = [
-            cp for cp in (catalog.get("custom_providers") or [])
+            cp
+            for cp in (catalog.get("custom_providers") or [])
             if isinstance(cp, dict) and str(cp.get("env") or "") != raw_env
         ]
         custom_providers.append(
@@ -678,7 +723,11 @@ def update_setup_wizard_config(payload: dict[str, Any]) -> dict[str, Any]:
             t_ids = list(AGENT_MODEL_SPECS.keys()) if target_agent == "all" else [target_agent]
             for aid in t_ids:
                 if aid in AGENT_MODEL_SPECS:
-                    opts = list(model_options_map.get(aid) or cur_opts.get(aid) or AGENT_MODEL_SPECS[aid]["options"])
+                    opts = list(
+                        model_options_map.get(aid)
+                        or cur_opts.get(aid)
+                        or AGENT_MODEL_SPECS[aid]["options"]
+                    )
                     for pm in reversed(provider_models):
                         if pm not in opts:
                             opts.insert(0, pm)
@@ -711,18 +760,21 @@ def update_setup_wizard_config(payload: dict[str, Any]) -> dict[str, Any]:
             updates[env_key] = ""
             if action == "delete_provider":
                 # 刪除自訂服務商時，一併清除它的 Base URL 環境變數，避免 .env 殘留
-                for cp in (catalog.get("custom_providers") or []):
+                for cp in catalog.get("custom_providers") or []:
                     if isinstance(cp, dict) and str(cp.get("env") or "") == env_key:
                         stale_url_env = str(cp.get("base_url_env") or "").strip()
                         if stale_url_env and _ENV_KEY_RE.match(stale_url_env):
                             os.environ.pop(stale_url_env, None)
                             updates[stale_url_env] = ""
                 custom_providers = [
-                    cp for cp in (catalog.get("custom_providers") or [])
+                    cp
+                    for cp in (catalog.get("custom_providers") or [])
                     if isinstance(cp, dict) and str(cp.get("env") or "") != env_key
                 ]
                 catalog["custom_providers"] = custom_providers
-                if any(s["env"] == env_key for s in BYOK_PROVIDER_SPECS) and bool(payload.get("hide_builtin", False)):
+                if any(s["env"] == env_key for s in BYOK_PROVIDER_SPECS) and bool(
+                    payload.get("hide_builtin", False)
+                ):
                     del_list = list(catalog.get("deleted_providers") or [])
                     if env_key not in del_list:
                         del_list.append(env_key)
@@ -915,14 +967,34 @@ def list_deliverable_artifacts() -> list[dict[str, Any]]:
 
     # Key generated files in khavis
     scan_targets = [
-        ("scripts/quick_setup_wizard.sh", "開源/團隊快速部署與 BYOK 精靈腳本", "script", "fa-magic"),
-        ("core/workspace_manager.py", "共用專案資料夾與 Git Worktree 管理模組", "code", "fa-code-branch"),
+        (
+            "scripts/quick_setup_wizard.sh",
+            "開源/團隊快速部署與 BYOK 精靈腳本",
+            "script",
+            "fa-magic",
+        ),
+        (
+            "core/workspace_manager.py",
+            "共用專案資料夾與 Git Worktree 管理模組",
+            "code",
+            "fa-code-branch",
+        ),
         ("core/custom_agents.py", "用戶自訂 Agent 動態擴充註冊表模組", "code", "fa-plug"),
         ("outputs/e2e_collaborative_code.py", "跨模型多 Agent 協同代碼產出", "code", "fa-code"),
-        ("scripts/e2e_multiagent_code_dispatch.py", "多 Agent 並發協同派工腳本", "script", "fa-project-diagram"),
+        (
+            "scripts/e2e_multiagent_code_dispatch.py",
+            "多 Agent 並發協同派工腳本",
+            "script",
+            "fa-project-diagram",
+        ),
         ("scripts/stress_test_failover_alerts.py", "端到端壓力測試腳本", "script", "fa-bolt"),
         ("docker-compose.yml", "一體化 Docker Compose 部署配置", "config", "fa-cubes"),
-        ("deploy/docker-compose.all-in-one.yml", "全服務部署編排 (All-in-One)", "config", "fa-server"),
+        (
+            "deploy/docker-compose.all-in-one.yml",
+            "全服務部署編排 (All-in-One)",
+            "config",
+            "fa-server",
+        ),
         ("core/quota_tracker.py", "主動額度與速率限制追蹤模組", "code", "fa-tachometer-alt"),
         ("core/escalation.py", "多 Agent 自動派工與升級模組", "code", "fa-users-cog"),
         ("core/alerting.py", "Webhook 即時防抖警報模組", "code", "fa-bell"),
@@ -968,7 +1040,10 @@ def read_artifact_content(rel_or_abs_path: str) -> dict[str, Any]:
     else:
         target_path = target_path.resolve()
 
-    if any(part.startswith(".") for part in target_path.parts) or target_path.suffix.lower() in _BLOCKED_SUFFIXES:
+    if (
+        any(part.startswith(".") for part in target_path.parts)
+        or target_path.suffix.lower() in _BLOCKED_SUFFIXES
+    ):
         return {"ok": False, "error": "Access denied: protected or hidden resource"}
 
     allowed_items = list_deliverable_artifacts()
@@ -987,7 +1062,8 @@ def read_artifact_content(rel_or_abs_path: str) -> dict[str, Any]:
 
     if target_path.is_dir():
         files = sorted(
-            f for f in target_path.rglob("*")
+            f
+            for f in target_path.rglob("*")
             if f.is_file() and not any(p.startswith(".") for p in f.parts)
         )
         summary_lines = [

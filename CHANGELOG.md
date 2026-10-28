@@ -241,5 +241,7 @@ Pre-public development. Not documented here.
 
 ---
 
-[Unreleased]: https://github.com/kiddhsu5/K.H.A.V.I.S./compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/kiddhsu5/K.H.A.V.I.S./releases/tag/v0.1.0
+[Unreleased]: https://github.com/kiddhsu5/KHAVIS/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/kiddhsu5/KHAVIS/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/kiddhsu5/KHAVIS/compare/v0.1.0...v0.4.0
+[0.1.0]: https://github.com/kiddhsu5/KHAVIS/releases/tag/v0.1.0

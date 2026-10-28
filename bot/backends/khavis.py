@@ -66,12 +66,12 @@ class KhavisBackend(Backend):
                 call_upstream_llm_fallback,
                 envelope.prompt,
                 "LangGraph-7-Role",
-                    "khavis",
-                    65,
-                    envelope.workspace_dir,
-                    True,
-                    envelope.thinking_mode,
-                    envelope.thinking_parameter,
+                "khavis",
+                65,
+                envelope.workspace_dir,
+                True,
+                envelope.thinking_mode,
+                envelope.thinking_parameter,
             )
             if fb.get("ok"):
                 return BackendResult(
