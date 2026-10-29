@@ -2287,11 +2287,25 @@ _WORKBENCH_PAGE_HEAD = """<!DOCTYPE html>
               </div>
             </div>
 
-            <div class="relative">
-              <textarea id="prompt-input" rows="3" placeholder="直接輸入您的目標（例如：『幫我在共用資料夾寫一個健康檢查腳本並直接執行驗證』），選取的 Agent 將自動實作、互評並給出高完成度成果..." class="w-full bg-[#050811]/90 border border-white/10 rounded-xl p-4 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 font-sans resize-y"></textarea>
+            <div class="rounded-xl border border-white/10 bg-[#050811]/90 focus-within:border-sky-500/70 focus-within:ring-1 focus-within:ring-sky-500/40 transition">
+              <textarea id="prompt-input" rows="3" placeholder="直接輸入您的目標（例如：『幫我在共用資料夾寫一個健康檢查腳本並直接執行驗證』），選取的 Agent 將自動實作、互評並給出高完成度成果..." class="w-full bg-transparent border-0 rounded-xl p-4 pb-1 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-0 font-sans resize-y block"></textarea>
+              <div class="flex items-center justify-between gap-2 px-2.5 pb-2">
+                <div class="flex items-center gap-2">
+                  <input id="attachment-input" type="file" multiple class="hidden" onchange="handleAttachmentInput(this.files)" />
+                  <button type="button" onclick="document.getElementById('attachment-input').click()" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-sky-500/15 text-slate-300 hover:text-sky-200 border border-white/10 hover:border-sky-500/35 text-xs transition inline-flex items-center gap-1.5" title="加入附件（單檔最多 10 MB，總量最多 25 MB）">
+                    📎 附件
+                  </button>
+                </div>
+                <div class="flex items-center gap-2 min-w-0">
+                  <span id="thinking-capability-source" class="text-[10px] font-mono text-slate-500 truncate max-w-[300px]">尚未查詢供應商能力</span>
+                  <button type="button" onclick="loadThinkingCapabilities(true)" class="px-2 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 hover:text-slate-200 text-xs transition shrink-0" title="重新查詢目前 Agent 的供應商模型能力">
+                    ↻
+                  </button>
+                </div>
+              </div>
             </div>
 
-            <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-2 mt-2.5">
               <div class="flex flex-wrap items-center gap-2 text-xs text-slate-400">
                 <span>能力路由偏好:</span>
                 <select id="capability-hint" class="bg-[#0B1120] border border-white/10 text-xs text-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-sky-500">
@@ -2307,24 +2321,13 @@ _WORKBENCH_PAGE_HEAD = """<!DOCTYPE html>
                     <option value="">⚙️ Auto · 供應商預設</option>
                   </select>
                 </label>
-                <button type="button" onclick="loadThinkingCapabilities(true)" class="px-2 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 hover:text-white transition" title="重新查詢已連線供應商的模型能力">
-                  ↻
-                </button>
-                <span id="thinking-capability-source" class="text-[10px] font-mono text-slate-500">尚未查詢供應商能力</span>
               </div>
-              <div class="flex items-center gap-2">
-                <input id="attachment-input" type="file" multiple class="hidden" onchange="handleAttachmentInput(this.files)" />
-                <button type="button" onclick="document.getElementById('attachment-input').click()" class="px-3 py-2 rounded-lg bg-white/5 hover:bg-sky-500/15 text-slate-300 hover:text-sky-200 border border-white/10 hover:border-sky-500/35 text-xs transition" title="加入附件（單檔最多 10 MB，總量最多 25 MB）">
-                  📎 附件
-                </button>
-              </div>
-            </div>
-            <div id="attachment-list" class="hidden flex flex-wrap items-center gap-1.5 text-[11px] font-mono"></div>
-
-            <button id="btn-dispatch" onclick="submitDispatch()" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 via-cyan-500 to-teal-500 hover:from-sky-400 hover:to-teal-400 text-white font-bold text-sm shadow-lg shadow-sky-500/25 flex items-center gap-2 transition transform active:scale-95">
+              <button id="btn-dispatch" onclick="submitDispatch()" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 via-cyan-500 to-teal-500 hover:from-sky-400 hover:to-teal-400 text-white font-bold text-sm shadow-lg shadow-sky-500/25 flex items-center gap-2 justify-center flex-1 min-w-[220px] transition transform active:scale-95">
                 <i class="fas fa-play"></i>
                 <span id="btn-dispatch-label">啟動多 Agent 自主協同執行</span>
               </button>
+            </div>
+            <div id="attachment-list" class="hidden flex flex-wrap items-center gap-1.5 text-[11px] font-mono"></div>
             </div>
           </div>
         </div>

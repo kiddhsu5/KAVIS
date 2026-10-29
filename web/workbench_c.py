@@ -44,11 +44,11 @@ _SLICES: Final[dict[str, tuple[int, int]]] = {
     # 快速範本 + textarea + 能力路由 + 派工按鈕
     "composer": (703, 756),
     # 執行面板：狀態列、pipeline stepper、延遲圖、成果容器
-    "result": (761, 847),
+    "result": (764, 850),
     # VIEW 2-5：交付文件 / 額度熔斷 / Agent 集群 / 部署精靈
-    "views": (851, 981),
+    "views": (854, 984),
     # 產物預覽抽屜
-    "drawers": (986, 1009),
+    "drawers": (989, 1012),
 }
 
 
@@ -324,13 +324,13 @@ html:not(.dark) #live-results-container > div{
   background-image:var(--v-brand-grad) !important;
   color:#fff !important;
   border:0 !important;
-  box-shadow:0 10px 26px -10px rgba(139,92,246,.65),0 4px 12px -6px rgba(34,211,238,.4) !important;
+  box-shadow:0 10px 26px -12px rgba(124,155,181,.8) !important;
   font-weight:700;
 }
 #btn-dispatch:hover:not(:disabled){
-  background:linear-gradient(135deg,#A78BFA 0%,#60A5FA 52%,#67E8F9 100%) !important;
-  background-image:linear-gradient(135deg,#A78BFA 0%,#60A5FA 52%,#67E8F9 100%) !important;
-  box-shadow:0 12px 30px -10px rgba(139,92,246,.8),0 6px 16px -6px rgba(34,211,238,.5) !important;
+  background:#8FACBF !important;
+  background-image:linear-gradient(135deg,#8FACBF 0%,#A3BCA6 100%) !important;
+  box-shadow:0 10px 26px -10px rgba(124,155,181,.75) !important;
 }
 #btn-dispatch:disabled{opacity:.45 !important;cursor:not-allowed}
 #btn-dispatch i{color:currentColor !important}
@@ -624,18 +624,19 @@ html:not(.dark) .c-foot-chip:hover{background:rgba(27,35,48,.05)}
 # 導航 / 協同模式 / 文檔類型 / 對話串歸檔 / 全頁視圖 各有專屬色相
 # ══════════════════════════════════════════════════════════════════════
 _VIVID_CSS: Final[str] = """
+/* Morandi 色版：所有 v-* 功能色都映射回莫蘭迪基底 */
 :root{
-  --v-violet:#8B5CF6; --v-sky:#38BDF8; --v-emerald:#34D399; --v-amber:#FBBF24;
-  --v-rose:#FB7185; --v-cyan:#22D3EE; --v-blue:#60A5FA; --v-orange:#FB923C;
-  --v-brand-grad:linear-gradient(135deg,#8B5CF6 0%,#3B82F6 52%,#22D3EE 100%);
-  --v-doc-docx:#60A5FA; --v-doc-pdf:#FB7185; --v-doc-md:#34D399; --v-doc-xlsx:#4ADE80;
-  --v-doc-pptx:#FB923C; --v-doc-zip:#A78BFA; --v-doc-html:#FBBF24; --v-doc-default:#94A3B8;
+  --v-violet:#A99AB5; --v-sky:#7C9BB5; --v-emerald:#8FA894; --v-amber:#C9A17E;
+  --v-rose:#BC8B8B; --v-cyan:#7C9BB5; --v-blue:#A99AB5; --v-orange:#C9A17E;
+  --v-brand-grad:linear-gradient(135deg,#7C9BB5 0%,#8FA894 100%);
+  --v-doc-docx:#9FB3C4; --v-doc-pdf:#C4A6A6; --v-doc-md:#A3BCA6; --v-doc-xlsx:#AECBAD;
+  --v-doc-pptx:#D0B394; --v-doc-zip:#B3A6C4; --v-doc-html:#D6C49A; --v-doc-default:#8D99A6;
 }
 
 /* ── 品牌漸層 logo ── */
 .v-brand-mark{
   background:var(--v-brand-grad);
-  box-shadow:0 4px 14px -4px rgba(139,92,246,.55),0 2px 6px -2px rgba(34,211,238,.35);
+  box-shadow:0 4px 14px -5px rgba(124,155,181,.6);
 }
 .v-brand-name{
   background:var(--v-brand-grad);
@@ -653,24 +654,24 @@ _VIVID_CSS: Final[str] = """
 .v-nav.v-on .v-nav-ic{box-shadow:0 3px 10px -3px currentColor}
 .v-nav .v-nav-dot{margin-left:auto;width:.4rem;height:.4rem;border-radius:9999px;opacity:0;transition:opacity .18s}
 .v-nav.v-on .v-nav-dot{opacity:1}
-.v-ic-command{background:linear-gradient(135deg,#38BDF8,#818CF8)}
-.v-ic-agents{background:linear-gradient(135deg,#34D399,#22D3EE)}
-.v-ic-db{background:linear-gradient(135deg,#FBBF24,#FB923C)}
-.v-ic-quota{background:linear-gradient(135deg,#FB7185,#E879F9)}
+.v-ic-command{background:linear-gradient(135deg,#9FB3C4,#7C9BB5)}
+.v-ic-agents{background:linear-gradient(135deg,#A3BCA6,#8FA894)}
+.v-ic-db{background:linear-gradient(135deg,#D0B394,#C9A17E)}
+.v-ic-quota{background:linear-gradient(135deg,#C4A6A6,#BC8B8B)}
 .v-ic-new{background:var(--v-brand-grad);color:#fff}
 
 /* ── 對話串列表：專案分組色點 ── */
 .v-proj-dot{width:.5rem;height:.5rem;border-radius:9999px;flex-shrink:0}
 
 /* ── 協同模式按鈕：各自色彩 ── */
-.c-collab-btn[data-mode="auto_loop"]{--mode-c:#34D399}
-.c-collab-btn[data-mode="relay"]{--mode-c:#38BDF8}
-.c-collab-btn[data-mode="critique"]{--mode-c:#FB7185}
-.c-collab-btn[data-mode="parallel"]{--mode-c:#FBBF24}
-.c-collab-btn.m-btn-primary{background:color-mix(in srgb,var(--mode-c,#8B5CF6) 22%,transparent)!important;
-  color:var(--mode-c,#8B5CF6)!important;border:1px solid color-mix(in srgb,var(--mode-c,#8B5CF6) 55%,transparent)!important;
-  box-shadow:0 0 12px -4px color-mix(in srgb,var(--mode-c,#8B5CF6) 60%,transparent)}
-.c-collab-btn:not(.m-btn-primary):hover{border-color:color-mix(in srgb,var(--mode-c,#8B5CF6) 40%,transparent);color:var(--mode-c,#8B5CF6)}
+.c-collab-btn[data-mode="auto_loop"]{--mode-c:#8FA894}
+.c-collab-btn[data-mode="relay"]{--mode-c:#7C9BB5}
+.c-collab-btn[data-mode="critique"]{--mode-c:#BC8B8B}
+.c-collab-btn[data-mode="parallel"]{--mode-c:#C9A17E}
+.c-collab-btn.m-btn-primary{background:color-mix(in srgb,var(--mode-c,#7C9BB5) 22%,transparent)!important;
+  color:var(--mode-c,#7C9BB5)!important;border:1px solid color-mix(in srgb,var(--mode-c,#7C9BB5) 55%,transparent)!important;
+  box-shadow:0 0 12px -4px color-mix(in srgb,var(--mode-c,#7C9BB5) 60%,transparent)}
+.c-collab-btn:not(.m-btn-primary):hover{border-color:color-mix(in srgb,var(--mode-c,#7C9BB5) 40%,transparent);color:var(--mode-c,#7C9BB5)}
 
 /* ── 文檔類型徽章：依副檔名上色 ── */
 .v-doc-badge{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;
@@ -689,7 +690,7 @@ _VIVID_CSS: Final[str] = """
   background:var(--m-panel-2);overflow:hidden}
 .v-turn-docs-head{display:flex;align-items:center;gap:.4rem;padding:.4rem .65rem;
   font-size:.66rem;color:var(--m-faint);border-bottom:1px solid var(--m-line);
-  background:color-mix(in srgb,#8B5CF6 7%,transparent)}
+  background:color-mix(in srgb,#7C9BB5 8%,transparent)}
 .v-turn-doc-row{display:flex;align-items:center;gap:.5rem;padding:.42rem .65rem;
   border-bottom:1px solid var(--m-line);transition:background .15s}
 .v-turn-doc-row:last-child{border-bottom:0}
@@ -698,8 +699,8 @@ _VIVID_CSS: Final[str] = """
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .v-turn-doc-row .v-doc-size{font-family:monospace;font-size:.62rem;color:var(--m-faint);flex-shrink:0}
 .v-turn-doc-row .v-dl{flex-shrink:0;font-size:.64rem;font-weight:700;padding:.18rem .5rem;border-radius:.45rem;
-  background:rgba(52,211,153,.16);color:#34D399;border:1px solid rgba(52,211,153,.4);transition:all .15s}
-.v-turn-doc-row .v-dl:hover{background:#34D399;color:#16181D}
+  background:var(--m-sage-soft);color:var(--m-sage);border:1px solid rgba(143,168,148,.45);transition:all .15s}
+.v-turn-doc-row .v-dl:hover{background:#8FA894;color:#16181D}
 .v-turn-doc-row .v-pv{flex-shrink:0;font-size:.64rem;padding:.18rem .5rem;border-radius:.45rem;
   background:var(--m-faint-bg);color:var(--m-dim);border:1px solid var(--m-line);transition:all .15s}
 .v-turn-doc-row .v-pv:hover{color:var(--v-sky);border-color:rgba(56,189,248,.45)}
@@ -716,7 +717,7 @@ _VIVID_CSS: Final[str] = """
 /* ── 資料庫：對話串歸檔卡片 ── */
 .v-thread-card{border:1px solid var(--m-line);border-radius:.9rem;background:var(--m-panel-2);
   overflow:hidden;transition:border-color .15s}
-.v-thread-card:hover{border-color:color-mix(in srgb,#8B5CF6 35%,var(--m-line))}
+.v-thread-card:hover{border-color:color-mix(in srgb,#7C9BB5 40%,var(--m-line))}
 .v-thread-head{display:flex;align-items:center;gap:.6rem;padding:.6rem .8rem;cursor:pointer;user-select:none}
 .v-thread-head:hover{background:var(--m-faint-bg)}
 .v-thread-title{font-size:.76rem;font-weight:700;color:var(--m-bone);min-width:0;
@@ -764,7 +765,7 @@ _SIDEBAR: Final[str] = """
   <div class="shrink-0 px-3 pt-3 pb-2 space-y-1.5 border-b m-line">
     <button type="button" onclick="cNewTask()" id="c-new-task"
             class="v-nav v-on !border-0 justify-center !py-2 font-bold text-xs"
-            style="background:var(--v-brand-grad);color:#fff;box-shadow:0 6px 18px -6px rgba(139,92,246,.55)"
+            style="background:var(--v-brand-grad);color:#16181D;box-shadow:0 6px 18px -8px rgba(124,155,181,.7)"
             title="開始新對話">
       <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
       新工作任務
@@ -779,14 +780,14 @@ _SIDEBAR: Final[str] = """
     <button type="button" onclick="cOpenPage('agents')" id="nav-agents" data-nav="agents" class="tab-btn v-nav">
       <span class="v-nav-ic v-ic-agents"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="18" r="2"/><path d="M12 7v4m0 0-5 5m5-5 5 5" stroke-linecap="round"/></svg></span>
       <span class="text-xs font-semibold min-w-0">Agent 狀態</span>
-      <span class="text-[9px] font-mono px-1 py-0.5 rounded shrink-0" style="background:rgba(52,211,153,.15);color:var(--v-emerald)"><span id="c-fleet-count">7</span>/7</span>
+      <span class="text-[9px] font-mono px-1 py-0.5 rounded shrink-0" style="background:var(--m-sage-soft);color:var(--m-sage)"><span id="c-fleet-count">7</span>/7</span>
       <span class="v-nav-dot" style="background:var(--v-emerald)"></span>
     </button>
 
     <button type="button" onclick="cOpenPage('artifacts')" id="nav-artifacts" data-nav="artifacts" class="tab-btn v-nav">
       <span class="v-nav-ic v-ic-db"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"/></svg></span>
       <span class="text-xs font-semibold min-w-0">資料庫</span>
-      <span id="artifacts-badge" class="text-[9px] font-mono px-1 py-0.5 rounded shrink-0" style="background:rgba(251,191,36,.15);color:var(--v-amber)">--</span>
+      <span id="artifacts-badge" class="text-[9px] font-mono px-1 py-0.5 rounded shrink-0" style="background:var(--m-apricot-soft);color:var(--m-apricot)">--</span>
       <span class="v-nav-dot" style="background:var(--v-amber)"></span>
     </button>
 
@@ -863,7 +864,7 @@ _SIDEBAR: Final[str] = """
       <button type="button" onclick="cOpenPage('quotas')" class="hover:underline" style="color:var(--v-rose)">額度熔斷 →</button>
     </div>
     <div class="h-1.5 rounded-full overflow-hidden" style="background:var(--m-track)">
-      <div id="c-quota-bar" class="h-full rounded-full transition-all" style="width:94%;background:linear-gradient(90deg,#34D399,#38BDF8,#8B5CF6)"></div>
+      <div id="c-quota-bar" class="h-full rounded-full transition-all" style="width:94%;background:linear-gradient(90deg,#8FA894,#7C9BB5)"></div>
     </div>
     <div id="c-sidebar-quota-pills" class="grid grid-cols-2 gap-1 text-[10px] font-mono">
       <div class="px-2 py-1 rounded m-line flex items-center justify-between" style="background:var(--m-panel-2)">
@@ -1022,7 +1023,7 @@ const C_AGENT_COLORS = {
   minimax:     ['--m-apricot','#C9A17E'],
   opencode:    ['--m-rose',  '#BC8B8B'],
   khavis:      ['--m-butter','#D9C89E'],
-  'kavis-tencent': ['--m-butter', '#A78BFA']
+  'kavis-tencent': ['--m-lilac', '#A99AB5']
 };
 
 let cTasks = [];            // 任務卡片資料
@@ -1233,7 +1234,7 @@ function cOpenTurnDetail(id) {
         <div class="text-[13px] leading-relaxed" style="color:var(--m-bone)">${escapeHtml(t.prompt || '（未記錄）')}</div>
         <div class="flex items-center gap-1.5 flex-wrap mt-2.5">
           ${agents}
-          ${t.mode ? `<span class="c-conn-badge" style="background:rgba(139,92,246,.14);color:var(--v-violet)">${escapeHtml(t.mode)}</span>` : ''}
+          ${t.mode ? `<span class="c-conn-badge" style="background:var(--m-lilac-soft);color:var(--m-lilac)">${escapeHtml(t.mode)}</span>` : ''}
           ${t.project ? `<span class="c-conn-badge" style="background:var(--m-faint-bg);color:var(--m-dim)">${escapeHtml(t.project)}</span>` : ''}
           ${t.duration ? `<span class="c-conn-badge" style="background:var(--m-faint-bg);color:var(--m-dim)">${escapeHtml(t.duration)}</span>` : ''}
           <span class="c-conn-badge" style="background:var(--m-faint-bg);color:var(--m-dim)">${escapeHtml(cStatusMeta(t.status).label || t.status || '')}</span>
@@ -2784,7 +2785,7 @@ function cRenderDatabaseThreads() {
   const ungrouped = (cDbOverview.ungrouped || []).filter(matchFile);
   if (ungrouped.length) groups.push({ title: '📦 未歸檔文件（歷史紀錄找不到來源對話串）', project: '', at: '', files: ungrouped, muted: true });
 
-  const projDots = ['#8B5CF6','#38BDF8','#34D399','#FBBF24','#FB7185','#22D3EE'];
+  const projDots = ['#A99AB5','#7C9BB5','#8FA894','#C9A17E','#BC8B8B','#9FB3C4'];
   let dotIdx = 0;
   host.innerHTML = groups.map(g => {
     const dot = g.muted ? '#64748B' : projDots[dotIdx++ % projDots.length];
