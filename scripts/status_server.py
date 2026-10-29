@@ -745,6 +745,7 @@ class Handler(BaseHTTPRequestHandler):
             "/api/workbench/artifacts",
             "/api/workbench/artifacts/read",
             "/api/workbench/artifacts/download",
+            "/api/workbench/database",
             "/api/workbench/agents",
             "/api/workbench/models",
             "/api/workbench/workspace",
@@ -938,6 +939,16 @@ class Handler(BaseHTTPRequestHandler):
             from web.workbench import list_deliverable_artifacts  # noqa: PLC0415
 
             payload = {"ok": True, "artifacts": list_deliverable_artifacts()}
+            self._send(
+                200,
+                json.dumps(payload, ensure_ascii=False).encode(),
+                "application/json; charset=utf-8",
+            )
+            return
+        if path == "/api/workbench/database":
+            from web.workbench import get_database_overview  # noqa: PLC0415
+
+            payload = {"ok": True, **get_database_overview()}
             self._send(
                 200,
                 json.dumps(payload, ensure_ascii=False).encode(),

@@ -1078,6 +1078,121 @@ def _tencent_kavis_probe_cached() -> dict[str, Any]:
     return probe
 
 
+_FILE_EXT_ICON: dict[str, tuple[str, str]] = {
+    ".docx": ("fa-file-word", "DOCX"),
+    ".pdf": ("fa-file-pdf", "PDF"),
+    ".md": ("fa-file-alt", "MD"),
+    ".pptx": ("fa-file-powerpoint", "PPTX"),
+    ".xlsx": ("fa-file-excel", "XLSX"),
+    ".csv": ("fa-file-csv", "CSV"),
+    ".html": ("fa-file-code", "HTML"),
+    ".txt": ("fa-file-lines", "TXT"),
+    ".zip": ("fa-file-archive", "ZIP"),
+    ".json": ("fa-file-code", "JSON"),
+    ".py": ("fa-file-code", "PY"),
+}
+
+
+def _artifact_file_meta(entry: dict[str, Any]) -> dict[str, Any]:
+    """補齊單一產出檔案的呈現欄位（badge/icon/名稱/下載路徑）。"""
+    rel = str(entry.get("path") or "").strip()
+    full = str(entry.get("full_path") or "").strip() or rel
+    ext = Path(rel).suffix.lower()
+    icon, badge = _FILE_EXT_ICON.get(ext, ("fa-file", ext.lstrip(".").upper() or "FILE"))
+    name = Path(rel).name or rel
+    return {
+        "name": name,
+        "path": rel,
+        "full_path": full,
+        "status": str(entry.get("status") or "A"),
+        "size": str(entry.get("size") or ""),
+        "mtime": str(entry.get("mtime") or ""),
+        "icon": icon,
+        "badge": badge,
+    }
+
+
+def get_database_overview(history_items: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    """彙整資料庫總覽：產出文件按「對話串主題」歸檔，其餘為未歸檔。
+
+    資料來源：bot_history 紀錄的 output_files（每輪實際產出）。
+    同一檔案若多輪重複出現，歸到最新的對話串；歷史紀錄找不到的
+    交付檔案落入 ``ungrouped``（依 list_deliverable_artifacts 掃描）。
+    """
+    if history_items is None:
+        from bot import history as bot_history  # noqa: PLC0415
+
+        history_items = bot_history.tail(400)
+
+    threads: dict[str, dict[str, Any]] = {}
+    claimed: set[str] = set()
+
+    # 最新輪優先處理：同一檔案多輪重複出現時歸給「最新」的對話串
+    ordered = sorted(
+        (i for i in history_items if isinstance(i, dict)),
+        key=lambda i: float(i.get("ts") or 0.0),
+        reverse=True,
+    )
+
+    for item in ordered:
+        if not isinstance(item, dict):
+            continue
+        raw_files = item.get("output_files")
+        if not isinstance(raw_files, list) or not raw_files:
+            continue
+        thread_id = str(item.get("thread") or "").strip()
+        ts = float(item.get("ts") or 0.0)
+        prompt = str(item.get("prompt") or "").strip().replace("\n", " ")
+        title = (prompt[:48] + "…") if len(prompt) > 48 else (prompt or "（無標題任務）")
+        project = str(item.get("project") or "shared-app")
+        dispatched = str(item.get("dispatched_at") or "")
+        key = thread_id or f"t-{int(ts * 1000) if ts else len(threads)}"
+        entry = threads.setdefault(
+            key,
+            {
+                "thread": key,
+                "title": title,
+                "project": project,
+                "dispatched_at": dispatched,
+                "ts": ts,
+                "count": 0,
+                "files": [],
+            },
+        )
+        entry["ts"] = max(float(entry.get("ts") or 0.0), ts)
+        for raw in raw_files:
+            e = raw if isinstance(raw, dict) else {"path": str(raw)}
+            rel = str(e.get("path") or "").strip()
+            if not rel or rel in claimed:
+                continue
+            claimed.add(rel)
+            meta = _artifact_file_meta(e)
+            # full_path 可能不存在（舊紀錄只有相對路徑）——嘗試用工作區解析
+            if meta["full_path"] == rel or not Path(meta["full_path"]).is_absolute():
+                resolved = resolve_downloadable_artifact(rel)
+                if resolved is not None:
+                    meta["full_path"] = str(resolved)
+            entry["files"].append(meta)
+            entry["count"] += 1
+
+    thread_list = [threads[k] for k in sorted(threads, key=lambda k: threads[k]["ts"], reverse=True)]
+
+    ungrouped: list[dict[str, Any]] = []
+    for art in list_deliverable_artifacts():
+        rel = str(art.get("path") or "")
+        if rel in claimed:
+            continue
+        meta = _artifact_file_meta({**art, "path": rel, "full_path": art.get("full_path") or rel})
+        meta["project"] = str(art.get("project") or "")
+        ungrouped.append(meta)
+
+    return {
+        "threads": thread_list,
+        "ungrouped": ungrouped,
+        "total": sum(t["count"] for t in thread_list) + len(ungrouped),
+    }
+
+
 _OUTPUT_DOC_PRIORITY: dict[str, int] = {
     ".docx": 1,
     ".pdf": 2,

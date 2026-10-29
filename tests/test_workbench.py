@@ -286,6 +286,16 @@ def test_status_server_workbench_endpoints(monkeypatch) -> None:
     assert "cFetchProviderModels" in wb_body
     assert "/api/workbench/provider_models" in wb_body
     assert 'id="c-prov-models"' not in wb_body
+    # 全頁視圖（如外掛市集頁）：Agent/資料庫/額度/執行明細都以獨立頁呈現
+    assert 'id="c-fullpage"' in wb_body
+    assert 'id="c-fullpage-content"' in wb_body
+    assert "cOpenTurnDetail" in wb_body
+    assert "cCloseFullpage" in wb_body
+    # 繽紛色彩層與 FeiBo 式側欄導航
+    assert "v-nav" in wb_body
+    assert "v-brand-grad" in wb_body
+    assert "新工作任務" in wb_body
+    assert 'id="c-db-thread-groups"' in wb_body
 
     # 1a. Agent 狀態與資料庫必須可直接深連結開啟，不能只依賴 SPA 歷史狀態。
     for deep_link in ("/agents", "/database"):
@@ -526,6 +536,72 @@ def test_provider_models_endpoint(monkeypatch) -> None:
     data = json.loads(h_ok.responses[0][1].decode("utf-8"))
     assert data["ok"] is True
     assert data["models"] == ["m1", "m2"]
+
+
+def test_get_database_overview_groups_by_thread() -> None:
+    """資料庫依對話串主題歸檔：同檔多輪歸最新串、找不到來源的落入未歸檔。"""
+    from web.workbench import get_database_overview
+
+    history_items = [
+        {
+            "thread": "t-old",
+            "prompt": "舊對話：產出報告初稿",
+            "project": "proj-a",
+            "ts": 1000.0,
+            "dispatched_at": "2026-10-29 10:00:00",
+            "output_files": [{"path": "docs/report.md", "full_path": "/ws/docs/report.md", "status": "A", "size": "1 KB"}],
+        },
+        {
+            "thread": "t-new",
+            "prompt": "新對話：修正報告並補充 PDF 版本\n第二行",
+            "project": "proj-a",
+            "ts": 2000.0,
+            "dispatched_at": "2026-10-29 11:00:00",
+            "output_files": [
+                {"path": "docs/report.md", "full_path": "/ws/docs/report.md", "status": "M", "size": "2 KB"},
+                {"path": "docs/report.pdf", "full_path": "/ws/docs/report.pdf", "status": "A", "size": "300 KB"},
+            ],
+        },
+    ]
+    res = get_database_overview(history_items=history_items)
+
+    # 兩個對話串，t-new 在前（依 ts 排序）
+    assert [t["thread"] for t in res["threads"]] == ["t-new", "t-old"]
+    t_new = res["threads"][0]
+    # 同檔多輪只歸最新串
+    assert [f["path"] for f in t_new["files"]] == ["docs/report.md", "docs/report.pdf"]
+    assert t_new["count"] == 2
+    # 標題取 prompt 摘要且不含換行
+    assert "\n" not in t_new["title"]
+    # badge 依副檔名
+    badges = {f["path"]: f["badge"] for f in t_new["files"]}
+    assert badges["docs/report.md"] == "MD"
+    assert badges["docs/report.pdf"] == "PDF"
+
+    # 歷史紀錄沒有 output_files 時，thread 不應出現
+    empty = get_database_overview(history_items=[{"thread": "t-x", "prompt": "沒有產出", "ts": 5.0}])
+    assert all(t["thread"] != "t-x" for t in empty["threads"])
+
+
+def test_database_endpoint(monkeypatch) -> None:
+    monkeypatch.setattr(
+        _wb_module,
+        "get_database_overview",
+        lambda: {
+            "threads": [{"thread": "t1", "title": "T", "project": "p", "dispatched_at": "", "ts": 1.0, "count": 1,
+                         "files": [{"name": "a.md", "path": "a.md", "full_path": "/ws/a.md", "status": "A",
+                                    "size": "", "mtime": "", "icon": "fa-file-alt", "badge": "MD"}]}],
+            "ungrouped": [],
+            "total": 1,
+        },
+    )
+    h = DummyStatusHandler("/api/workbench/database")
+    h.do_GET()
+    assert h.responses[0][0] == 200
+    data = json.loads(h.responses[0][1].decode("utf-8"))
+    assert data["ok"] is True
+    assert data["total"] == 1
+    assert data["threads"][0]["thread"] == "t1"
 
 
 def test_fleet_has_kavis_rename_and_tencent_node() -> None:

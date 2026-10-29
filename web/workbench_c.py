@@ -609,66 +609,222 @@ html:not(.dark) .c-menu-item:hover{background:rgba(27,35,48,.05)}
 html:not(.dark) .c-foot-chip:hover{background:rgba(27,35,48,.05)}
 """
 
+# ══════════════════════════════════════════════════════════════════════
+# VIVID LAYER — 繽紛色彩層：在莫蘭迪基底上加入高彩度功能色
+# 導航 / 協同模式 / 文檔類型 / 對話串歸檔 / 全頁視圖 各有專屬色相
+# ══════════════════════════════════════════════════════════════════════
+_VIVID_CSS: Final[str] = """
+:root{
+  --v-violet:#8B5CF6; --v-sky:#38BDF8; --v-emerald:#34D399; --v-amber:#FBBF24;
+  --v-rose:#FB7185; --v-cyan:#22D3EE; --v-blue:#60A5FA; --v-orange:#FB923C;
+  --v-brand-grad:linear-gradient(135deg,#8B5CF6 0%,#3B82F6 52%,#22D3EE 100%);
+  --v-doc-docx:#60A5FA; --v-doc-pdf:#FB7185; --v-doc-md:#34D399; --v-doc-xlsx:#4ADE80;
+  --v-doc-pptx:#FB923C; --v-doc-zip:#A78BFA; --v-doc-html:#FBBF24; --v-doc-default:#94A3B8;
+}
+
+/* ── 品牌漸層 logo ── */
+.v-brand-mark{
+  background:var(--v-brand-grad);
+  box-shadow:0 4px 14px -4px rgba(139,92,246,.55),0 2px 6px -2px rgba(34,211,238,.35);
+}
+.v-brand-name{
+  background:var(--v-brand-grad);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+
+/* ── 側欄導航：每項專屬色相 ── */
+.v-nav{position:relative;display:flex;align-items:center;gap:.625rem;width:100%;
+  padding:.5rem .625rem;border-radius:.65rem;border:1px solid transparent;
+  color:var(--m-dim);transition:all .18s ease;text-align:left}
+.v-nav:hover{background:var(--m-faint-bg);color:var(--m-bone)}
+.v-nav.v-on{color:var(--m-bone);background:var(--m-faint-bg);border-color:var(--m-line)}
+.v-nav .v-nav-ic{width:1.9rem;height:1.9rem;border-radius:.55rem;display:grid;place-items:center;flex-shrink:0;
+  color:#16181D;font-size:.72rem}
+.v-nav.v-on .v-nav-ic{box-shadow:0 3px 10px -3px currentColor}
+.v-nav .v-nav-dot{margin-left:auto;width:.4rem;height:.4rem;border-radius:9999px;opacity:0;transition:opacity .18s}
+.v-nav.v-on .v-nav-dot{opacity:1}
+.v-ic-command{background:linear-gradient(135deg,#38BDF8,#818CF8)}
+.v-ic-agents{background:linear-gradient(135deg,#34D399,#22D3EE)}
+.v-ic-db{background:linear-gradient(135deg,#FBBF24,#FB923C)}
+.v-ic-quota{background:linear-gradient(135deg,#FB7185,#E879F9)}
+.v-ic-new{background:var(--v-brand-grad);color:#fff}
+
+/* ── 對話串列表：專案分組色點 ── */
+.v-proj-dot{width:.5rem;height:.5rem;border-radius:9999px;flex-shrink:0}
+
+/* ── 協同模式按鈕：各自色彩 ── */
+.c-collab-btn[data-mode="auto_loop"]{--mode-c:#34D399}
+.c-collab-btn[data-mode="relay"]{--mode-c:#38BDF8}
+.c-collab-btn[data-mode="critique"]{--mode-c:#FB7185}
+.c-collab-btn[data-mode="parallel"]{--mode-c:#FBBF24}
+.c-collab-btn.m-btn-primary{background:color-mix(in srgb,var(--mode-c,#8B5CF6) 22%,transparent)!important;
+  color:var(--mode-c,#8B5CF6)!important;border:1px solid color-mix(in srgb,var(--mode-c,#8B5CF6) 55%,transparent)!important;
+  box-shadow:0 0 12px -4px color-mix(in srgb,var(--mode-c,#8B5CF6) 60%,transparent)}
+.c-collab-btn:not(.m-btn-primary):hover{border-color:color-mix(in srgb,var(--mode-c,#8B5CF6) 40%,transparent);color:var(--mode-c,#8B5CF6)}
+
+/* ── 文檔類型徽章：依副檔名上色 ── */
+.v-doc-badge{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;
+  min-width:2.6rem;padding:.1rem .4rem;border-radius:.4rem;font-family:'JetBrains Mono',ui-monospace,monospace;
+  font-size:.6rem;font-weight:800;letter-spacing:.04em;color:#16181D}
+.v-doc-badge[data-ext="DOCX"]{background:var(--v-doc-docx)} .v-doc-badge[data-ext="PDF"]{background:var(--v-doc-pdf)}
+.v-doc-badge[data-ext="MD"]{background:var(--v-doc-md)}   .v-doc-badge[data-ext="XLSX"]{background:var(--v-doc-xlsx)}
+.v-doc-badge[data-ext="CSV"]{background:var(--v-doc-xlsx)} .v-doc-badge[data-ext="PPTX"]{background:var(--v-doc-pptx)}
+.v-doc-badge[data-ext="ZIP"]{background:var(--v-doc-zip)}  .v-doc-badge[data-ext="HTML"]{background:var(--v-doc-html)}
+.v-doc-badge[data-ext="PY"]{background:var(--v-doc-html)}  .v-doc-badge[data-ext="JSON"]{background:var(--v-doc-html)}
+.v-doc-badge:not([data-ext]){background:var(--v-doc-default)}
+.v-doc-badge[data-ext=""]:not([data-ext="DOCX"]):not([data-ext="PDF"]){background:var(--v-doc-default)}
+
+/* ── 對話串內：本輪產出文檔（內聯清單，如附圖 1 樣式） ── */
+.v-turn-docs{margin-top:.5rem;border:1px solid var(--m-line);border-radius:.7rem;
+  background:var(--m-panel-2);overflow:hidden}
+.v-turn-docs-head{display:flex;align-items:center;gap:.4rem;padding:.4rem .65rem;
+  font-size:.66rem;color:var(--m-faint);border-bottom:1px solid var(--m-line);
+  background:color-mix(in srgb,#8B5CF6 7%,transparent)}
+.v-turn-doc-row{display:flex;align-items:center;gap:.5rem;padding:.42rem .65rem;
+  border-bottom:1px solid var(--m-line);transition:background .15s}
+.v-turn-doc-row:last-child{border-bottom:0}
+.v-turn-doc-row:hover{background:var(--m-faint-bg)}
+.v-turn-doc-row .v-doc-name{flex:1;min-width:0;font-size:.72rem;color:var(--m-bone);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.v-turn-doc-row .v-doc-size{font-family:monospace;font-size:.62rem;color:var(--m-faint);flex-shrink:0}
+.v-turn-doc-row .v-dl{flex-shrink:0;font-size:.64rem;font-weight:700;padding:.18rem .5rem;border-radius:.45rem;
+  background:rgba(52,211,153,.16);color:#34D399;border:1px solid rgba(52,211,153,.4);transition:all .15s}
+.v-turn-doc-row .v-dl:hover{background:#34D399;color:#16181D}
+.v-turn-doc-row .v-pv{flex-shrink:0;font-size:.64rem;padding:.18rem .5rem;border-radius:.45rem;
+  background:var(--m-faint-bg);color:var(--m-dim);border:1px solid var(--m-line);transition:all .15s}
+.v-turn-doc-row .v-pv:hover{color:var(--v-sky);border-color:rgba(56,189,248,.45)}
+
+/* ── 全頁視圖（Agent / 資料庫 / 額度 / 執行明細） ── */
+#c-fullpage{z-index:46}
+#c-fullpage .v-fp-head{border-bottom:1px solid var(--m-line);
+  background:color-mix(in srgb,#16181D 88%,transparent);backdrop-filter:blur(14px)}
+.v-fp-tab{padding:.35rem .8rem;border-radius:.6rem;font-size:.72rem;font-weight:600;
+  color:var(--m-dim);border:1px solid transparent;transition:all .15s}
+.v-fp-tab:hover{color:var(--m-bone);background:var(--m-faint-bg)}
+.v-fp-tab.v-on{color:var(--m-bone);background:var(--m-faint-bg);border-color:var(--m-line)}
+
+/* ── 資料庫：對話串歸檔卡片 ── */
+.v-thread-card{border:1px solid var(--m-line);border-radius:.9rem;background:var(--m-panel-2);
+  overflow:hidden;transition:border-color .15s}
+.v-thread-card:hover{border-color:color-mix(in srgb,#8B5CF6 35%,var(--m-line))}
+.v-thread-head{display:flex;align-items:center;gap:.6rem;padding:.6rem .8rem;cursor:pointer;user-select:none}
+.v-thread-head:hover{background:var(--m-faint-bg)}
+.v-thread-title{font-size:.76rem;font-weight:700;color:var(--m-bone);min-width:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.v-thread-meta{font-family:monospace;font-size:.62rem;color:var(--m-faint);flex-shrink:0}
+.v-thread-body{border-top:1px solid var(--m-line)}
+
+/* ── 執行明細頁 ── */
+.v-detail-sec{border:1px solid var(--m-line);border-radius:.8rem;background:var(--m-panel-2);padding:.8rem .9rem}
+.v-detail-sec h4{font-size:.7rem;font-weight:800;letter-spacing:.05em;color:var(--m-faint);
+  text-transform:uppercase;margin-bottom:.5rem;display:flex;align-items:center;gap:.4rem}
+.v-detail-pre{white-space:pre-wrap;word-break:break-word;font-size:.74rem;line-height:1.65;color:var(--m-dim);
+  max-height:26rem;overflow-y:auto}
+
+html:not(.dark) .v-turn-docs{background:rgba(255,255,255,.6)}
+html:not(.dark) .v-thread-card{background:rgba(255,255,255,.65)}
+html:not(.dark) .v-nav{color:#5A6472}
+html:not(.dark) .v-nav.v-on{color:#1F2430}
+"""
+
 
 # ── 新版外層版面 ───────────────────────────────────────────────────────────
 
 _SIDEBAR: Final[str] = """
-<aside id="c-sidebar" class="w-[284px] xl:w-[300px] shrink-0 bg-ink-800/85 backdrop-blur border-r m-line flex flex-col h-full">
+<aside id="c-sidebar" class="w-[280px] xl:w-[296px] shrink-0 bg-ink-800/85 backdrop-blur border-r m-line flex flex-col h-full">
 
-  <!-- ═══════════════════════════════════════════════════════════════
-       左上區塊 1：歷史談話 (History Conversations)
-       ═══════════════════════════════════════════════════════════════ -->
-  <div class="flex-1 min-h-0 flex flex-col border-b m-line">
-    <div class="c-zone-header">
-      <div class="w-6 h-6 rounded-md grid place-items-center text-[10px] font-black shrink-0"
-           style="background:linear-gradient(135deg,#7C9BB5,#8FA894);color:#16181D">K</div>
+  <!-- ═══ 品牌列：K.A.V.I.S. 漸層識別 + 節點狀態 ═══ -->
+  <div class="shrink-0 px-3 pt-3 pb-2 flex items-center gap-2.5 border-b m-line">
+    <div class="v-brand-mark w-9 h-9 rounded-xl grid place-items-center text-sm font-black shrink-0" style="color:#fff">K</div>
+    <div class="min-w-0 flex-1">
+      <div class="v-brand-name text-base font-black tracking-tight leading-none">K.A.V.I.S.</div>
+      <div class="text-[10px] mt-0.5 flex items-center gap-1" style="color:var(--m-faint)">
+        <span class="w-1.5 h-1.5 rounded-full m-live" style="background:var(--v-emerald)"></span>智慧工作台 · 節點在線
+      </div>
+    </div>
+    <button type="button" onclick="toggleTheme()" class="w-7 h-7 rounded-lg m-btn-ghost grid place-items-center transition shrink-0" title="切換深淺色主題">
+      <i id="theme-icon" class="fas fa-sun text-[11px]" style="color:var(--v-amber)"></i>
+    </button>
+    <button type="button" onclick="cToggleSidebar(false)" id="c-sidebar-close" class="w-7 h-7 rounded-lg m-btn-ghost grid place-items-center shrink-0 xl:hidden" aria-label="關閉側欄">
+      <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+
+  <!-- ═══ 主操作：新工作任務 + 功能導航（繽紛色相） ═══ -->
+  <div class="shrink-0 px-3 pt-3 pb-2 space-y-1.5 border-b m-line">
+    <button type="button" onclick="cNewTask()" id="c-new-task"
+            class="v-nav v-on !border-0 justify-center !py-2 font-bold text-xs"
+            style="background:var(--v-brand-grad);color:#fff;box-shadow:0 6px 18px -6px rgba(139,92,246,.55)"
+            title="開始新對話">
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
+      新工作任務
+    </button>
+
+    <button type="button" onclick="cOpenPage('command')" data-nav="command" class="tab-btn v-nav">
+      <span class="v-nav-ic v-ic-command"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke-linejoin="round"/></svg></span>
+      <span class="text-xs font-semibold">對話串</span>
+      <span class="v-nav-dot" style="background:var(--v-sky)"></span>
+    </button>
+
+    <button type="button" onclick="cOpenPage('agents')" id="nav-agents" data-nav="agents" class="tab-btn v-nav">
+      <span class="v-nav-ic v-ic-agents"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="18" r="2"/><path d="M12 7v4m0 0-5 5m5-5 5 5" stroke-linecap="round"/></svg></span>
+      <span class="text-xs font-semibold min-w-0">Agent 狀態</span>
+      <span class="text-[9px] font-mono px-1 py-0.5 rounded shrink-0" style="background:rgba(52,211,153,.15);color:var(--v-emerald)"><span id="c-fleet-count">7</span>/7</span>
+      <span class="v-nav-dot" style="background:var(--v-emerald)"></span>
+    </button>
+
+    <button type="button" onclick="cOpenPage('artifacts')" id="nav-artifacts" data-nav="artifacts" class="tab-btn v-nav">
+      <span class="v-nav-ic v-ic-db"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"/></svg></span>
+      <span class="text-xs font-semibold min-w-0">資料庫</span>
+      <span id="artifacts-badge" class="text-[9px] font-mono px-1 py-0.5 rounded shrink-0" style="background:rgba(251,191,36,.15);color:var(--v-amber)">--</span>
+      <span class="v-nav-dot" style="background:var(--v-amber)"></span>
+    </button>
+
+    <button type="button" onclick="cOpenPage('quotas')" id="nav-quotas" data-nav="quotas" class="tab-btn v-nav">
+      <span class="v-nav-ic v-ic-quota"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      <span class="text-xs font-semibold min-w-0">額度、設定</span>
+      <span class="text-[9px] font-mono shrink-0" style="color:var(--v-emerald)" id="c-quota-pct">額度 95%</span>
+      <span class="v-nav-dot" style="background:var(--v-rose)"></span>
+    </button>
+  </div>
+
+  <!-- ═══ 歷史談話：依專案分組的對話串清單 ═══ -->
+  <div class="flex-1 min-h-0 flex flex-col">
+    <div class="px-3 pt-2.5 pb-1 flex items-center gap-1.5 shrink-0">
       <span class="c-zone-title">歷史談話</span>
       <span class="c-zone-tag">HISTORY</span>
       <div class="flex-1"></div>
-      <button type="button" onclick="cNewTask()" id="c-new-task"
-              class="px-2.5 py-1 rounded-md m-btn-primary text-[11px] font-bold transition inline-flex items-center gap-1 shrink-0"
-              title="開始新對話">
-        <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
-        新對話
-      </button>
-      <button type="button" onclick="cToggleSidebar(false)" id="c-sidebar-close" class="w-6 h-6 rounded-md m-btn-ghost grid place-items-center shrink-0"
-              aria-label="關閉側欄">
-        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg>
+      <button type="button" onclick="cToggleSearch()" id="c-search-btn"
+              class="w-6 h-6 shrink-0 rounded-lg m-btn-ghost grid place-items-center transition" title="搜尋歷史談話" aria-label="搜尋歷史談話">
+        <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="m20 20-3.5-3.5" stroke-linecap="round"/></svg>
       </button>
     </div>
 
-    <div class="px-2.5 pt-2 pb-1.5 space-y-1.5 shrink-0">
-      <!-- 檢視切換：時間線 / 專案 / 執行電腦 / 協同模式 / 狀態 + 搜尋 -->
+    <div class="px-3 pb-1.5 space-y-1.5 shrink-0">
       <div class="relative">
-        <div class="flex items-center gap-1.5">
-          <button type="button" onclick="cToggleViewMenu()" id="c-view-btn"
-                  class="flex-1 min-w-0 flex items-center gap-1.5 px-2 py-1 rounded-lg m-btn-ghost text-[11px] transition"
-                  aria-haspopup="menu" aria-expanded="false">
-            <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h6" stroke-linecap="round"/></svg>
-            <span class="truncate" id="c-view-label">時間線</span>
-            <svg class="ml-auto shrink-0" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
-          <button type="button" onclick="cToggleSearch()" id="c-search-btn"
-                  class="w-7 h-7 shrink-0 rounded-lg m-btn-ghost grid place-items-center transition" title="搜尋歷史談話" aria-label="搜尋歷史談話">
-            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="m20 20-3.5-3.5" stroke-linecap="round"/></svg>
-          </button>
-        </div>
+        <button type="button" onclick="cToggleViewMenu()" id="c-view-btn"
+                class="flex-1 min-w-0 flex items-center gap-1.5 px-2 py-1 rounded-lg m-btn-ghost text-[11px] transition w-full"
+                aria-haspopup="menu" aria-expanded="false">
+          <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h6" stroke-linecap="round"/></svg>
+          <span class="truncate" id="c-view-label">時間線</span>
+          <svg class="ml-auto shrink-0" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
 
         <div id="c-view-menu" class="c-menu hidden" role="menu" aria-label="檢視方式">
           <button type="button" class="c-menu-item c-on" data-view="timeline" onclick="cSetView('timeline')" role="menuitem">
-            <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:var(--m-mist)"></span>時間線<span class="ml-auto text-[10px] opacity-70">依日期</span>
+            <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:var(--v-sky)"></span>時間線<span class="ml-auto text-[10px] opacity-70">依日期</span>
           </button>
           <button type="button" class="c-menu-item" data-view="project" onclick="cSetView('project')" role="menuitem">
-            <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:var(--m-sage)"></span>依專案<span class="ml-auto text-[10px] opacity-70">分組</span>
+            <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:var(--v-emerald)"></span>依專案<span class="ml-auto text-[10px] opacity-70">分組</span>
           </button>
           <button type="button" class="c-menu-item" data-view="backend" onclick="cSetView('backend')" role="menuitem">
-            <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:var(--m-lilac)"></span>依執行電腦<span class="ml-auto text-[10px] opacity-70">分組</span>
+            <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:var(--v-violet)"></span>依執行電腦<span class="ml-auto text-[10px] opacity-70">分組</span>
           </button>
           <button type="button" class="c-menu-item" data-view="mode" onclick="cSetView('mode')" role="menuitem">
-            <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:var(--m-apricot)"></span>依協同模式<span class="ml-auto text-[10px] opacity-70">分組</span>
+            <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:var(--v-amber)"></span>依協同模式<span class="ml-auto text-[10px] opacity-70">分組</span>
           </button>
           <button type="button" class="c-menu-item" data-view="status" onclick="cSetView('status')" role="menuitem">
-            <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:var(--m-rose)"></span>依狀態<span class="ml-auto text-[10px] opacity-70">分組</span>
+            <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:var(--v-rose)"></span>依狀態<span class="ml-auto text-[10px] opacity-70">分組</span>
           </button>
         </div>
       </div>
@@ -687,99 +843,35 @@ _SIDEBAR: Final[str] = """
       </div>
     </div>
 
-    <!-- 歷史談話清單 -->
     <div id="c-item-list" class="flex-1 overflow-y-auto m-scroll px-2 pb-2 text-xs"></div>
   </div>
 
-  <!-- ═══════════════════════════════════════════════════════════════
-       左中區塊 2：獨立頁面快捷入口 (首頁僅顯示按鈕，點擊進入獨立頁面)
-       ═══════════════════════════════════════════════════════════════ -->
-  <div class="shrink-0 p-2.5 space-y-2 border-b m-line" style="background:var(--m-panel-2)">
-    <div class="flex items-center justify-between px-1">
-      <span class="m-section-label">獨立功能專頁</span>
-      <span class="text-[10px] font-mono" style="color:var(--m-faint)">點擊開啟全頁管理</span>
+  <!-- ═══ 底部：額度水位 + 快捷 ═══ -->
+  <div class="shrink-0 border-t m-line px-3 py-2 space-y-1.5" style="background:var(--m-panel-2)">
+    <div class="flex items-center justify-between text-[10px] font-mono" style="color:var(--m-faint)">
+      <span>額度水位</span>
+      <button type="button" onclick="cOpenPage('quotas')" class="hover:underline" style="color:var(--v-rose)">額度熔斷 →</button>
     </div>
-
-    <button type="button" onclick="cOpenPage('agents')" id="nav-agents"
-            class="tab-btn w-full p-2.5 rounded-xl m-line frost hover:border-sky-400/50 transition flex items-center justify-between gap-2 text-left group">
-      <div class="flex items-center gap-2.5 min-w-0">
-        <div class="w-8 h-8 rounded-lg grid place-items-center shrink-0" style="background:var(--m-sage-soft);color:var(--m-sage)">
-          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="18" r="2"/><path d="M12 7v4m0 0-5 5m5-5 5 5" stroke-linecap="round"/></svg>
-        </div>
-        <div class="min-w-0">
-          <div class="text-xs font-bold flex items-center gap-1.5" style="color:var(--m-bone)">
-            <span>Agent 狀態</span>
-            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded" style="background:var(--m-sage-soft);color:var(--m-sage)"><span id="c-fleet-count">7</span>/7 在線</span>
-          </div>
-          <div class="text-[10px] truncate mt-0.5" style="color:var(--m-faint)">模型新增/刪除/異動 · 新增服務商</div>
-        </div>
+    <div class="h-1.5 rounded-full overflow-hidden" style="background:var(--m-track)">
+      <div id="c-quota-bar" class="h-full rounded-full transition-all" style="width:94%;background:linear-gradient(90deg,#34D399,#38BDF8,#8B5CF6)"></div>
+    </div>
+    <div id="c-sidebar-quota-pills" class="grid grid-cols-2 gap-1 text-[10px] font-mono">
+      <div class="px-2 py-1 rounded m-line flex items-center justify-between" style="background:var(--m-panel-2)">
+        <span style="color:var(--m-dim)">MiniMax</span><span style="color:var(--v-emerald)">95%</span>
       </div>
-      <span class="text-xs font-mono shrink-0 group-hover:translate-x-0.5 transition" style="color:var(--m-mist)">進入 ↗</span>
+      <div class="px-2 py-1 rounded m-line flex items-center justify-between" style="background:var(--m-panel-2)">
+        <span style="color:var(--m-dim)">GLM-5.3</span><span style="color:var(--v-sky)">92%</span>
+      </div>
+      <div class="px-2 py-1 rounded m-line flex items-center justify-between" style="background:var(--m-panel-2)">
+        <span style="color:var(--m-dim)">GPT GO</span><span style="color:var(--v-violet)">90%</span>
+      </div>
+      <div class="px-2 py-1 rounded m-line flex items-center justify-between" style="background:var(--m-panel-2)">
+        <span style="color:var(--m-dim)">AGY Pro</span><span style="color:var(--v-amber)">98%</span>
+      </div>
+    </div>
+    <button type="button" onclick="cOpenPage('agents')" id="nav-wizard" class="tab-btn w-full px-2 py-1.5 rounded-lg m-btn-ghost text-[11px] font-medium transition text-center">
+      模型與服務商設定
     </button>
-
-    <button type="button" onclick="cOpenPage('artifacts')" id="nav-artifacts"
-            class="tab-btn w-full p-2.5 rounded-xl m-line frost hover:border-sky-400/50 transition flex items-center justify-between gap-2 text-left group">
-      <div class="flex items-center gap-2.5 min-w-0">
-        <div class="w-8 h-8 rounded-lg grid place-items-center shrink-0" style="background:var(--m-mist-soft);color:var(--m-mist)">
-          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"/></svg>
-        </div>
-        <div class="min-w-0">
-          <div class="text-xs font-bold flex items-center gap-1.5" style="color:var(--m-bone)">
-            <span>資料庫</span>
-            <span id="artifacts-badge" class="text-[10px] font-mono px-1.5 py-0.5 rounded" style="background:var(--m-mist-soft);color:var(--m-mist)">--</span>
-          </div>
-          <div class="text-[10px] truncate mt-0.5" style="color:var(--m-faint)">檢視、搜尋與預覽所有交付產物文件</div>
-        </div>
-      </div>
-      <span class="text-xs font-mono shrink-0 group-hover:translate-x-0.5 transition" style="color:var(--m-mist)">進入 ↗</span>
-    </button>
-  </div>
-
-  <!-- ═══════════════════════════════════════════════════════════════
-       左下區塊 3：額度、設定 (Quota & Settings)
-       ═══════════════════════════════════════════════════════════════ -->
-  <div class="shrink-0 flex flex-col">
-    <div class="c-zone-header">
-      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" style="color:var(--m-apricot)" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v2m0 14v2M3 12h2m14 0h2m-2.93-6.07-1.41 1.41M7.34 16.66l-1.41 1.41m0-11.31 1.41 1.41m9.32 9.32 1.41 1.41" stroke-linecap="round"/></svg>
-      <span class="c-zone-title">額度、設定</span>
-      <span class="ml-auto font-mono text-[10px]" style="color:var(--m-sage)" id="c-quota-pct">額度 95%</span>
-      <button type="button" onclick="toggleTheme()" class="w-6 h-6 rounded-md m-btn-ghost grid place-items-center transition shrink-0" title="切換深淺色主題">
-        <i id="theme-icon" class="fas fa-sun text-[11px]" style="color:var(--m-apricot)"></i>
-      </button>
-    </div>
-
-    <div class="p-2.5 space-y-2">
-      <div class="h-1.5 rounded-full overflow-hidden" style="background:var(--m-track)">
-        <div id="c-quota-bar" class="h-full rounded-full transition-all" style="width:94%;background:linear-gradient(90deg,#8FA894,#7C9BB5)"></div>
-      </div>
-
-      <div id="c-sidebar-quota-pills" class="grid grid-cols-2 gap-1 text-[10px] font-mono">
-        <div class="px-2 py-1 rounded m-line flex items-center justify-between" style="background:var(--m-panel-2)">
-          <span style="color:var(--m-dim)">MiniMax</span><span style="color:var(--m-sage)">95%</span>
-        </div>
-        <div class="px-2 py-1 rounded m-line flex items-center justify-between" style="background:var(--m-panel-2)">
-          <span style="color:var(--m-dim)">GLM-5.3</span><span style="color:var(--m-mist)">92%</span>
-        </div>
-        <div class="px-2 py-1 rounded m-line flex items-center justify-between" style="background:var(--m-panel-2)">
-          <span style="color:var(--m-dim)">GPT GO</span><span style="color:var(--m-lilac)">90%</span>
-        </div>
-        <div class="px-2 py-1 rounded m-line flex items-center justify-between" style="background:var(--m-panel-2)">
-          <span style="color:var(--m-dim)">AGY Pro</span><span style="color:var(--m-sage)">98%</span>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-3 gap-1 pt-0.5">
-        <button type="button" onclick="cOpenPage('quotas')" id="nav-quotas" class="tab-btn px-2 py-1.5 rounded-lg m-btn-ghost text-[11px] font-medium flex items-center justify-center gap-1 transition">
-          <span>額度熔斷</span>
-        </button>
-        <button type="button" onclick="cOpenPage('agents')" id="nav-wizard" class="tab-btn px-2 py-1.5 rounded-lg m-btn-ghost text-[11px] font-medium flex items-center justify-center gap-1 transition">
-          <span>模型與服務商</span>
-        </button>
-        <button type="button" onclick="cOpenPage('command')" class="px-2 py-1.5 rounded-lg m-btn-ghost text-[11px] font-medium flex items-center justify-center gap-1 transition">
-          <span>對話首頁</span>
-        </button>
-      </div>
-    </div>
   </div>
 </aside>
 """
@@ -983,61 +1075,86 @@ if (_nativeFetch) {
   };
 }
 
-// ── 覆寫 switchTab 與獨立頁面切換 cOpenPage ───────────────────────────────
+// ── 覆寫 switchTab：主對話 + 全頁視圖（如外掛市集頁） ─────────────────────
 const _switchTabLegacy = __legacySwitchTab;
+
+// 全頁視圖定義：tab → (來源 section, 標題, 色彩 icon)
+const C_FP_META = {
+  agents:   { sec: 'view-agents',    title: 'Agent 狀態 · 模型與服務商管理', ic: 'v-ic-agents' },
+  wizard:   { sec: 'view-wizard',    title: '部署與服務商金鑰設定',          ic: 'v-ic-db' },
+  artifacts:{ sec: 'view-artifacts', title: '資料庫 · 依對話串歸檔的產出文檔', ic: 'v-ic-db' },
+  quotas:   { sec: 'view-quotas',    title: '額度與熔斷監控',                ic: 'v-ic-quota' },
+};
+
+function cFullpageShow(tab) {
+  const fp = document.getElementById('c-fullpage');
+  const content = document.getElementById('c-fullpage-content');
+  const meta = C_FP_META[tab];
+  if (!fp || !content || !meta) return;
+  // 執行明細頁與功能頁互斥
+  const detail = document.getElementById('c-turn-detail-page');
+  if (detail) detail.classList.add('hidden');
+  // 把來源 section 搬進全頁容器（一次性；搬過的元素持續保留在裡面）
+  let sec = document.getElementById(meta.sec);
+  if (sec && sec.parentElement !== content) {
+    sec.classList.remove('hidden');
+    sec.classList.add('block', 'max-w-5xl', 'mx-auto', 'px-4', 'sm:px-6', 'py-5');
+    content.appendChild(sec);
+  } else if (sec) {
+    sec.classList.remove('hidden');
+  }
+  content.querySelectorAll('.tab-content').forEach(el => { if (el !== sec) el.classList.add('hidden'); });
+  const ic = document.getElementById('c-fullpage-ic');
+  if (ic) ic.className = 'v-nav-ic ' + meta.ic;
+  const ti = document.getElementById('c-fullpage-title');
+  if (ti) ti.textContent = meta.title;
+  fp.classList.remove('hidden');
+  if (tab === 'agents' && typeof cLoadAgentsAndProvidersPage === 'function') cLoadAgentsAndProvidersPage();
+  if (tab === 'artifacts' && typeof cLoadDatabasePage === 'function') cLoadDatabasePage();
+}
+
+function cFullpageHide() {
+  const fp = document.getElementById('c-fullpage');
+  if (fp) fp.classList.add('hidden');
+}
+
+const C_NAV_BY_TAB = { command: 'nav-command', agents: 'nav-agents', artifacts: 'nav-artifacts', quotas: 'nav-quotas', wizard: 'nav-wizard' };
+
 function switchTab(tab) {
   _switchTabLegacy(tab);
+
+  // 側欄導航激活態（含繽紛 v-on 色彩）
   document.querySelectorAll('.tab-btn').forEach(b => {
-    b.classList.remove('m-nav-active', 'bg-sky-600/20', 'text-sky-400', 'border-sky-500/30');
-    b.classList.add('m-nav');
+    b.classList.remove('m-nav-active');
     b.setAttribute('aria-current', 'false');
   });
-  const active = document.getElementById('nav-' + tab);
-  if (active) {
-    active.classList.remove('bg-sky-600/20', 'text-sky-400', 'border-sky-500/30');
-    active.classList.add('m-nav-active');
-    active.classList.remove('m-nav');
-    active.setAttribute('aria-current', 'page');
+  document.querySelectorAll('#c-sidebar .v-nav').forEach(b => {
+    b.classList.remove('v-on');
+    if (b.dataset.nav === tab) b.classList.add('v-on');
+  });
+  const navId = C_NAV_BY_TAB[tab];
+  if (navId) {
+    const el = document.getElementById(navId);
+    if (el) {
+      el.classList.add('m-nav-active');
+      el.setAttribute('aria-current', 'page');
+    }
   }
-  const topAgents = document.getElementById('c-top-btn-agents');
-  if (topAgents) {
-    topAgents.classList.toggle('m-nav-active', tab === 'agents' || tab === 'wizard');
-    topAgents.classList.toggle('m-btn-ghost', !(tab === 'agents' || tab === 'wizard'));
-  }
-  const topDb = document.getElementById('c-top-btn-db');
-  if (topDb) {
-    topDb.classList.toggle('m-nav-active', tab === 'artifacts');
-    topDb.classList.toggle('m-btn-ghost', tab !== 'artifacts');
-  }
+
   const titles = {
-    command:'主對話視窗',
-    artifacts:'📚 資料庫獨立專頁',
-    quotas:'📊 額度與熔斷監控',
-    agents:'🤖 Agent 狀態 · 模型與服務商管理專頁',
-    wizard:'🚀 部署與服務商金鑰設定'
+    command: '主對話視窗',
+    artifacts: '📚 資料庫 · 對話串歸檔',
+    quotas: '📊 額度與熔斷監控',
+    agents: '🤖 Agent 狀態 · 模型與服務商管理',
+    wizard: '🚀 部署與服務商金鑰設定'
   };
   const t = document.getElementById('c-view-title');
   if (t) t.textContent = titles[tab] || '主對話視窗';
 
-  // 當進入「Agent 狀態」或「資料庫」等獨立頁面時，自動隱藏首頁底部的輸入框與右側 Using 檔案欄，讓獨立頁面全寬展示
-  const isHome = (tab === 'command');
-  const compWrap = document.getElementById('c-composer-wrap');
-  if (compWrap) compWrap.classList.toggle('hidden', !isHome);
-  const rightDrawer = document.getElementById('c-drawer');
-  if (rightDrawer) rightDrawer.classList.toggle('hidden', !isHome);
-  const mainContainer = document.getElementById('c-main-container');
-  if (mainContainer) {
-    mainContainer.className = isHome
-      ? 'max-w-4xl mx-auto px-4 sm:px-6 py-4'
-      : 'max-w-6xl mx-auto px-4 sm:px-6 py-5';
-  }
+  // 全頁視圖：非對話首頁都以獨立頁呈現（Esc／返回鍵回到對話串）
+  if (tab === 'command') cFullpageHide();
+  else cFullpageShow(tab);
 
-  if (tab === 'agents') {
-    if (typeof cLoadAgentsAndProvidersPage === 'function') cLoadAgentsAndProvidersPage();
-  }
-  if (tab === 'artifacts') {
-    if (typeof cLoadDatabasePage === 'function') cLoadDatabasePage();
-  }
   // 窄螢幕下側欄是抽屜，切換頁籤後自動收合
   cToggleSidebar(false);
 }
@@ -1064,6 +1181,77 @@ function cOpenPage(tab, pushUrl = true) {
       }
     } catch (_) {}
   }
+}
+
+function cCloseFullpage() {
+  cFullpageHide();
+  // 全頁關閉 = 回到主對話串（網址同步，不觸發 push 迴圈）
+  if (typeof location !== 'undefined' && location.pathname !== '/workbench') {
+    try { history.pushState({ page: 'command' }, '', '/workbench'); } catch (_) {}
+  }
+  switchTab('command');
+}
+
+// ── 執行明細全頁：單輪任務的角色流水線 / 交叉審查與比較明細 ───────────
+function cOpenTurnDetail(id) {
+  const t = (cTasks || []).find(x => x.id === id);
+  if (!t) { cToast('找不到這一輪的明細資料', 'err'); return; }
+  const fp = document.getElementById('c-fullpage');
+  const content = document.getElementById('c-fullpage-content');
+  if (!fp || !content) return;
+
+  // 隱藏功能頁 sections，只顯示明細頁
+  content.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+  let page = document.getElementById('c-turn-detail-page');
+  if (!page) {
+    page = document.createElement('div');
+    page.id = 'c-turn-detail-page';
+    content.appendChild(page);
+  }
+  page.classList.remove('hidden');
+
+  const agents = (t.agents || []).map(a => {
+    const hex = (C_AGENT_COLORS[a] || [])[1] || '#7C9BB5';
+    return `<span class="c-conn-badge" style="background:${hex}26;color:${hex}">${escapeHtml(C_AGENT_LABELS[a] || a)}</span>`;
+  }).join('') || '<span class="text-[11px]" style="color:var(--m-faint)">（未記錄）</span>';
+  const round = t.step || '—';
+
+  page.innerHTML = `
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 py-5 space-y-3">
+      <div class="v-detail-sec">
+        <h4><span>🧭</span>任務（第 ${escapeHtml(String(round))} 輪）</h4>
+        <div class="text-[13px] leading-relaxed" style="color:var(--m-bone)">${escapeHtml(t.prompt || '（未記錄）')}</div>
+        <div class="flex items-center gap-1.5 flex-wrap mt-2.5">
+          ${agents}
+          ${t.mode ? `<span class="c-conn-badge" style="background:rgba(139,92,246,.14);color:var(--v-violet)">${escapeHtml(t.mode)}</span>` : ''}
+          ${t.project ? `<span class="c-conn-badge" style="background:var(--m-faint-bg);color:var(--m-dim)">${escapeHtml(t.project)}</span>` : ''}
+          ${t.duration ? `<span class="c-conn-badge" style="background:var(--m-faint-bg);color:var(--m-dim)">${escapeHtml(t.duration)}</span>` : ''}
+          <span class="c-conn-badge" style="background:var(--m-faint-bg);color:var(--m-dim)">${escapeHtml(cStatusMeta(t.status).label || t.status || '')}</span>
+        </div>
+      </div>
+
+      <div class="v-detail-sec">
+        <h4><span>📎</span>本輪產出文檔</h4>
+        ${cOutputFilesHtml(t) || '<div class="text-[11px]" style="color:var(--m-faint)">這一輪沒有產出文檔</div>'}
+      </div>
+
+      <div class="v-detail-sec">
+        <h4><span>🏁</span>共識結論 (Consensus)</h4>
+        <pre class="v-detail-pre">${escapeHtml(t.raw || t.result || '（無）')}</pre>
+      </div>
+
+      <div class="v-detail-sec">
+        <h4><span>⚔️</span>Agent 交叉審查與比較明細 (Review)</h4>
+        <pre class="v-detail-pre">${escapeHtml(t.review || '（這一輪沒有交叉審查明細）')}</pre>
+      </div>
+    </div>`;
+
+  const ti = document.getElementById('c-fullpage-title');
+  if (ti) ti.textContent = `執行明細 · 第 ${round} 輪`;
+  const ic = document.getElementById('c-fullpage-ic');
+  if (ic) ic.className = 'v-nav-ic v-ic-command';
+  fp.classList.remove('hidden');
+  content.scrollTop = 0;
 }
 
 // ── 覆寫 setCollabMode：同步 composer 內的模式列 ───────────────────
@@ -1477,49 +1665,29 @@ function cFileExtBadge(pathStr, fallbackBadge) {
 
 function cOutputFilesHtml(t) {
   const files = cGetTurnOutputFiles(t);
-  if (!files.length) {
-    return `<div class="c-output-download-panel">
-      <div class="c-output-panel-head">
-        <div class="c-turn-files-title">📥 Output 產出文檔（預設展示）</div>
-        <button type="button" class="c-action m-btn-ghost" onclick="cOpenPage('artifacts')">📂 前往資料庫檢視全部產物</button>
-      </div>
-      <div class="text-[12px]" style="color:var(--m-dim)">目前尚無偵測到可下載的 Output 產出檔案，或可點選右上角「📂 資料庫」查看所有專案產物。</div>
-    </div>`;
-  }
-  const items = files.map((f, i) => {
-    const key = (t.id || '') + '|' + f.path;
-    // 預設展開第一份可讀文檔內容，同時每一份文檔都在列上直接顯示「📥 下載」按鈕
-    const open = (key in cFileOpen) ? cFileOpen[key] : (i === 0);
+  if (!files.length) return '';   // 本輪沒有產出文檔 → 不顯示任何區塊
+  const rows = files.map(f => {
     const full = f.full_path || f.path;
     const baseName = String(f.path || '').split('/').pop() || f.path;
     const badge = cFileExtBadge(f.path, f.badge);
     const dlUrl = '/api/workbench/artifacts/download?path=' + encodeURIComponent(full);
-    return `<details class="c-file m-collapse" ${open ? 'open' : ''} data-path="${escapeHtml(full)}" data-key="${escapeHtml(key)}"
-               ontoggle="cOnFileToggle(this)">
-      <summary>
-        <span class="c-file-badge">${escapeHtml(badge)}</span>
-        <span class="c-file-name" title="${escapeHtml(f.path)}">${escapeHtml(baseName)} <span style="color:var(--m-faint);font-size:11px">(${escapeHtml(f.path)})</span></span>
-        <span class="c-file-size">${escapeHtml(f.size || '')}</span>
-        <a href="${escapeHtml(dlUrl)}" download="${escapeHtml(baseName)}"
-           class="c-dl-btn" title="直接下載此 Output 產出文檔至電腦"
-           onclick="event.stopPropagation()">📥 下載</a>
-        <button type="button" class="c-action m-btn-ghost" title="在側欄完整檢視內容"
-                onclick="event.preventDefault();event.stopPropagation();openArtifact('${escapeHtml(full)}','${escapeHtml(baseName)}')">預覽內容</button>
-      </summary>
-      <pre class="c-file-body">${open && cFileCache[full] != null ? escapeHtml(cFileCache[full]) : '載入內容預覽中…'}</pre>
-    </details>`;
+    return `<div class="v-turn-doc-row">
+      <span class="v-doc-badge" data-ext="${escapeHtml(badge)}">${escapeHtml(badge)}</span>
+      <span class="v-doc-name" title="${escapeHtml(f.path)}">${escapeHtml(baseName)}</span>
+      <span class="v-doc-size">${escapeHtml(f.size || '')}</span>
+      <a href="${escapeHtml(dlUrl)}" download="${escapeHtml(baseName)}" class="v-dl"
+         title="下載此文檔至電腦" onclick="event.stopPropagation()">下載</a>
+      <button type="button" class="v-pv" title="預覽內容"
+              onclick="openArtifact('${escapeHtml(full)}','${escapeHtml(baseName)}')">預覽</button>
+    </div>`;
   }).join('');
-  return `<div class="c-output-download-panel">
-    <div class="c-output-panel-head">
-      <div class="c-turn-files-title">📥 Output 產出文檔（預設展示 · 共 ${files.length} 份可供下載與預覽）</div>
-      <div class="flex items-center gap-1.5">
-        <span class="text-[11px] font-mono" style="color:var(--m-faint)">點擊「📥 下載」可直接儲存檔案</span>
-        <button type="button" class="c-action m-btn-ghost" onclick="cOpenPage('artifacts')">📂 全部產物</button>
-      </div>
+  return `<div class="v-turn-docs c-output-download-panel">
+    <div class="v-turn-docs-head">
+      <span>📎</span><span>本輪產出文檔 · ${files.length} 份</span>
+      <span class="flex-1"></span>
+      <button type="button" class="hover:underline" style="color:var(--v-amber)" onclick="cOpenPage('artifacts')">資料庫歸檔 →</button>
     </div>
-    <div class="c-turn-files">
-      ${items}
-    </div>
+    ${rows}
   </div>`;
 }
 
@@ -1589,6 +1757,8 @@ function cTurnHtml(t, idx) {
       </div>
       ${cOutputFilesHtml(t)}
       <div class="c-turn-actions">
+        <button type="button" onclick="cOpenTurnDetail('${id}')" class="c-action m-btn-ghost"
+                title="角色流水線、交叉審查與比較明細（全頁檢視）">🔍 執行明細</button>
         <button type="button" onclick="cShowDiff()" class="c-action m-btn-ghost">專案檔案 Diff</button>
       </div>
     </div>`;
@@ -2558,25 +2728,91 @@ async function cLoadSidebarDatabase() {
   } catch (_) {}
 }
 
+let cDbOverview = { threads: [], ungrouped: [], total: 0 };
+
 async function cLoadDatabasePage() {
   await cLoadSidebarDatabase();
-  // 依實際產物種類動態產生類型下拉選單，保留目前選取
-  const sel = document.getElementById('c-artifact-badge');
-  if (sel) {
-    const types = Array.from(new Set(cAllArtifactsCache.map(i => String(i.badge || 'DOC').toUpperCase()))).sort();
-    sel.innerHTML = '<option value="all">全部類型</option>' +
-      types.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
-    sel.value = (cArtifactFilterBadge !== 'all' && types.indexOf(String(cArtifactFilterBadge).toUpperCase()) !== -1)
-      ? String(cArtifactFilterBadge).toUpperCase() : 'all';
-    if (sel.value === 'all') cArtifactFilterBadge = 'all';
-  }
-  cFilterArtifactsPage();
+  const flatGrid = document.getElementById('artifacts-grid');
+  if (flatGrid) flatGrid.classList.add('hidden');   // 歸檔視圖取代平面網格
+  try {
+    const res = await _nativeFetch ? _nativeFetch('/api/workbench/database') : fetch('/api/workbench/database');
+    const data = await res.json();
+    if (data && data.ok) cDbOverview = { threads: data.threads || [], ungrouped: data.ungrouped || [], total: data.total || 0 };
+  } catch (_) {}
+  cRenderDatabaseThreads();
 }
+
+function cDocRowHtml(f) {
+  const full = f.full_path || f.path;
+  const baseName = String(f.path || '').split('/').pop() || f.path;
+  const badge = cFileExtBadge(f.path, f.badge);
+  const dlUrl = '/api/workbench/artifacts/download?path=' + encodeURIComponent(full);
+  return `<div class="v-turn-doc-row">
+    <span class="v-doc-badge" data-ext="${escapeHtml(badge)}">${escapeHtml(badge)}</span>
+    <span class="v-doc-name" title="${escapeHtml(f.path)}">${escapeHtml(baseName)}</span>
+    <span class="v-doc-size">${escapeHtml(f.size || '')}</span>
+    <a href="${escapeHtml(dlUrl)}" download="${escapeHtml(baseName)}" class="v-dl">下載</a>
+    <button type="button" class="v-pv" onclick="openArtifact('${escapeHtml(full)}','${escapeHtml(baseName)}')">預覽</button>
+  </div>`;
+}
+
+function cRenderDatabaseThreads() {
+  const host = document.getElementById('c-db-thread-groups');
+  if (!host) return;
+  const kw = (cArtifactFilterQuery || '').trim().toLowerCase();
+  const badge = (cArtifactFilterBadge || 'all').toUpperCase();
+  const matchFile = f => {
+    const okBadge = badge === 'all' || String(f.badge || '').toUpperCase() === badge || cFileExtBadge(f.path, f.badge).toUpperCase() === badge;
+    const okKw = !kw || String(f.path || '').toLowerCase().includes(kw) || String(f.name || '').toLowerCase().includes(kw);
+    return okBadge && okKw;
+  };
+  const groups = [];
+  (cDbOverview.threads || []).forEach(t => {
+    const files = (t.files || []).filter(matchFile);
+    if (files.length) groups.push({ title: t.title, project: t.project, at: t.dispatched_at, files });
+  });
+  const ungrouped = (cDbOverview.ungrouped || []).filter(matchFile);
+  if (ungrouped.length) groups.push({ title: '📦 未歸檔文件（歷史紀錄找不到來源對話串）', project: '', at: '', files: ungrouped, muted: true });
+
+  const projDots = ['#8B5CF6','#38BDF8','#34D399','#FBBF24','#FB7185','#22D3EE'];
+  let dotIdx = 0;
+  host.innerHTML = groups.map(g => {
+    const dot = g.muted ? '#64748B' : projDots[dotIdx++ % projDots.length];
+    const bodyId = 'v-thread-body-' + Math.abs([...g.title].reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 7));
+    return `<div class="v-thread-card">
+      <div class="v-thread-head" onclick="cToggleThreadGroup('${bodyId}', this)">
+        <span class="v-proj-dot" style="background:${dot}"></span>
+        <span class="v-thread-title">${escapeHtml(g.title)}</span>
+        <span class="v-thread-meta">${g.project ? escapeHtml(g.project) + ' · ' : ''}${g.files.length} 份${g.at ? ' · ' + escapeHtml(g.at) : ''}</span>
+        <svg class="m-caret shrink-0" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="v-thread-body" id="${bodyId}">${g.files.map(cDocRowHtml).join('')}</div>
+    </div>`;
+  }).join('') || '<div class="text-[12px] py-8 text-center" style="color:var(--m-faint)">沒有符合的文檔</div>';
+
+  const countEl = document.getElementById('c-db-page-count');
+  if (countEl) countEl.textContent = String(groups.reduce((a, g) => a + g.files.length, 0));
+}
+
+function cToggleThreadGroup(bodyId, headEl) {
+  const body = document.getElementById(bodyId);
+  if (!body) return;
+  const open = body.classList.toggle('hidden');
+  if (headEl) {
+    const caret = headEl.querySelector('.m-caret');
+    if (caret) caret.style.transform = open ? '' : 'rotate(90deg)';
+  }
+}
+
+let cArtifactFilterQuery = '';
 
 function cFilterArtifactsPage(queryText, badgeType) {
   if (badgeType !== undefined) cArtifactFilterBadge = badgeType;
   const searchEl = document.getElementById('c-artifact-search');
   const q = String(queryText !== undefined ? queryText : (searchEl ? searchEl.value : '')).trim().toLowerCase();
+  cArtifactFilterQuery = q;
+  // 對話串歸檔視圖為主要呈現；平面網格保留但隱藏（舊邏輯相容）
+  if (typeof cRenderDatabaseThreads === 'function') cRenderDatabaseThreads();
   const grid = document.getElementById('artifacts-grid');
   if (!grid) return;
   if (!cAllArtifactsCache.length) {
@@ -3476,6 +3712,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Esc 關閉側欄抽屜 / 選單
   document.addEventListener('keydown', e => {
     if (e.key !== 'Escape') return;
+    if (typeof cCloseFullpage === 'function') cCloseFullpage();
     cToggleSidebar(false);
     cToggleViewMenu(false);
     cToggleProjectMenu(false);
@@ -3768,6 +4005,7 @@ _PAGE_DB_TOOLBAR: Final[str] = """
           <select id="c-artifact-badge" onchange="cFilterArtifactsPage(undefined, this.value)" class="bg-[#050811] border border-white/15 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-sky-400" aria-label="產物類型"><option value="all">全部類型</option></select>
           <span class="text-[11px] font-mono text-slate-400">共 <span id="c-db-page-count">0</span> 筆</span>
         </div>
+        <div id="c-db-thread-groups" class="space-y-2.5"></div>
 """
 
 
@@ -3919,6 +4157,29 @@ def render_workbench_html_c() -> str:
 
 <div id="c-drawer-scrim" onclick="cToggleDrawer(false)"></div>
 <div id="c-scrim" onclick="cToggleSidebar(false)"></div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     全頁視圖（如外掛市集頁）：Agent / 資料庫 / 額度 / 執行明細
+     點擊側欄功能後整頁呈現；「返回對話」回到主對話串。
+     ═══════════════════════════════════════════════════════════════ -->
+<div id="c-fullpage" class="hidden fixed inset-0 flex flex-col" style="background:var(--m-ink-900)">
+  <header class="v-fp-head shrink-0 h-12 flex items-center gap-2 px-3 sm:px-5">
+    <button type="button" onclick="cCloseFullpage()" class="w-8 h-8 rounded-lg m-btn-ghost grid place-items-center shrink-0" title="返回對話 (Esc)" aria-label="返回對話">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <span id="c-fullpage-ic" class="v-nav-ic v-ic-agents" style="width:1.6rem;height:1.6rem"></span>
+    <div class="min-w-0">
+      <div id="c-fullpage-title" class="text-sm font-bold truncate" style="color:var(--m-bone)">頁面</div>
+    </div>
+    <div class="flex-1"></div>
+    <div id="c-fullpage-actions" class="flex items-center gap-1.5 min-w-0"></div>
+    <button type="button" onclick="cCloseFullpage()" class="w-8 h-8 rounded-lg m-btn-ghost grid place-items-center shrink-0" title="關閉" aria-label="關閉全頁視圖">
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg>
+    </button>
+  </header>
+  <div id="c-fullpage-content" class="flex-1 min-h-0 overflow-y-auto m-scroll"></div>
+</div>
+
 {drawers}
 <div id="c-toast-host" aria-live="polite" aria-atomic="false"></div>
 """
@@ -3954,6 +4215,7 @@ def render_workbench_html_c() -> str:
   <style>
 {_legacy_style()}
 {_MORANDI_CSS}
+{_VIVID_CSS}
   </style>
 </head>
 {body}
