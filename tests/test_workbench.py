@@ -27,9 +27,15 @@ def _isolate_workbench_settings(tmp_path, monkeypatch):
 
     模型切換、服務商新增/刪除都會寫入這兩個檔案；改寫到 tmp_path，
     並在結束時還原 os.environ，避免污染使用者的實際設定。
+    騰訊雲 K.A.V.I.S. 的健康探測也一併 stub，避免測試對外發出網路請求。
     """
     monkeypatch.setattr(_wb_module, "_CATALOG_PATH", tmp_path / "workbench_catalog.json")
     monkeypatch.setattr(_wb_module, "_persist_env_updates", lambda updates: None)
+    monkeypatch.setattr(
+        _wb_module,
+        "_tencent_kavis_probe_cached",
+        lambda: {"ok": False, "endpoint": "http://probe-stub", "detail": "stubbed"},
+    )
     monkeypatch.setenv("CLAUDE_DISPATCH_MODEL", "gemini4")
     monkeypatch.setenv("CODEX_DISPATCH_MODEL", "kimi-k3.1-pro")
     saved_env = dict(os.environ)
@@ -61,7 +67,7 @@ def test_render_workbench_html() -> None:
 
 def test_get_agent_fleet_status() -> None:
     fleet = get_agent_fleet_status()
-    assert len(fleet) >= 6
+    assert len(fleet) >= 7
     ids = [a["id"] for a in fleet]
     assert "claude" in ids
     assert "codex" in ids
@@ -69,6 +75,7 @@ def test_get_agent_fleet_status() -> None:
     assert "minimax" in ids
     assert "opencode" in ids
     assert "khavis" in ids
+    assert "kavis-tencent" in ids
 
     claude_node = next(a for a in fleet if a["id"] == "claude")
     assert claude_node["model"] == "gemini-4-argon"
@@ -78,6 +85,15 @@ def test_get_agent_fleet_status() -> None:
     khavis_node = next(a for a in fleet if a["id"] == "khavis")
     assert khavis_node["installed"] is True
     assert khavis_node["status"] == "ready"
+    # Agent 已由 K.H.A.V.I.S. 更名為 K.A.V.I.S.
+    assert khavis_node["name"] == "K.A.V.I.S. Team"
+
+    # 騰訊雲 openclaw × hermes 合併節點：監控指標齊備且誠實標示離線（stub 探測）
+    tencent_node = next(a for a in fleet if a["id"] == "kavis-tencent")
+    assert tencent_node["name"] == "K.A.V.I.S. (Tencent)"
+    assert tencent_node["installed"] is True
+    assert tencent_node["status"] == "unreachable"
+    assert "openclaw" in tencent_node["model"].lower()
 
 
 def test_list_deliverable_artifacts() -> None:
@@ -244,12 +260,16 @@ def test_status_server_workbench_endpoints(monkeypatch) -> None:
     assert "cOpenPage('agents')" in wb_body
     assert "cOpenPage('artifacts')" in wb_body
     # 專頁上必須真的有可操作的表單（新增服務商、模型新增/刪除、資料庫搜尋）
+    # 服務商模型已改為「從供應商抓取清單 → 勾選要呈現的模型」，不再全文列舉輸入框。
     for element_id in (
         "c-provider-form-box",
         "c-prov-label",
         "c-prov-env",
         "c-prov-key",
-        "c-prov-models",
+        "c-prov-models-box",
+        "c-prov-models-list",
+        "c-prov-models-status",
+        "c-prov-models-count",
         "c-prov-presets",
         "c-providers-crud-grid",
         "c-model-crud-agent",
@@ -262,6 +282,10 @@ def test_status_server_workbench_endpoints(monkeypatch) -> None:
         assert f'id="{element_id}"' in wb_body, element_id
         assert wb_body.count(f'id="{element_id}"') == 1, f"duplicate id: {element_id}"
     assert 'id="c-using-files-host"' in wb_body
+    # 抓取清單的函式與 API 必須存在；舊的全列舉文字輸入框必須移除
+    assert "cFetchProviderModels" in wb_body
+    assert "/api/workbench/provider_models" in wb_body
+    assert 'id="c-prov-models"' not in wb_body
 
     # 1a. Agent 狀態與資料庫必須可直接深連結開啟，不能只依賴 SPA 歷史狀態。
     for deep_link in ("/agents", "/database"):
@@ -407,6 +431,113 @@ def test_status_server_workbench_endpoints(monkeypatch) -> None:
     mod_reset = json.loads(h_mod_reset.responses[0][1].decode("utf-8"))
     assert mod_reset["models"]["claude"] == "gemini-4-argon"
     assert mod_reset["models"]["antigravity"] == "antigravity-pro"
+
+
+def test_fetch_provider_model_list(monkeypatch) -> None:
+    from web.workbench import fetch_provider_model_list
+
+    # 1. 無效 env key → ValueError
+    with pytest.raises(ValueError):
+        fetch_provider_model_list({"env": "9BAD ENV!"})
+
+    # 2. 非 http/https base_url → ValueError（SSRF 防護）
+    with pytest.raises(ValueError):
+        fetch_provider_model_list({"env": "DEEPSEEK_API_KEY", "base_url": "file:///etc/passwd"})
+
+    # 3. 遮罩金鑰應被忽略，不送去當真金鑰
+    with pytest.raises(ValueError):
+        fetch_provider_model_list({"env": "!!"})
+
+    # 4. 正常路徑：mock 上層 _fetch_provider，確認只回 model id 清單
+    def fake_fetch(spec, values, timeout_s=5.0):  # noqa: ANN001, ARG001
+        return {
+            "env": spec["env"],
+            "label": "Stub Provider",
+            "configured": True,
+            "reachable": True,
+            "status": "ok",
+            "models": [
+                {"id": "z-model", "ref": "X::z-model"},
+                {"id": "a-model", "ref": "X::a-model"},
+                {"id": "a-model", "ref": "X::a-model"},  # 重複應去重
+            ],
+            "fetched_at": "2026-10-29T00:00:00+00:00",
+        }
+
+    monkeypatch.setattr("core.provider_capabilities._fetch_provider", fake_fetch)
+    res = fetch_provider_model_list(
+        {"env": "STUB_API_KEY", "base_url": "https://stub.example/v1", "api_key": "sk-stub-123"}
+    )
+    assert res["ok"] is True
+    assert res["status"] == "ok"
+    assert res["models"] == ["a-model", "z-model"]  # 排序 + 去重
+    assert res["count"] == 2
+
+    # 5. 供應商不可達 → ok=False，誠實帶回 status
+    def unreachable_fetch(spec, values, timeout_s=5.0):  # noqa: ANN001, ARG001
+        return {
+            "env": spec["env"],
+            "label": spec["env"],
+            "configured": False,
+            "reachable": False,
+            "status": "not_configured",
+            "models": [],
+        }
+
+    monkeypatch.setattr("core.provider_capabilities._fetch_provider", unreachable_fetch)
+    res2 = fetch_provider_model_list({"env": "STUB_API_KEY"})
+    assert res2["ok"] is False
+    assert res2["status"] == "not_configured"
+    assert res2["models"] == []
+
+
+def test_provider_models_endpoint(monkeypatch) -> None:
+    # POST /api/workbench/provider_models：無效 env → 400
+    h_bad = DummyStatusHandler(
+        "/api/workbench/provider_models",
+        method="POST",
+        body=b'{"env":"bad env!"}',
+    )
+    h_bad.do_POST()
+    assert h_bad.responses[0][0] == 400
+
+    # 正常路徑：mock 抓取函式 → 200 + id 清單
+    monkeypatch.setattr(
+        _wb_module,
+        "fetch_provider_model_list",
+        lambda payload: {
+            "ok": True,
+            "env": payload.get("env"),
+            "label": "Stub",
+            "reachable": True,
+            "status": "ok",
+            "models": ["m1", "m2"],
+            "count": 2,
+            "fetched_at": None,
+        },
+    )
+    h_ok = DummyStatusHandler(
+        "/api/workbench/provider_models",
+        method="POST",
+        body=b'{"env":"STUB_API_KEY"}',
+    )
+    h_ok.do_POST()
+    assert h_ok.responses[0][0] == 200
+    data = json.loads(h_ok.responses[0][1].decode("utf-8"))
+    assert data["ok"] is True
+    assert data["models"] == ["m1", "m2"]
+
+
+def test_fleet_has_kavis_rename_and_tencent_node() -> None:
+    """Agent 改名 K.A.V.I.S. + 騰訊雲 openclaw × hermes 合併節點併入架構。"""
+    html = render_workbench_html()
+
+    # 拓撲 Node 6 已改名；新增 Node 7 騰訊雲節點卡片
+    assert ">K.A.V.I.S.</div>" in html
+    assert ">K.H.A.V.I.S.</div>" not in html
+    assert 'id="node-card-kavis-tencent"' in html
+    assert 'value="kavis-tencent"' in html
+    assert "openclaw × hermes" in html
 
 
 def test_workspace_and_worktree_endpoints() -> None:

@@ -1,7 +1,7 @@
 """K.H.A.V.I.S. Unified Graphical Web Workbench (全域圖形化智慧指揮工作台).
 
 Provides a graphical, interactive, single-page command console to:
-1. Visually orchestrate 5 Tencent Cloud CLI Agents (Claude Code [gemini-4-argon], Codex [kimi-k3.1-pro], Antigravity [AGY], MiniMax Code [MiniMax-M3.1-Flash], opencode [GLM 5.3 FlashX]) + K.H.A.V.I.S. Multi-Agent Team via an interactive SVG Topology Canvas.
+1. Visually orchestrate 5 Tencent Cloud CLI Agents (Claude Code [gemini-4-argon], Codex [kimi-k3.1-pro], Antigravity [AGY], MiniMax Code [MiniMax-M3.1-Flash], opencode [GLM 5.3 FlashX]) + K.A.V.I.S. Multi-Agent Team via an interactive SVG Topology Canvas.
 2. Monitor real-time quotas, 429 breakers & dynamic reset timers with SVG radial gauges.
 3. Track execution progress via a graphical 7-Role LangGraph DAG visualizer and latency bar charts.
 4. Safely browse, preview, copy, and download whitelisted deliverables and artifacts.
@@ -465,7 +465,7 @@ BYOK_PROVIDER_SPECS = [
     {
         "env": "OPENAI_API_KEY",
         "label": "OpenAI GPT GO Platform API Key",
-        "agents": "K.H.A.V.I.S. Planner / Judge / GPT-5-Codex",
+        "agents": "K.A.V.I.S. Planner / Judge / GPT-5-Codex",
         "base_url_env": "OPENAI_API_BASE",
         "default_base_url": "https://api.openai.com/v1",
         "builtin": True,
@@ -646,6 +646,72 @@ def get_workbench_capabilities() -> dict[str, Any]:
         "model_options": model_catalog["options"],
         "model_catalog": model_catalog["catalog"],
         "active_model_refs": model_catalog["active_model_refs"],
+    }
+
+
+def fetch_provider_model_list(payload: dict[str, Any]) -> dict[str, Any]:
+    """Fetch the live model catalogue from ONE provider for the Workbench picker.
+
+    取代「後台模型設定把供應商模型全部列舉」的舊行為：前端先填好
+    env / Base URL / API Key，再呼叫本函式向供應商的 ``/models`` 端點
+    抓取即時清單，由使用者在 UI 勾選要呈現（綁定）的模型。
+
+    傳入的 API Key 只用於這次查詢，不會被持久化，也不會回傳到前端。
+    """
+    from urllib.parse import urlparse  # noqa: PLC0415
+
+    from core.provider_capabilities import _fetch_provider  # noqa: PLC0415
+
+    env_key = str(payload.get("env") or "").strip().upper()
+    if not _ENV_KEY_RE.match(env_key):
+        raise ValueError(f"Invalid provider env key: {env_key!r}")
+
+    base_url = str(payload.get("base_url") or "").strip()
+    if base_url:
+        scheme = urlparse(base_url).scheme.lower()
+        if scheme not in ("http", "https"):
+            raise ValueError(f"Base URL 必須是 http/https，收到: {scheme or '(空)'}")
+    base_url_env = str(payload.get("base_url_env") or "").strip().upper()
+    if base_url_env and not _ENV_KEY_RE.match(base_url_env):
+        raise ValueError(f"Invalid base_url env key: {base_url_env!r}")
+
+    provided_key = str(payload.get("api_key") or "").strip()
+    if provided_key and ("••••" in provided_key or "\n" in provided_key or len(provided_key) > 512):
+        # 前端可能把遮罩字元原樣送回；遮罩值不是真金鑰，忽略並退回已儲存的。
+        provided_key = ""
+
+    # 既有規格（內建或自訂服務商）優先，讓「儲存過的服務商」直接可抓；
+    # 表單上暫存的 base_url / api_key 覆蓋已儲存值，支援未存檔先預覽。
+    spec = next(
+        (dict(s) for s in _get_all_provider_specs() if s["env"] == env_key),
+        {"env": env_key, "label": env_key, "base_url_env": "", "default_base_url": ""},
+    )
+    if base_url_env:
+        spec["base_url_env"] = base_url_env
+    if base_url:
+        spec["default_base_url"] = base_url
+
+    values = dict(_read_env_file_vars(PROJECT_ROOT / ".env"))
+    for k, v in os.environ.items():
+        if k.isupper():
+            values.setdefault(k, v)
+    if provided_key:
+        values[env_key] = provided_key
+
+    result = _fetch_provider(spec, values, timeout_s=8.0)
+    model_ids = sorted(
+        {str(m.get("id") or "").strip() for m in result.get("models") or []} - {""}
+    )
+    status = str(result.get("status") or "unknown")
+    return {
+        "ok": status == "ok",
+        "env": env_key,
+        "label": str(result.get("label") or env_key),
+        "reachable": bool(result.get("reachable")),
+        "status": status,
+        "models": model_ids,
+        "count": len(model_ids),
+        "fetched_at": result.get("fetched_at"),
     }
 
 
@@ -831,7 +897,7 @@ def update_setup_wizard_config(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def get_agent_fleet_status() -> list[dict[str, Any]]:
-    """Probe the 5 CLI agents on Tencent Cloud, K.H.A.V.I.S. team, and any user-defined Custom Agents."""
+    """Probe the 5 CLI agents on Tencent Cloud, K.A.V.I.S. team + Tencent K.A.V.I.S. node, and any user-defined Custom Agents."""
     from core.custom_agents import enrich_custom_agent_status, load_custom_agents  # noqa: PLC0415
 
     cfg = get_workbench_models_config()
@@ -917,7 +983,7 @@ def get_agent_fleet_status() -> list[dict[str, Any]]:
         },
         {
             "id": "khavis",
-            "name": "K.H.A.V.I.S. Team",
+            "name": "K.A.V.I.S. Team",
             "binary": "internal",
             "model": "LangGraph 7-Role",
             "default_model": "LangGraph 7-Role",
@@ -930,6 +996,21 @@ def get_agent_fleet_status() -> list[dict[str, Any]]:
             "icon": "fa-sitemap",
             "color": "#38BDF8",
         },
+        {
+            "id": "kavis-tencent",
+            "name": "K.A.V.I.S. (Tencent)",
+            "binary": "remote",
+            "model": "openclaw × hermes",
+            "default_model": "openclaw × hermes",
+            "options": ["openclaw × hermes"],
+            "adjustable": False,
+            "custom": False,
+            "plan": "騰訊雲常駐節點 (hermes gateway + openclaw)",
+            "desc": "騰訊雲 openclaw × hermes 合併運作的 K.A.V.I.S. 遠端節點 (Telegram 閘道 + Agent 執行環境)",
+            "tier": "Remote",
+            "icon": "fa-cloud",
+            "color": "#A78BFA",
+        },
     ]
 
     for a in agents:
@@ -938,6 +1019,21 @@ def get_agent_fleet_status() -> list[dict[str, Any]]:
             a["path"] = "internal://langgraph/7-roles"
             a["version"] = "v0.5.0 (LangGraph 7 Roles)"
             a["status"] = "ready"
+            continue
+
+        if a["id"] == "kavis-tencent":
+            probe = _tencent_kavis_probe_cached()
+            a["installed"] = True
+            a["path"] = str(probe.get("endpoint") or "remote://tencent-cloud")
+            if probe.get("ok"):
+                a["status"] = "ready"
+                a["version"] = (
+                    f"Online (HTTP {probe.get('http_code')}, "
+                    f"{'dispatch ready' if probe.get('dispatch_wired') else 'monitor-only'})"
+                )
+            else:
+                a["status"] = "unreachable"
+                a["version"] = f"Offline ({probe.get('detail')})"
             continue
 
         binary_path = shutil.which(a["binary"])
@@ -960,6 +1056,26 @@ def get_agent_fleet_status() -> list[dict[str, Any]]:
 
     return agents
 
+
+_TENCENT_KAVIS_PROBE_TTL_S = 60.0
+_tencent_kavis_probe_cache: dict[str, Any] = {"at": 0.0, "data": None}
+
+
+def _tencent_kavis_probe_cached() -> dict[str, Any]:
+    """Probe the Tencent K.A.V.I.S. node with a 60s TTL cache (fleet page is polled)."""
+    from bot.backends.kavis_tencent import dispatch_url, probe_tencent_kavis  # noqa: PLC0415
+
+    now = time.time()
+    cached = _tencent_kavis_probe_cache.get("data")
+    if cached is not None and now - float(_tencent_kavis_probe_cache.get("at") or 0.0) < (
+        _TENCENT_KAVIS_PROBE_TTL_S
+    ):
+        return cached
+    probe = probe_tencent_kavis()
+    probe["dispatch_wired"] = bool(dispatch_url())
+    _tencent_kavis_probe_cache["at"] = now
+    _tencent_kavis_probe_cache["data"] = probe
+    return probe
 
 
 _OUTPUT_DOC_PRIORITY: dict[str, int] = {
@@ -1717,7 +1833,7 @@ _WORKBENCH_PAGE_HEAD = """<!DOCTYPE html>
                 <i class="fas fa-laptop-code mr-1"></i>代碼三劍客
               </button>
               <button type="button" onclick="selectPresetAgents('khavis_only')" class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 font-medium transition">
-                僅 K.H.A.V.I.S. 團隊
+                僅 K.A.V.I.S. 團隊
               </button>
             </div>
           </div>
@@ -1990,7 +2106,7 @@ _WORKBENCH_PAGE_HEAD = """<!DOCTYPE html>
                 </div>
               </div>
 
-              <!-- Node 6: K.H.A.V.I.S. 7-Role Team -->
+              <!-- Node 6: K.A.V.I.S. 7-Role Team -->
               <div id="node-card-khavis" onclick="toggleAgentNode('khavis')" class="agent-node-card selected cursor-pointer rounded-xl p-3 bg-[#0E1525] border border-white/10 flex flex-col justify-between space-y-2.5 select-none">
                 <input type="checkbox" name="agent_target" value="khavis" checked class="hidden" onchange="syncTopologyBeams()">
                 <div class="flex items-center justify-between">
@@ -2000,12 +2116,31 @@ _WORKBENCH_PAGE_HEAD = """<!DOCTYPE html>
                   <span id="badge-node-khavis" class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300">已選取</span>
                 </div>
                 <div>
-                  <div class="font-bold text-white text-xs">K.H.A.V.I.S.</div>
+                  <div class="font-bold text-white text-xs">K.A.V.I.S.</div>
                   <div class="text-[10px] text-cyan-400 font-mono truncate mt-0.5">LangGraph 7-Role</div>
                 </div>
                 <div class="text-[10px] text-slate-400 flex items-center justify-between pt-1 border-t border-white/5">
                   <span>Master DAG</span>
                   <i class="fas fa-check-circle text-sky-400 check-indicator"></i>
+                </div>
+              </div>
+
+              <!-- Node 7: K.A.V.I.S. (Tencent) — openclaw × hermes merged remote node -->
+              <div id="node-card-kavis-tencent" onclick="toggleAgentNode('kavis-tencent')" class="agent-node-card cursor-pointer rounded-xl p-3 bg-[#0E1525] border border-white/10 flex flex-col justify-between space-y-2.5 select-none">
+                <input type="checkbox" name="agent_target" value="kavis-tencent" class="hidden" onchange="syncTopologyBeams()">
+                <div class="flex items-center justify-between">
+                  <div class="w-8 h-8 rounded-lg bg-violet-500/20 border border-violet-500/30 flex items-center justify-center text-violet-400">
+                    <i class="fas fa-cloud"></i>
+                  </div>
+                  <span id="badge-node-kavis-tencent" class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-slate-400">待命</span>
+                </div>
+                <div>
+                  <div class="font-bold text-white text-xs">K.A.V.I.S. (Tencent)</div>
+                  <div class="text-[10px] text-violet-400 font-mono truncate mt-0.5">openclaw × hermes</div>
+                </div>
+                <div class="text-[10px] text-slate-400 flex items-center justify-between pt-1 border-t border-white/5">
+                  <span>遠端常駐節點</span>
+                  <i class="fas fa-check-circle text-slate-600 check-indicator"></i>
                 </div>
               </div>
             </div>
@@ -2258,7 +2393,7 @@ _WORKBENCH_PAGE_HEAD = """<!DOCTYPE html>
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 class="text-xl font-bold text-white">雲端主機主機 Agent 集群與用戶自訂 Agent 拓撲</h2>
-            <p class="text-xs text-slate-400">包含 Claude Code (MiniMax-M3.1-Flash), Codex, Antigravity (AGY), MiniMax Code, OpenCode (opencode), K.H.A.V.I.S. 團隊以及您自訂掛載的 Agent</p>
+            <p class="text-xs text-slate-400">包含 Claude Code (MiniMax-M3.1-Flash), Codex, Antigravity (AGY), MiniMax Code, OpenCode (opencode), K.A.V.I.S. 團隊、騰訊雲 K.A.V.I.S. 遠端節點 (openclaw × hermes) 以及您自訂掛載的 Agent</p>
           </div>
           <button type="button" onclick="switchTab('command'); document.getElementById('custom-agent-panel').classList.remove('hidden');" class="px-3.5 py-2 rounded-xl bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 border border-pink-500/30 text-xs font-bold transition">
             <i class="fas fa-plug mr-1"></i>➕ 新增自訂 Agent
@@ -3947,7 +4082,7 @@ _WORKBENCH_CLIENT_JS = """    let currentTab = 'command';
           const data = await res.json();
           history = (data.history || []).map(h => ({
             prompt: h.prompt || `系統協同流水線執行 (${h.phase || h.kind || 'pipeline'})`,
-            consensus_source: h.consensus_source || h.backend || h.phase || 'K.H.A.V.I.S. Pipeline',
+            consensus_source: h.consensus_source || h.backend || h.phase || 'K.A.V.I.S. Pipeline',
             dispatched_at: h.dispatched_at || (h.ts ? new Date(h.ts * 1000).toLocaleString('zh-TW', { hour12: false }) : '剛剛'),
             ok: h.ok !== false,
             latency_ms: h.latency_ms

@@ -1104,6 +1104,35 @@ class Handler(BaseHTTPRequestHandler):
             )
             return
 
+        if path == "/api/workbench/provider_models":
+            content_len = int(self.headers.get("Content-Length", 0))
+            raw_body = self.rfile.read(content_len).decode("utf-8", errors="replace")
+            try:
+                payload = json.loads(raw_body)
+            except Exception:  # noqa: BLE001
+                payload = {}
+
+            from web.workbench import fetch_provider_model_list  # noqa: PLC0415
+
+            try:
+                result = fetch_provider_model_list(
+                    payload if isinstance(payload, dict) else {}
+                )
+            except ValueError as exc:
+                self._send(
+                    400,
+                    json.dumps({"ok": False, "detail": str(exc)}, ensure_ascii=False).encode(),
+                    "application/json; charset=utf-8",
+                )
+                return
+
+            self._send(
+                200,
+                json.dumps(result, ensure_ascii=False).encode(),
+                "application/json; charset=utf-8",
+            )
+            return
+
         if path == "/api/workbench/workspace":
             content_len = int(self.headers.get("Content-Length", 0))
             raw_body = self.rfile.read(content_len).decode("utf-8", errors="replace")
@@ -1284,6 +1313,7 @@ class Handler(BaseHTTPRequestHandler):
                 ClaudeBackend,
                 CodexBackend,
                 CustomAgentBackend,
+                KavisTencentBackend,
                 KhavisBackend,
                 MinimaxBackend,
                 OpencodeBackend,
@@ -1317,7 +1347,9 @@ class Handler(BaseHTTPRequestHandler):
                 *(str(a) for a in agents),
             }
             for aid in all_known_ids:
-                if aid == "khavis":
+                if aid in ("khavis", "kavis-tencent"):
+                    # khavis 在本機 in-process 執行；kavis-tencent 是遠端節點，
+                    # 兩者都不需要本機 workspace。
                     continue
                 agent_cwds[aid] = prepare_agent_cwd(
                     aid, isolation_mode=eff_mode, project_name=eff_project
@@ -1359,6 +1391,9 @@ class Handler(BaseHTTPRequestHandler):
                     cwd=str(agent_cwds.get("opencode", shared_dir)),
                 ),
                 "khavis": KhavisBackend(),
+                "kavis-tencent": KavisTencentBackend(
+                    model=str(agent_models.get("kavis-tencent") or "").strip(),
+                ),
             }
 
             for custom_cfg in load_custom_agents():

@@ -18,6 +18,7 @@ from .claude import ClaudeBackend
 from .codex import CodexBackend
 from .custom import CustomAgentBackend
 from .judge import JudgeBackend
+from .kavis_tencent import KavisTencentBackend
 from .khavis import KhavisBackend
 from .minimax import MinimaxBackend
 from .opencode import OpencodeBackend
@@ -33,4 +34,5 @@ __all__ = [
     "CustomAgentBackend",
     "JudgeBackend",
     "KhavisBackend",
+    "KavisTencentBackend",
 ]

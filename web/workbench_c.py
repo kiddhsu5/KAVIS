@@ -32,19 +32,21 @@ _LINES: Final[list[str]] = _WORKBENCH_PAGE_HEAD.split("\n")
 
 # 1-indexed inclusive slices into _WORKBENCH_PAGE_HEAD (verified by the
 # contract check in tests/test_workbench.py).
+# 注意：行號與 legacy markup 綁定。在 workbench.py 的拓撲／views 區塊增刪行
+# 之後，必須同步更新這張表（insertion after line 648 → 全部 +N）。
 _SLICES: Final[dict[str, tuple[int, int]]] = {
     # 工作區 + Git worktree/diff 主控台
     "workspace": (250, 327),
     # 拓撲畫布 + Agent 節點 + 協同模式 + 任務範本 (不含輸入框, 見 composer)
-    "topology": (329, 702),
+    "topology": (329, 721),
     # 快速範本 + textarea + 能力路由 + 派工按鈕
-    "composer": (703, 756),
+    "composer": (722, 775),
     # 執行面板：狀態列、pipeline stepper、延遲圖、成果容器
-    "result": (761, 847),
+    "result": (780, 866),
     # VIEW 2-5：交付文件 / 額度熔斷 / Agent 集群 / 部署精靈
-    "views": (851, 981),
+    "views": (870, 1000),
     # 產物預覽抽屜
-    "drawers": (986, 1009),
+    "drawers": (1005, 1028),
 }
 
 
@@ -707,7 +709,7 @@ _SIDEBAR: Final[str] = """
         <div class="min-w-0">
           <div class="text-xs font-bold flex items-center gap-1.5" style="color:var(--m-bone)">
             <span>Agent 狀態</span>
-            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded" style="background:var(--m-sage-soft);color:var(--m-sage)"><span id="c-fleet-count">6</span>/6 在線</span>
+            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded" style="background:var(--m-sage-soft);color:var(--m-sage)"><span id="c-fleet-count">7</span>/7 在線</span>
           </div>
           <div class="text-[10px] truncate mt-0.5" style="color:var(--m-faint)">模型新增/刪除/異動 · 新增服務商</div>
         </div>
@@ -917,7 +919,8 @@ const C_AGENT_COLORS = {
   antigravity: ['--m-sage', '#8FA894'],
   minimax:     ['--m-apricot','#C9A17E'],
   opencode:    ['--m-rose',  '#BC8B8B'],
-  khavis:      ['--m-butter','#D9C89E']
+  khavis:      ['--m-butter','#D9C89E'],
+  'kavis-tencent': ['--m-butter', '#A78BFA']
 };
 
 let cTasks = [];            // 任務卡片資料
@@ -1780,7 +1783,8 @@ function cSyncAgentChips() {
 
 const C_AGENT_LABELS = {
   claude:'Claude', codex:'Codex', antigravity:'AGY',
-  minimax:'minimax', opencode:'opencode', khavis:'K.H.A.V.I.S.'
+  minimax:'minimax', opencode:'opencode', khavis:'K.A.V.I.S.',
+  'kavis-tencent':'K.A.V.I.S. (Tencent)'
 };
 
 function cRenderAgentChips() {
@@ -2172,7 +2176,7 @@ async function cLoadTasks() {
       return {
         id: hms ? ('#' + hms.split(':').join('')) : ('#' + (0x8a3f - i * 0x11).toString(16)),
         prompt: h.prompt || '系統派工任務',
-        source: h.consensus_source || 'K.H.A.V.I.S. Pipeline',
+        source: h.consensus_source || 'K.A.V.I.S. Pipeline',
         project: h.project || '',
         thread: h.thread || '',
         step: h.step || 1,
@@ -2465,7 +2469,8 @@ const C_AGENT_ROLES = {
   antigravity: 'Antigravity · 自主 Agentic CLI',
   minimax:     'MiniMax Code · 中文與長上下文',
   opencode:    'OpenCode · 跨模型開源編碼 CLI',
-  khavis:      'LangGraph 7-Role 協同流水線'
+  khavis:      'LangGraph 7-Role 協同流水線',
+  'kavis-tencent': '騰訊雲 openclaw × hermes 合併遠端節點'
 };
 
 function cRenderAgentStatusPanel() {
@@ -2477,7 +2482,7 @@ function cRenderAgentStatusPanel() {
   });
   ['c-fleet-count', 'c-fleet-count-page'].forEach(cid => {
     const countEl = document.getElementById(cid);
-    if (countEl) countEl.textContent = String(seen.length || 6);
+    if (countEl) countEl.textContent = String(seen.length || 7);
   });
 
   host.innerHTML = seen.map(b => {
@@ -2621,80 +2626,185 @@ function cFilterArtifactsPage(queryText, badgeType) {
 }
 
 // ── Agent 狀態 · 模型新增/刪除/調整異動 · 服務商點選新增管理專頁 ────────
+// 服務商模型不再全數列舉：改為「從供應商 /models 端點抓取清單 → 使用者勾選要呈現的模型」。
 const C_PROVIDER_PRESETS = {
   juapi: {
     label: 'JUAPI TokenRouter',
     env: 'JUAPI_API_KEY',
     base_url_env: 'JUAPI_BASE_URL',
     base_url: 'https://www.juapi.net/v1',
-    agents: 'Claude Code (Anthropic Messages) / Codex (OpenAI Responses)',
-    models: 'gemini-4-argon, kimi-k3.1-pro'
+    agents: 'Claude Code (Anthropic Messages) / Codex (OpenAI Responses)'
   },
   openrouter: {
     label: 'OpenRouter 全模型路由',
     env: 'OPENROUTER_API_KEY',
     base_url_env: 'OPENROUTER_BASE_URL',
     base_url: 'https://openrouter.ai/api/v1',
-    agents: '所有 Agent 節點 (OpenCode / Codex / Claude / 自訂 HTTP)',
-    models: 'deepseek/deepseek-chat-v3-0324, anthropic/claude-3.7-sonnet, google/gemini-2.5-pro'
+    agents: '所有 Agent 節點 (OpenCode / Codex / Claude / 自訂 HTTP)'
   },
   deepseek: {
     label: 'DeepSeek 官方 API',
     env: 'DEEPSEEK_API_KEY',
     base_url_env: 'DEEPSEEK_BASE_URL',
     base_url: 'https://api.deepseek.com/v1',
-    agents: 'OpenCode / Codex / DeepSeek Coder',
-    models: 'deepseek-chat, deepseek-reasoner'
+    agents: 'OpenCode / Codex / DeepSeek Coder'
   },
   anthropic: {
     label: 'Anthropic Claude 官方 API',
     env: 'ANTHROPIC_API_KEY',
     base_url_env: 'ANTHROPIC_BASE_URL',
     base_url: 'https://api.anthropic.com',
-    agents: 'Claude Code CLI 官方直連',
-    models: 'claude-sonnet-4-20250514, claude-3-7-sonnet-20250219, claude-3-5-haiku-20241022'
+    agents: 'Claude Code CLI 官方直連'
   },
   groq: {
     label: 'Groq 極速推理雲',
     env: 'GROQ_API_KEY',
     base_url_env: 'GROQ_BASE_URL',
     base_url: 'https://api.groq.com/openai/v1',
-    agents: 'OpenCode / 高速輕量推理節點',
-    models: 'llama-3.3-70b-versatile, qwen-qwq-32b'
+    agents: 'OpenCode / 高速輕量推理節點'
   },
   xai: {
     label: 'xAI Grok 官方 API',
     env: 'XAI_API_KEY',
     base_url_env: 'XAI_BASE_URL',
     base_url: 'https://api.x.ai/v1',
-    agents: 'Codex / OpenCode / Grok 推理節點',
-    models: 'grok-3-beta, grok-3-mini-beta'
+    agents: 'Codex / OpenCode / Grok 推理節點'
   },
   gemini: {
     label: 'Google Gemini AI Studio',
     env: 'GEMINI_API_KEY',
     base_url_env: 'GEMINI_BASE_URL',
     base_url: 'https://generativelanguage.googleapis.com/v1beta/openai',
-    agents: 'Antigravity / Gemini 節點',
-    models: 'gemini-2.5-pro, gemini-2.5-flash'
+    agents: 'Antigravity / Gemini 節點'
   },
   ollama: {
     label: 'Ollama 本地 / 內網推理伺服器',
     env: 'OLLAMA_API_KEY',
     base_url_env: 'OLLAMA_BASE_URL',
     base_url: 'http://127.0.0.1:11434/v1',
-    agents: '本地兜底與離線代碼生成',
-    models: 'qwen2.5-coder:32b, deepseek-r1:32b'
+    agents: '本地兜底與離線代碼生成'
   },
   custom: {
     label: '',
     env: '',
     base_url_env: '',
     base_url: 'https://',
-    agents: '所有 CLI / HTTP Agent 節點',
-    models: ''
+    agents: '所有 CLI / HTTP Agent 節點'
   }
 };
+
+// ── 服務商模型選擇狀態：抓取清單 + 使用者勾選 ─────────────────────────
+let cProvModelPool = [];            // 從供應商抓到（或手動加入）的候選模型
+let cProvModelSelected = new Set(); // 使用者勾選要呈現（綁定）的模型
+
+function cGetSelectedProvModels() {
+  return Array.from(cProvModelSelected);
+}
+
+function cResetProvModels() {
+  cProvModelPool = [];
+  cProvModelSelected = new Set();
+  const box = document.getElementById('c-prov-models-box');
+  if (box) box.classList.add('hidden');
+  const list = document.getElementById('c-prov-models-list');
+  if (list) list.innerHTML = '';
+  const st = document.getElementById('c-prov-models-status');
+  if (st) st.textContent = '尚未抓取 · 填好 API Key 與 Base URL 後即可抓取';
+  const cnt = document.getElementById('c-prov-models-count');
+  if (cnt) cnt.textContent = '0';
+}
+
+function cSetProvSavedModels(modelsStr) {
+  const ids = String(modelsStr || '').split(',').map(s => s.trim()).filter(Boolean);
+  cProvModelSelected = new Set(ids);
+  ids.forEach(id => { if (!cProvModelPool.includes(id)) cProvModelPool.push(id); });
+  const box = document.getElementById('c-prov-models-box');
+  if (box && ids.length) box.classList.remove('hidden');
+  const st = document.getElementById('c-prov-models-status');
+  if (st && ids.length) st.textContent = `已同步 ${ids.length} 個現存綁定模型，可抓取完整清單後調整勾選`;
+  cRenderProvModelList();
+}
+
+function cRenderProvModelList() {
+  const list = document.getElementById('c-prov-models-list');
+  if (!list) return;
+  const filterEl = document.getElementById('c-prov-models-filter');
+  const kw = ((filterEl && filterEl.value) || '').trim().toLowerCase();
+  const ids = cProvModelPool.filter(id => !kw || id.toLowerCase().includes(kw));
+  if (!ids.length) {
+    list.innerHTML = '<div class="text-[10px] text-slate-500 py-1">' +
+      (cProvModelPool.length ? '沒有符合的模型' : '尚無清單：點「從供應商抓取模型清單」，或於下方手動加入') + '</div>';
+  } else {
+    list.innerHTML = ids.map(id => `
+      <label class="flex items-center gap-2 px-1.5 py-1 rounded hover:bg-white/5 cursor-pointer">
+        <input type="checkbox" ${cProvModelSelected.has(id) ? 'checked' : ''} onchange="cToggleProvModel('${escapeHtml(id)}', this.checked)" class="accent-emerald-400 shrink-0" />
+        <span class="text-[11px] font-mono text-slate-200 truncate">${escapeHtml(id)}</span>
+      </label>`).join('');
+  }
+  const cnt = document.getElementById('c-prov-models-count');
+  if (cnt) cnt.textContent = String(cProvModelSelected.size);
+}
+
+function cToggleProvModel(id, on) {
+  if (on) cProvModelSelected.add(id);
+  else cProvModelSelected.delete(id);
+  const cnt = document.getElementById('c-prov-models-count');
+  if (cnt) cnt.textContent = String(cProvModelSelected.size);
+}
+
+function cAddManualProvModel() {
+  const inp = document.getElementById('c-prov-models-manual');
+  const id = ((inp && inp.value) || '').trim();
+  if (!id) { cToast('請輸入模型 ID', 'err'); return; }
+  if (!/^[A-Za-z0-9._:\\-\\/]{1,80}$/.test(id)) { cToast('模型 ID 格式無效（限英數字與 . _ : - /）', 'err'); return; }
+  if (!cProvModelPool.includes(id)) cProvModelPool.push(id);
+  cProvModelSelected.add(id);
+  if (inp) inp.value = '';
+  const box = document.getElementById('c-prov-models-box');
+  if (box) box.classList.remove('hidden');
+  cRenderProvModelList();
+  cToast(`已加入模型「${id}」並勾選`, 'ok');
+}
+
+async function cFetchProviderModels() {
+  const getVal = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+  const env = getVal('c-prov-env').toUpperCase();
+  if (!env) {
+    cToast('請先填「金鑰環境變數名稱」（或點選上方服務商範本自動帶入）', 'err');
+    return;
+  }
+  const st = document.getElementById('c-prov-models-status');
+  if (st) st.textContent = '⏳ 正在向供應商抓取模型清單…';
+  try {
+    const res = await fetch('/api/workbench/provider_models', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        env,
+        base_url: getVal('c-prov-url'),
+        base_url_env: getVal('c-prov-url-env').toUpperCase(),
+        api_key: getVal('c-prov-key')
+      })
+    });
+    const data = await res.json();
+    if (!res.ok || data.ok === false) {
+      const reason = data.detail || data.status || ('HTTP ' + res.status);
+      if (st) st.textContent = '❌ 抓取失敗：' + reason;
+      cToast('抓取模型清單失敗：' + reason, 'err');
+      return;
+    }
+    cProvModelPool = Array.isArray(data.models) ? data.models.slice() : [];
+    cProvModelSelected.forEach(id => { if (!cProvModelPool.includes(id)) cProvModelPool.push(id); });
+    const box = document.getElementById('c-prov-models-box');
+    if (box) box.classList.remove('hidden');
+    cRenderProvModelList();
+    if (st) st.textContent = `✅ 抓到 ${cProvModelPool.length} 個模型，請勾選要呈現的項目`;
+    cToast(`✅ 已從「${data.label || env}」抓到 ${cProvModelPool.length} 個模型`, 'ok');
+  } catch (err) {
+    if (st) st.textContent = '❌ 連線錯誤：' + err.message;
+    cToast('抓取模型清單連線錯誤：' + err.message, 'err');
+  }
+}
 
 function cFillProviderPreset(presetKey) {
   const p = C_PROVIDER_PRESETS[presetKey] || C_PROVIDER_PRESETS.custom;
@@ -2704,7 +2814,7 @@ function cFillProviderPreset(presetKey) {
   setVal('c-prov-url-env', p.base_url_env);
   setVal('c-prov-url', p.base_url);
   setVal('c-prov-agents', p.agents);
-  setVal('c-prov-models', p.models);
+  cResetProvModels();
   const keyInput = document.getElementById('c-prov-key');
   if (keyInput) {
     keyInput.value = '';
@@ -2714,7 +2824,7 @@ function cFillProviderPreset(presetKey) {
   if (formBox && typeof formBox.scrollIntoView === 'function') {
     formBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
-  cToast(`已帶入「${p.label || '自訂服務商'}」範本，貼上 API Key 即可一鍵新增！`, 'ok');
+  cToast(`已帶入「${p.label || '自訂服務商'}」範本，貼上 API Key 後即可抓取並勾選模型！`, 'ok');
 }
 
 function cEditExistingProvider(envKey, label, baseUrl, baseUrlEnv, agentsDesc, modelsStr) {
@@ -2724,7 +2834,8 @@ function cEditExistingProvider(envKey, label, baseUrl, baseUrlEnv, agentsDesc, m
   setVal('c-prov-url-env', baseUrlEnv);
   setVal('c-prov-url', baseUrl);
   setVal('c-prov-agents', agentsDesc);
-  setVal('c-prov-models', modelsStr);
+  cResetProvModels();
+  cSetProvSavedModels(modelsStr);
   const keyInput = document.getElementById('c-prov-key');
   if (keyInput) keyInput.focus();
   const formBox = document.getElementById('c-provider-form-box');
@@ -2742,7 +2853,7 @@ async function cUpsertProvider() {
   const base_url = getVal('c-prov-url');
   const base_url_env = getVal('c-prov-url-env').toUpperCase();
   const agents = getVal('c-prov-agents') || '通用 Agent 節點';
-  const models = getVal('c-prov-models');
+  const models = cGetSelectedProvModels().join(', ');
   const target_agent = getVal('c-prov-target-agent') || 'all';
 
   if (!label && !env) {
@@ -3565,7 +3676,7 @@ _PAGE_AGENTS_TOP: Final[str] = """
         <div class="glass-panel p-4 rounded-2xl border border-white/10 space-y-3">
           <div class="flex items-center gap-2 flex-wrap">
             <h3 class="font-bold text-sm text-white">即時 Agent 狀態</h3>
-            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded" style="background:var(--m-sage-soft);color:var(--m-sage)"><span id="c-fleet-count-page">6</span>/6 在線</span>
+            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded" style="background:var(--m-sage-soft);color:var(--m-sage)"><span id="c-fleet-count-page">7</span>/7 在線</span>
             <span class="text-[11px] text-slate-400">點選卡片可啟用／停用該 Agent 參與派工</span>
           </div>
           <div id="c-agent-status-list" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-1.5"></div>
@@ -3612,8 +3723,22 @@ _PAGE_AGENTS_BOTTOM: Final[str] = """
               <input id="c-prov-url-env" type="text" placeholder="例如 DEEPSEEK_BASE_URL" class="w-full bg-[#050811] border border-white/15 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-sky-400" /></label>
             <label class="text-[11px] text-slate-400 space-y-1">適用 Agent 說明
               <input id="c-prov-agents" type="text" placeholder="例如 OpenCode / Codex" class="w-full bg-[#050811] border border-white/15 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-400" /></label>
-            <label class="text-[11px] text-slate-400 space-y-1">③ 綁定模型（逗號分隔，會同步加進模型選單）
-              <input id="c-prov-models" type="text" placeholder="deepseek-chat, deepseek-reasoner" class="w-full bg-[#050811] border border-white/15 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-sky-400" /></label>
+            <label class="text-[11px] text-slate-400 space-y-1">③ 綁定模型（從供應商抓取清單，勾選要呈現的模型）
+              <div class="space-y-2">
+                <div class="flex items-center gap-1.5">
+                  <button type="button" onclick="cFetchProviderModels()" class="px-3 py-1.5 rounded-lg bg-sky-500/20 hover:bg-sky-500/35 text-sky-300 border border-sky-500/40 text-xs font-bold shrink-0 transition">🔄 從供應商抓取模型清單</button>
+                  <span id="c-prov-models-status" class="text-[10px] font-mono text-slate-500 truncate">尚未抓取 · 填好 API Key 與 Base URL 後即可抓取</span>
+                </div>
+                <div id="c-prov-models-box" class="hidden rounded-lg bg-[#050811] border border-white/15 p-2 space-y-2">
+                  <input id="c-prov-models-filter" type="search" oninput="cRenderProvModelList()" placeholder="搜尋過濾模型…" autocomplete="off" class="w-full bg-transparent border border-white/10 rounded px-2 py-1 text-[11px] font-mono text-white placeholder-slate-500 focus:outline-none focus:border-sky-400" />
+                  <div id="c-prov-models-list" class="max-h-44 overflow-y-auto space-y-0.5 pr-1"></div>
+                  <div class="flex items-center gap-1.5">
+                    <input id="c-prov-models-manual" type="text" onkeydown="if(event.key==='Enter'){event.preventDefault();cAddManualProvModel();}" placeholder="供應商無 /models 端點時，手動輸入模型 ID…" autocomplete="off" class="flex-1 bg-transparent border border-white/10 rounded px-2 py-1 text-[11px] font-mono text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400" />
+                    <button type="button" onclick="cAddManualProvModel()" class="px-2 py-1 rounded bg-emerald-500/20 hover:bg-emerald-500/35 text-emerald-300 border border-emerald-500/40 text-[11px] font-bold shrink-0 transition">＋加入</button>
+                  </div>
+                  <div class="text-[10px] font-mono text-slate-400">已勾選 <span id="c-prov-models-count" class="text-emerald-300">0</span> 個模型（只有勾選的會寫入服務商並同步到模型選單）</div>
+                </div>
+              </div></label>
             <label class="text-[11px] text-slate-400 space-y-1">模型加入哪個 Agent
               <select id="c-prov-target-agent" class="w-full bg-[#050811] border border-white/15 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-sky-400"><option value="all">全部 Agent</option></select></label>
           </div>
