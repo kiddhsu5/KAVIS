@@ -961,9 +961,127 @@ def get_agent_fleet_status() -> list[dict[str, Any]]:
     return agents
 
 
+
+_OUTPUT_DOC_PRIORITY: dict[str, int] = {
+    ".docx": 1,
+    ".pdf": 2,
+    ".pptx": 3,
+    ".xlsx": 4,
+    ".md": 5,
+    ".html": 6,
+    ".txt": 7,
+    ".csv": 8,
+    ".zip": 9,
+}
+
+
+def discover_project_output_files(
+    project_name: str | None = None,
+    limit: int = 30,
+) -> list[dict[str, Any]]:
+    """Scan workspace/<project>/{output,outputs,deliverables} and PROJECT_ROOT/{output,outputs,deliverables}."""
+    from core.workspace_manager import (  # noqa: PLC0415
+        get_active_project_name,
+        get_workspace_root,
+    )
+
+    ws_root = get_workspace_root()
+    proj_name = (project_name or get_active_project_name() or "shared-app").strip()
+    proj_dir = (ws_root / proj_name).resolve()
+
+    search_roots: list[tuple[Path, Path]] = []
+    for sub in ("deliverables", "output", "outputs"):
+        cand = proj_dir / sub
+        if cand.exists() and cand.is_dir():
+            search_roots.append((cand, proj_dir))
+
+    seen_paths: set[str] = set()
+    found: list[tuple[tuple[int, float, str], dict[str, Any]]] = []
+    skip_dirs = {
+        ".git",
+        ".worktrees",
+        ".venv",
+        "venv",
+        "docenv",
+        "node_modules",
+        "__pycache__",
+        "references",
+        "tmp",
+        ".khavis_attachments",
+    }
+
+    for folder, base in search_roots:
+        for p in folder.rglob("*"):
+            if not p.is_file():
+                continue
+            rel = p.relative_to(base)
+            if any(part.startswith(".") or part in skip_dirs for part in rel.parts):
+                continue
+            ext = p.suffix.lower()
+            if ext in _BLOCKED_SUFFIXES or ext in {".pyc", ".pyo"}:
+                continue
+            # Skip helper python build scripts inside deliverables/output folders
+            if ext == ".py" and rel.parts[0] in ("deliverables", "output"):
+                continue
+            full_str = str(p.resolve())
+            if full_str in seen_paths:
+                continue
+            seen_paths.add(full_str)
+            try:
+                st = p.stat()
+            except OSError:
+                continue
+            size_kb = max(0.1, round(st.st_size / 1024, 1))
+            size_str = f"{size_kb} KB" if st.st_size >= 100 else f"{st.st_size} B"
+            prio = _OUTPUT_DOC_PRIORITY.get(ext, 20)
+            badge = ext.lstrip(".").upper() or "FILE"
+            icon_map = {
+                ".docx": "fa-file-word",
+                ".pdf": "fa-file-pdf",
+                ".md": "fa-file-alt",
+                ".xlsx": "fa-file-excel",
+                ".pptx": "fa-file-powerpoint",
+                ".zip": "fa-file-archive",
+            }
+            item = {
+                "name": p.name,
+                "path": str(rel),
+                "rel_path": str(rel),
+                "full_path": full_str,
+                "status": "A",
+                "type": "output",
+                "size": size_str,
+                "mtime": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(st.st_mtime)),
+                "icon": icon_map.get(ext, "fa-file-download"),
+                "badge": badge,
+                "ext": ext,
+            }
+            found.append(((prio, -st.st_mtime, p.name), item))
+
+    found.sort(key=lambda pair: pair[0])
+    return [item for _, item in found[:limit]]
+
+
 def list_deliverable_artifacts() -> list[dict[str, Any]]:
     """Scan workspace for delivered documents, presentations, and code artifacts."""
     artifacts: list[dict[str, Any]] = []
+    seen_full: set[str] = set()
+
+    for out_item in discover_project_output_files(limit=40):
+        fp = str(out_item.get("full_path") or out_item.get("path") or "")
+        seen_full.add(fp)
+        artifacts.append(
+            {
+                "name": out_item["name"],
+                "rel_path": out_item["rel_path"],
+                "path": fp,
+                "type": "doc" if out_item.get("ext") in {".docx", ".pdf", ".md", ".txt"} else "output",
+                "size": out_item["size"],
+                "mtime": out_item["mtime"],
+                "icon": out_item.get("icon", "fa-file-download"),
+                "badge": out_item.get("badge", "OUTPUT"),
+            }
+        )
 
     # Key generated files in khavis
     scan_targets = [
@@ -1003,8 +1121,8 @@ def list_deliverable_artifacts() -> list[dict[str, Any]]:
     ]
 
     for rel_path, title, cat, icon in scan_targets:
-        p = PROJECT_ROOT / rel_path
-        if p.exists():
+        p = (PROJECT_ROOT / rel_path).resolve()
+        if p.exists() and str(p) not in seen_full:
             st = p.stat()
             size_kb = max(1, round(st.st_size / 1024, 1))
             artifacts.append(
@@ -1024,6 +1142,99 @@ def list_deliverable_artifacts() -> list[dict[str, Any]]:
 
 
 _BLOCKED_SUFFIXES = {".env", ".pem", ".key", ".sec", ".ses", ".p12", ".pfx", ".sqlite", ".db"}
+_BINARY_DOC_SUFFIXES = {".docx", ".pdf", ".pptx", ".xlsx", ".zip", ".png", ".jpg", ".jpeg", ".webp"}
+
+
+def _resolve_candidate_artifact_path(raw: str) -> Path | None:
+    """Resolve a relative or absolute artifact path against workspace or project root."""
+    from core.workspace_manager import (  # noqa: PLC0415
+        get_active_project_name,
+        get_workspace_root,
+    )
+
+    cleaned = (raw or "").strip()
+    if not cleaned:
+        return None
+    p = Path(cleaned)
+    if p.is_absolute():
+        return p.resolve()
+
+    ws_root = get_workspace_root()
+    active_proj = (get_active_project_name() or "shared-app").strip()
+    for base in (ws_root / active_proj, ws_root, PROJECT_ROOT):
+        cand = (base / p).resolve()
+        if cand.exists():
+            return cand
+    return (PROJECT_ROOT / p).resolve()
+
+
+def resolve_downloadable_artifact(rel_or_abs_path: str) -> Path | None:
+    """Validate and resolve a file path for binary download."""
+    from core.workspace_manager import get_workspace_root  # noqa: PLC0415
+
+    target_path = _resolve_candidate_artifact_path(rel_or_abs_path)
+    if target_path is None:
+        return None
+
+    if (
+        any(part.startswith(".") for part in target_path.parts)
+        or target_path.suffix.lower() in _BLOCKED_SUFFIXES
+    ):
+        return None
+
+    allowed_items = list_deliverable_artifacts()
+    allowed_paths = {Path(item["path"]).resolve() for item in allowed_items if "path" in item}
+    ws_root = get_workspace_root()
+    allowed_roots = (
+        ws_root,
+        (PROJECT_ROOT / "outputs").resolve(),
+        (PROJECT_ROOT / "output").resolve(),
+        (PROJECT_ROOT / "deliverables").resolve(),
+    )
+    is_allowed = (
+        target_path in allowed_paths
+        or any(target_path.is_relative_to(r) for r in allowed_roots)
+        or any(ap.is_dir() and target_path.is_relative_to(ap) for ap in allowed_paths)
+    )
+    if not is_allowed or not target_path.exists() or not target_path.is_file():
+        return None
+    return target_path
+
+
+def _extract_docx_preview(target_path: Path) -> str:
+    """Extract human-readable text from a .docx file using stdlib zipfile + xml."""
+    import xml.etree.ElementTree as ET  # noqa: PLC0415
+    import zipfile  # noqa: PLC0415
+
+    lines: list[str] = [
+        f"📄 Word 產出文檔預覽：{target_path.name}",
+        "（提示：點擊「📥 下載」按鈕即可下載完整排版之 .docx 檔案）",
+        "=" * 64,
+    ]
+    try:
+        with zipfile.ZipFile(target_path, "r") as zf:
+            if "word/document.xml" not in zf.namelist():
+                return "\n".join(lines)
+            xml_bytes = zf.read("word/document.xml")
+        root = ET.fromstring(xml_bytes)
+        ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+        for elem in root.iter():
+            tag = elem.tag.rsplit("}", 1)[-1]
+            if tag == "p":
+                texts = [t.text for t in elem.findall(".//w:t", ns) if t.text]
+                para = "".join(texts).strip()
+                if para:
+                    lines.append(para)
+            elif tag == "tr":
+                cells: list[str] = []
+                for tc in elem.findall("./w:tc", ns):
+                    ctexts = [t.text for t in tc.findall(".//w:t", ns) if t.text]
+                    cells.append("".join(ctexts).strip())
+                if any(cells):
+                    lines.append(" | ".join(cells))
+    except Exception as exc:  # noqa: BLE001
+        lines.append(f"（無法直接解析預覽：{exc}，請直接點擊「📥 下載」按鈕下載檔案）")
+    return "\n".join(lines)
 
 
 def read_artifact_content(rel_or_abs_path: str) -> dict[str, Any]:
@@ -1034,11 +1245,9 @@ def read_artifact_content(rel_or_abs_path: str) -> dict[str, Any]:
     if not raw:
         return {"ok": False, "error": "Empty artifact path"}
 
-    target_path = Path(raw)
-    if not target_path.is_absolute():
-        target_path = (PROJECT_ROOT / target_path).resolve()
-    else:
-        target_path = target_path.resolve()
+    target_path = _resolve_candidate_artifact_path(raw)
+    if target_path is None:
+        return {"ok": False, "error": "Empty artifact path"}
 
     if (
         any(part.startswith(".") for part in target_path.parts)
@@ -1049,9 +1258,15 @@ def read_artifact_content(rel_or_abs_path: str) -> dict[str, Any]:
     allowed_items = list_deliverable_artifacts()
     allowed_paths = {Path(item["path"]).resolve() for item in allowed_items if "path" in item}
     ws_root = get_workspace_root()
+    allowed_roots = (
+        ws_root,
+        (PROJECT_ROOT / "outputs").resolve(),
+        (PROJECT_ROOT / "output").resolve(),
+        (PROJECT_ROOT / "deliverables").resolve(),
+    )
     is_allowed = (
         target_path in allowed_paths
-        or target_path.is_relative_to(ws_root)
+        or any(target_path.is_relative_to(r) for r in allowed_roots)
         or any(ap.is_dir() and target_path.is_relative_to(ap) for ap in allowed_paths)
     )
     if not is_allowed:
@@ -1091,6 +1306,44 @@ def read_artifact_content(rel_or_abs_path: str) -> dict[str, Any]:
     if not target_path.is_file():
         return {"ok": False, "error": "File not found"}
 
+    ext = target_path.suffix.lower()
+    if ext == ".docx":
+        preview_text = _extract_docx_preview(target_path)
+        return {
+            "ok": True,
+            "filename": target_path.name,
+            "path": str(target_path),
+            "size": target_path.stat().st_size,
+            "content": preview_text,
+            "ext": ext,
+        }
+
+    if ext in _BINARY_DOC_SUFFIXES:
+        st = target_path.stat()
+        size_kb = max(0.1, round(st.st_size / 1024, 1))
+        # Check if a matching .md or .txt file exists alongside or in output/ipas
+        md_sibling = target_path.with_suffix(".md")
+        if not md_sibling.exists() and target_path.parent.name == "pdf":
+            alt_dir = target_path.parent.parent / "ipas"
+            if (alt_dir / f"{target_path.stem}.md").exists():
+                md_sibling = alt_dir / f"{target_path.stem}.md"
+        preview_lines = [
+            f"📄 產出文檔：{target_path.name}（{size_kb} KB）",
+            "👉 請點擊「📥 下載」按鈕直接下載完整檔案至您的電腦檢視。",
+        ]
+        if md_sibling.exists():
+            preview_lines.append("=" * 64)
+            preview_lines.append(md_sibling.read_text(encoding="utf-8", errors="replace"))
+        joined_preview = "\n".join(preview_lines)
+        return {
+            "ok": True,
+            "filename": target_path.name,
+            "path": str(target_path),
+            "size": st.st_size,
+            "content": joined_preview,
+            "ext": ext,
+        }
+
     try:
         content = target_path.read_text(encoding="utf-8", errors="replace")
         return {
@@ -1099,7 +1352,7 @@ def read_artifact_content(rel_or_abs_path: str) -> dict[str, Any]:
             "path": str(target_path),
             "size": len(content),
             "content": content,
-            "ext": target_path.suffix.lower(),
+            "ext": ext,
         }
     except Exception as exc:  # noqa: BLE001
         return {"ok": False, "error": str(exc)}
@@ -3045,6 +3298,7 @@ _WORKBENCH_CLIENT_JS = """    let currentTab = 'command';
     let latestNextActions = [];
     let latestFinalDeliverableText = '';
     let latestReviewDetailsText = '';
+    let latestProducedFiles = [];
 
     const COLLAB_MODE_DESCS = {
       auto_loop: '🔥 預設推薦：各 Agent 同時動手實作 → 自動交叉檢查與相互批評 → 自動補執行並產出唯一高完成度結果',
@@ -3150,6 +3404,7 @@ _WORKBENCH_CLIENT_JS = """    let currentTab = 'command';
         promptInputEl.style.height = 'auto';
       }
       latestFinalDeliverableText = '';
+      latestProducedFiles = [];
 
       const capability = document.getElementById('capability-hint').value;
       const btn = document.getElementById('btn-dispatch');
@@ -3276,6 +3531,17 @@ _WORKBENCH_CLIENT_JS = """    let currentTab = 'command';
         const sharedChanged = Array.isArray(data.shared_changed_files) ? data.shared_changed_files : [];
         const producedMap = new Map();
         const baseDir = String(data.shared_dir || '').replace(/\\/+$/, '');
+        (Array.isArray(data.output_files) ? data.output_files : []).forEach(f => {
+          const p = typeof f === 'string' ? f : (f && f.path ? String(f.path) : '');
+          if (!p) return;
+          const full = (f && f.full_path) ? String(f.full_path) : (baseDir ? `${baseDir}/${p}` : p);
+          producedMap.set(p, {
+            path: p,
+            full_path: full,
+            status: (f && f.status) ? String(f.status) : 'A',
+            size: (f && f.size) ? String(f.size) : ''
+          });
+        });
         sharedChanged.forEach(f => {
           const p = typeof f === 'string' ? f : (f && f.path ? String(f.path) : '');
           if (!p) return;
@@ -3303,6 +3569,7 @@ _WORKBENCH_CLIENT_JS = """    let currentTab = 'command';
           });
         }
         const producedFiles = Array.from(producedMap.values());
+        latestProducedFiles = producedFiles;
 
         const nextButtonsHtml = latestNextActions.map((act, idx) => `
           <button type="button" onclick="runNextStepAction(${idx})" class="px-3 py-2 rounded-xl bg-sky-500/15 hover:bg-sky-500/30 text-sky-200 border border-sky-500/30 text-xs font-medium text-left transition flex items-center justify-between gap-2 group">
@@ -3311,39 +3578,10 @@ _WORKBENCH_CLIENT_JS = """    let currentTab = 'command';
           </button>
         `).join('');
 
-        const filesSectionHtml = producedFiles.length > 0 ? `
-          <div class="p-4 rounded-xl bg-teal-950/25 border border-teal-500/35 space-y-2.5">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <div class="flex items-center gap-2 text-xs font-bold text-teal-200">
-                <i class="fas fa-file-code text-teal-400"></i>
-                <span>📄 本輪產出與變更文件 (${producedFiles.length})</span>
-              </div>
-              <button type="button" onclick="if(typeof cShowDiff==='function'){cShowDiff();}else{toggleWorkspaceDiffPanel();}" class="px-2.5 py-1 rounded-lg bg-teal-500/15 hover:bg-teal-500/30 text-teal-200 border border-teal-500/30 text-[11px] font-mono transition">
-                查看檔案 Diff 差異
-              </button>
-            </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              ${producedFiles.map(f => {
-                const badgeText = (f.status === '??' || f.status === 'A') ? '新增' : '更新';
-                return `
-                  <button type="button" onclick="openArtifact('${escapeHtml(f.full_path)}', '${escapeHtml(f.path)}')" class="px-3 py-2 rounded-lg bg-[#050811]/85 hover:bg-teal-500/15 border border-white/10 hover:border-teal-500/40 text-left transition flex items-center justify-between gap-2 group">
-                    <div class="flex items-center gap-2 min-w-0">
-                      <span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-teal-500/20 text-teal-300 shrink-0">${badgeText}</span>
-                      <span class="text-xs font-mono text-sky-300 group-hover:underline truncate" title="${escapeHtml(f.path)}">${escapeHtml(f.path)}</span>
-                    </div>
-                    <span class="text-[10px] font-mono text-slate-400 shrink-0">${escapeHtml(f.size || '預覽 →')}</span>
-                  </button>
-                `;
-              }).join('')}
-            </div>
-          </div>
-        ` : '';
-
+        // 成果文件與內容已直接顯示在對話氣泡內，此處僅保留「接下來要怎麼做」
         const heroCard = document.createElement('div');
         heroCard.className = 'rounded-2xl bg-[#080E1E]/90 border border-white/10 p-4 space-y-3 shadow-lg';
         heroCard.innerHTML = `
-          ${filesSectionHtml}
-
           <!-- 🚀 NEXT-STEP CONTINUATION BAR (一鍵下一步 & 直接追問接力) -->
           <div class="p-4 rounded-xl bg-[#0B1326] border border-sky-500/30 space-y-3">
             <div class="flex flex-wrap items-center justify-between gap-2">
@@ -3369,10 +3607,10 @@ _WORKBENCH_CLIENT_JS = """    let currentTab = 'command';
         `;
         resultsContainer.appendChild(heroCard);
 
-        // 3. COLLAPSIBLE DRAWER: 👥 各 Agent 實作過程、接力棒次與 Diff 明細 (Decluttered!)
+        // 3. COLLAPSIBLE DRAWER: 👥 各 Agent 實作過程、接力棒次與 Diff 明細 (僅在開啟「進階明細」時顯示)
         if (data.results && data.results.length > 0) {
           const detailsEl = document.createElement('details');
-          detailsEl.className = 'rounded-2xl bg-white/[0.03] border border-white/10 overflow-hidden';
+          detailsEl.className = 'c-adv-only rounded-2xl bg-white/[0.03] border border-white/10 overflow-hidden';
 
           const cardsInner = data.results.map(res => {
             const changedFiles = Array.isArray(res.changed_files) ? res.changed_files : [];

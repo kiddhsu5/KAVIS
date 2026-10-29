@@ -394,6 +394,21 @@ def collect_directory_diff(target_dir: Path) -> dict[str, Any]:
     }
 
 
+_SKIP_WORKSPACE_DIRS = {
+    ".git",
+    ".worktrees",
+    ".venv",
+    "venv",
+    "docenv",
+    "node_modules",
+    "__pycache__",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".khavis_attachments",
+    "tmp",
+}
+
+
 def list_project_files(proj_dir: Path) -> list[dict[str, Any]]:
     """List user files inside the shared project workspace."""
     files: list[dict[str, Any]] = []
@@ -405,7 +420,7 @@ def list_project_files(proj_dir: Path) -> list[dict[str, Any]]:
             continue
         rel = p.relative_to(proj_dir)
         if any(
-            part.startswith(".git") or part == ".worktrees" or part == "__pycache__"
+            part.startswith(".git") or part in _SKIP_WORKSPACE_DIRS
             for part in rel.parts
         ):
             continue

@@ -85,6 +85,76 @@ def _redact(text: str) -> str:
     return text
 
 
+_MAX_OUTPUT_FILES = 30
+
+
+def _collect_output_files(
+    orch: dict[str, Any],
+    project_name: str | None = None,
+) -> list[dict[str, str]]:
+    """彙整本輪實際產出／變更的文件（去重），供前端只呈現「成果文件」。
+
+    只保留路徑、狀態與大小，不含 diff 與各 Agent 的過程資料。
+    """
+    files: dict[str, dict[str, str]] = {}
+
+    def _add(entry: Any, base_dir: str = "") -> None:
+        if isinstance(entry, str):
+            entry = {"path": entry}
+        if not isinstance(entry, dict):
+            return
+        rel = str(entry.get("path") or "").strip().rstrip("/")
+        if not rel or rel in files or len(files) >= _MAX_OUTPUT_FILES:
+            return
+        full = str(entry.get("full_path") or "").strip()
+        if not full and base_dir:
+            full = f"{base_dir.rstrip('/')}/{rel}"
+        p_obj = Path(full) if full else None
+        if p_obj and p_obj.exists() and p_obj.is_dir():
+            return
+        size_str = str(entry.get("size") or "")
+        if not size_str and p_obj and p_obj.exists() and p_obj.is_file():
+            try:
+                st = p_obj.stat()
+                size_str = (
+                    f"{max(0.1, round(st.st_size / 1024, 1))} KB"
+                    if st.st_size >= 100
+                    else f"{st.st_size} B"
+                )
+            except OSError:
+                size_str = ""
+        files[rel] = {
+            "path": rel,
+            "full_path": full or rel,
+            "status": str(entry.get("status") or "M"),
+            "size": size_str,
+        }
+
+    for entry in orch.get("shared_changed_files") or []:
+        _add(entry, str(orch.get("shared_dir") or ""))
+    for res in orch.get("results") or []:
+        if not isinstance(res, dict):
+            continue
+        cwd = str(res.get("cwd") or "")
+        for entry in res.get("changed_files") or []:
+            _add(entry, cwd)
+
+    if project_name:
+        from web.workbench import discover_project_output_files  # noqa: PLC0415
+
+        for disc in discover_project_output_files(project_name, limit=_MAX_OUTPUT_FILES):
+            rel = str(disc.get("path") or "").strip()
+            if not rel or rel in files or len(files) >= _MAX_OUTPUT_FILES:
+                continue
+            files[rel] = {
+                "path": rel,
+                "full_path": str(disc.get("full_path") or rel),
+                "status": str(disc.get("status") or "A"),
+                "size": str(disc.get("size") or ""),
+            }
+    return list(files.values())
+
+
 _MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 _MAX_ATTACHMENT_TOTAL_BYTES = 25 * 1024 * 1024
 _MAX_ATTACHMENT_COUNT = 8
@@ -424,12 +494,20 @@ def render_html(
 class Handler(BaseHTTPRequestHandler):
     server_version = "khavis-status/1.0"
 
-    def _send(self, code: int, body: bytes, content_type: str) -> None:
+    def _send(
+        self,
+        code: int,
+        body: bytes,
+        content_type: str,
+        extra_headers: dict[str, str] | None = None,
+    ) -> None:
         try:
             self.send_response(code)
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
+            for k, v in (extra_headers or {}).items():
+                self.send_header(k, v)
             self.end_headers()
             self.wfile.write(body)
         except (BrokenPipeError, ConnectionResetError):
@@ -666,6 +744,7 @@ class Handler(BaseHTTPRequestHandler):
             "/api/workbench/history",
             "/api/workbench/artifacts",
             "/api/workbench/artifacts/read",
+            "/api/workbench/artifacts/download",
             "/api/workbench/agents",
             "/api/workbench/models",
             "/api/workbench/workspace",
@@ -725,9 +804,27 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/workbench/history":
             from bot import history as bot_history  # noqa: PLC0415
+            from web.workbench import discover_project_output_files  # noqa: PLC0415
 
             raw_items = bot_history.tail(200)
             formatted: list[dict[str, object]] = []
+            proj_outputs_cache: dict[str, list[dict[str, str]]] = {}
+
+            def _fallback_outputs(proj_name: str) -> list[dict[str, str]]:
+                key = proj_name or "shared-app"
+                if key not in proj_outputs_cache:
+                    proj_outputs_cache[key] = [
+                        {
+                            "path": str(f.get("path") or ""),
+                            "full_path": str(f.get("full_path") or f.get("path") or ""),
+                            "status": str(f.get("status") or "A"),
+                            "size": str(f.get("size") or ""),
+                        }
+                        for f in discover_project_output_files(key, limit=_MAX_OUTPUT_FILES)
+                        if f.get("path")
+                    ]
+                return proj_outputs_cache[key]
+
             for item in raw_items:
                 if not isinstance(item, dict):
                     continue
@@ -767,6 +864,21 @@ class Handler(BaseHTTPRequestHandler):
                         else []
                     )
                 )
+                proj_str = str(item.get("project") or "")
+                raw_out_files = [
+                    {
+                        "path": str(f.get("path") or ""),
+                        "full_path": str(f.get("full_path") or f.get("path") or ""),
+                        "status": str(f.get("status") or "M"),
+                        "size": str(f.get("size") or ""),
+                    }
+                    for f in (item.get("output_files") or [])
+                    if isinstance(f, dict)
+                    and f.get("path")
+                    and not str(f.get("path") or "").endswith("/")
+                ][:_MAX_OUTPUT_FILES]
+                if not raw_out_files and bool(item.get("ok", True)):
+                    raw_out_files = _fallback_outputs(proj_str)[:_MAX_OUTPUT_FILES]
                 formatted.append(
                     {
                         "prompt": _redact(prompt_text),
@@ -777,7 +889,7 @@ class Handler(BaseHTTPRequestHandler):
                         # 分組維度 + 重讀成果用（見 module docstring）
                         "backends": backends,
                         "collab_mode": str(item.get("collab_mode") or ""),
-                        "project": str(item.get("project") or ""),
+                        "project": proj_str,
                         "thread": str(item.get("thread") or ""),
                         "step": int(item.get("step") or 0) or 1,
                         # ts 是記錄的唯一識別：舊紀錄的 handle 只到秒，
@@ -789,6 +901,8 @@ class Handler(BaseHTTPRequestHandler):
                         "review_details": _redact(
                             str(item.get("review_details") or "").replace(_legacy_cli, "opencode")
                         )[:12000],
+                        # 本輪產出文件（只含路徑/狀態/大小），讓對話區只呈現成果
+                        "output_files": raw_out_files,
                     }
                 )
             self._send(
@@ -843,6 +957,38 @@ class Handler(BaseHTTPRequestHandler):
                 200,
                 json.dumps(res, ensure_ascii=False).encode(),
                 "application/json; charset=utf-8",
+            )
+            return
+        if path == "/api/workbench/artifacts/download":
+            import mimetypes  # noqa: PLC0415
+            from urllib.parse import parse_qs, quote, urlparse  # noqa: PLC0415
+
+            from web.workbench import resolve_downloadable_artifact  # noqa: PLC0415
+
+            parsed = urlparse(self.path)
+            qs = parse_qs(parsed.query)
+            target_file = qs.get("path", [""])[0]
+            resolved = resolve_downloadable_artifact(target_file)
+            if resolved is None:
+                self._send(
+                    404,
+                    json.dumps(
+                        {"ok": False, "error": "File not found or access denied"},
+                        ensure_ascii=False,
+                    ).encode(),
+                    "application/json; charset=utf-8",
+                )
+                return
+            data = resolved.read_bytes()
+            mime_type = mimetypes.guess_type(resolved.name)[0] or "application/octet-stream"
+            ascii_name = resolved.name.encode("ascii", "ignore").decode("ascii") or "download"
+            encoded_name = quote(resolved.name)
+            disp = f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{encoded_name}'
+            self._send(
+                200,
+                data,
+                mime_type,
+                extra_headers={"Content-Disposition": disp},
             )
             return
         if path == "/api/workbench/agents":
@@ -1258,6 +1404,7 @@ class Handler(BaseHTTPRequestHandler):
             total_ms = int((time.perf_counter() - t0) * 1000)
 
             results_dump = orch["results"]
+            turn_output_files = _collect_output_files(orch, eff_project)
             bot_history.record(
                 {
                     "ts": time.time(),
@@ -1273,6 +1420,7 @@ class Handler(BaseHTTPRequestHandler):
                     "step": thread_step,
                     "consensus": str(orch.get("consensus") or ""),
                     "review_details": str(orch.get("review_details") or ""),
+                    "output_files": turn_output_files,
                     "dispatched_at": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
                     "ok": any(r.get("ok") for r in results_dump),
                     "latency_ms": total_ms,
@@ -1286,6 +1434,7 @@ class Handler(BaseHTTPRequestHandler):
                 "collab_mode": orch["collab_mode"],
                 "consensus": orch["consensus"],
                 "review_details": orch.get("review_details", ""),
+                "output_files": turn_output_files,
                 "consensus_source": orch["consensus_source"],
                 "critique_summary": orch["critique_summary"],
                 "collaboration_steps": orch["collaboration_steps"],

@@ -402,7 +402,64 @@ html:not(.dark) #live-results-container > div{
 html:not(.dark) .c-turn{
   background:linear-gradient(180deg,rgba(255,255,255,.95),rgba(242,245,249,.92));
 }
-.c-turn-actions{display:flex;flex-wrap:wrap;gap:.375rem;margin-top:.5rem}
+
+/* 成果文件：位於「以此任務接續」與「專案檔案 Diff」之間、預設展示的 Output 產出文檔下載與預覽欄 */
+.c-turn-footer-flow{width:100%;margin-top:.65rem;display:flex;flex-direction:column;gap:.55rem}
+.c-output-download-panel{
+  width:100%;border-radius:12px;padding:.65rem .8rem;
+  border:1px solid rgba(143,168,148,.42);
+  background:linear-gradient(180deg,rgba(143,168,148,.09),rgba(35,38,47,.65));
+  display:flex;flex-direction:column;gap:.45rem;
+}
+html:not(.dark) .c-output-download-panel{
+  background:linear-gradient(180deg,rgba(97,131,106,.08),rgba(255,255,255,.95));
+}
+.c-output-panel-head{
+  display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap;
+  padding-bottom:.35rem;border-bottom:1px dashed rgba(143,168,148,.28);
+}
+.c-turn-files{width:100%;display:flex;flex-direction:column;gap:.4rem}
+.c-turn-files-title{font-size:12.5px;font-weight:700;color:var(--m-sage);letter-spacing:.02em;display:flex;align-items:center;gap:.4rem}
+.c-dl-btn{
+  display:inline-flex;align-items:center;gap:.3rem;
+  font-size:12px;font-weight:600;padding:.24rem .65rem;border-radius:.45rem;
+  background:rgba(143,168,148,.22);color:#CBE2CF;
+  border:1px solid rgba(143,168,148,.5);text-decoration:none;transition:.15s;flex-shrink:0;
+}
+.c-dl-btn:hover{background:var(--m-sage);color:var(--m-on-accent)}
+html:not(.dark) .c-dl-btn{background:rgba(97,131,106,.16);color:#35533D;border-color:rgba(97,131,106,.4)}
+html:not(.dark) .c-dl-btn:hover{background:var(--m-sage);color:#fff}
+.c-file{
+  width:100%;border-radius:10px;border:1px solid var(--m-line);
+  background:var(--m-panel-2);overflow:hidden;
+}
+.c-file > summary{
+  list-style:none;cursor:pointer;padding:.45rem .7rem;
+  display:flex;align-items:center;gap:.45rem;user-select:none;
+  transition:background .15s;flex-wrap:wrap;
+}
+.c-file > summary::-webkit-details-marker{display:none}
+.c-file > summary:hover{background:rgba(143,168,148,.10)}
+.c-file[open] > summary{border-bottom:1px solid var(--m-line)}
+.c-file-badge{
+  font-size:10.5px;font-family:ui-monospace,monospace;font-weight:600;padding:.05rem .4rem;
+  border-radius:5px;background:var(--m-sage-soft);color:var(--m-sage);flex-shrink:0;
+}
+.c-file-name{
+  flex:1;min-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:12.5px;font-family:ui-monospace,monospace;color:var(--m-bone);
+}
+.c-file-size{font-size:11px;font-family:ui-monospace,monospace;color:var(--m-faint);flex-shrink:0}
+.c-file-body{
+  margin:0;padding:.75rem .9rem;font-size:12.5px;line-height:1.65;
+  font-family:ui-monospace,monospace;color:var(--m-dim);background:var(--m-panel-3);
+  white-space:pre-wrap;word-break:break-word;max-height:22rem;overflow-y:auto;
+}
+
+/* 進階明細（Agent 名稱、耗時、交叉審查、各節點輸出）預設不顯示 */
+.c-adv-only{display:none !important}
+body.c-adv .c-adv-only{display:block !important}
+.c-turn-actions{display:flex;flex-wrap:wrap;align-items:center;gap:.45rem}
 .c-live-slot:empty{display:none}
 .c-live-slot{margin-top:.875rem}
 .c-conn-badge{
@@ -1361,7 +1418,7 @@ function cSplitResultAndReview(t) {
   }
 
   if (!raw && review && t.status === 'done') {
-    raw = '✅ 已完成雲端主機與工作區指令檢測（舊紀錄之終端機原始輸出已收納於下方「🔍 點選展開 / 隱藏 Agent 交叉審查與比較明細」中；若需重新產生完整中文報告，可點擊下方「以此任務接續」或開啟新對話）。';
+    raw = '✅ 任務已完成，此輪沒有額外的文字說明。如需查看執行細節，可在上方開啟「顯示進階明細」。';
   }
 
   if (!review && Array.isArray(t.agents) && t.agents.length > 0 && t.status === 'done') {
@@ -1372,11 +1429,129 @@ function cSplitResultAndReview(t) {
   return { mainResult: raw, reviewText: review };
 }
 
-function cToggleAllReviews() {
-  const blocks = document.querySelectorAll('#c-conv-turns details.c-review-collapse');
-  if (!blocks.length) return;
-  const anyClosed = Array.from(blocks).some(d => !d.open);
-  blocks.forEach(d => { d.open = anyClosed; });
+// ── 進階明細開關：一般用戶只看成果；開啟後才顯示 Agent、耗時、審查與 Diff ──
+let cAdvanced = false;
+try { cAdvanced = localStorage.getItem('khavis.advanced') === '1'; } catch (_) {}
+
+function cToggleAdvanced() {
+  cAdvanced = !cAdvanced;
+  try { localStorage.setItem('khavis.advanced', cAdvanced ? '1' : '0'); } catch (_) {}
+  document.body.classList.toggle('c-adv', cAdvanced);
+  cRenderConversation();
+}
+
+// ── 成果文件：位於「以此任務接續」與「專案檔案 Diff」之間、預設展示的 Output 產出文檔下載欄 ──
+const cFileCache = Object.create(null);   // full_path -> 文件內容（避免重複請求）
+const cFileOpen = Object.create(null);    // `${taskId}|${path}` -> 使用者是否展開
+const C_FILE_PREVIEW_CHARS = 20000;
+
+function cGetTurnOutputFiles(t) {
+  const direct = Array.isArray(t && t.outputFiles) ? t.outputFiles.filter(f => f && f.path && !String(f.path).endsWith('/')) : [];
+  if (direct.length) return direct;
+  if (typeof cAllArtifactsCache !== 'undefined' && Array.isArray(cAllArtifactsCache) && cAllArtifactsCache.length) {
+    const wsOutputs = cAllArtifactsCache.filter(item => {
+      const rp = String(item.rel_path || item.path || '');
+      return new RegExp('(?:^|/)(?:deliverables|output|outputs)/', 'i').test(rp);
+    });
+    if (wsOutputs.length) {
+      return wsOutputs.map(item => ({
+        path: item.rel_path || item.name || item.path,
+        full_path: item.path || item.rel_path,
+        status: 'A',
+        size: item.size || '',
+        badge: item.badge || ''
+      }));
+    }
+  }
+  return [];
+}
+
+function cFileExtBadge(pathStr, fallbackBadge) {
+  if (fallbackBadge) return String(fallbackBadge).toUpperCase();
+  const m = String(pathStr || '').match(/\\.([A-Za-z0-9]+)$/);
+  return m ? m[1].toUpperCase() : 'OUTPUT';
+}
+
+function cOutputFilesHtml(t) {
+  const files = cGetTurnOutputFiles(t);
+  if (!files.length) {
+    return `<div class="c-output-download-panel">
+      <div class="c-output-panel-head">
+        <div class="c-turn-files-title">📥 Output 產出文檔（預設展示）</div>
+        <button type="button" class="c-action m-btn-ghost" onclick="cOpenPage('artifacts')">📂 前往資料庫檢視全部產物</button>
+      </div>
+      <div class="text-[12px]" style="color:var(--m-dim)">目前尚無偵測到可下載的 Output 產出檔案，或可點選右上角「📂 資料庫」查看所有專案產物。</div>
+    </div>`;
+  }
+  const items = files.map((f, i) => {
+    const key = (t.id || '') + '|' + f.path;
+    // 預設展開第一份可讀文檔內容，同時每一份文檔都在列上直接顯示「📥 下載」按鈕
+    const open = (key in cFileOpen) ? cFileOpen[key] : (i === 0);
+    const full = f.full_path || f.path;
+    const baseName = String(f.path || '').split('/').pop() || f.path;
+    const badge = cFileExtBadge(f.path, f.badge);
+    const dlUrl = '/api/workbench/artifacts/download?path=' + encodeURIComponent(full);
+    return `<details class="c-file m-collapse" ${open ? 'open' : ''} data-path="${escapeHtml(full)}" data-key="${escapeHtml(key)}"
+               ontoggle="cOnFileToggle(this)">
+      <summary>
+        <span class="c-file-badge">${escapeHtml(badge)}</span>
+        <span class="c-file-name" title="${escapeHtml(f.path)}">${escapeHtml(baseName)} <span style="color:var(--m-faint);font-size:11px">(${escapeHtml(f.path)})</span></span>
+        <span class="c-file-size">${escapeHtml(f.size || '')}</span>
+        <a href="${escapeHtml(dlUrl)}" download="${escapeHtml(baseName)}"
+           class="c-dl-btn" title="直接下載此 Output 產出文檔至電腦"
+           onclick="event.stopPropagation()">📥 下載</a>
+        <button type="button" class="c-action m-btn-ghost" title="在側欄完整檢視內容"
+                onclick="event.preventDefault();event.stopPropagation();openArtifact('${escapeHtml(full)}','${escapeHtml(baseName)}')">預覽內容</button>
+      </summary>
+      <pre class="c-file-body">${open && cFileCache[full] != null ? escapeHtml(cFileCache[full]) : '載入內容預覽中…'}</pre>
+    </details>`;
+  }).join('');
+  return `<div class="c-output-download-panel">
+    <div class="c-output-panel-head">
+      <div class="c-turn-files-title">📥 Output 產出文檔（預設展示 · 共 ${files.length} 份可供下載與預覽）</div>
+      <div class="flex items-center gap-1.5">
+        <span class="text-[11px] font-mono" style="color:var(--m-faint)">點擊「📥 下載」可直接儲存檔案</span>
+        <button type="button" class="c-action m-btn-ghost" onclick="cOpenPage('artifacts')">📂 全部產物</button>
+      </div>
+    </div>
+    <div class="c-turn-files">
+      ${items}
+    </div>
+  </div>`;
+}
+
+async function cLoadFileBody(det) {
+  const path = det.getAttribute('data-path') || '';
+  const body = det.querySelector('.c-file-body');
+  if (!path || !body) return;
+  if (cFileCache[path] != null) { body.textContent = cFileCache[path]; return; }
+  try {
+    const res = await fetch('/api/workbench/artifacts/read?path=' + encodeURIComponent(path));
+    const data = await res.json();
+    if (data && data.ok) {
+      let text = String(data.content || '');
+      if (text.length > C_FILE_PREVIEW_CHARS) {
+        text = text.slice(0, C_FILE_PREVIEW_CHARS) + `\n\n…（內容較長，僅顯示前 ${C_FILE_PREVIEW_CHARS} 字，請按「預覽內容」查看全文）`;
+      }
+      cFileCache[path] = text || '（此文件是空的）';
+      body.textContent = cFileCache[path];
+    } else {
+      body.textContent = '無法顯示此文件：' + ((data && data.error) || '未知原因');
+    }
+  } catch (err) {
+    body.textContent = '讀取文件失敗：' + err.message;
+  }
+}
+
+function cOnFileToggle(det) {
+  const key = det.getAttribute('data-key') || '';
+  if (key) cFileOpen[key] = det.open;
+  if (det.open) cLoadFileBody(det);
+}
+
+// 重新渲染後，把預設展開的文件內容補載進來
+function cHydrateOpenFiles() {
+  document.querySelectorAll('details.c-file[open]').forEach(cLoadFileBody);
 }
 
 function cTurnHtml(t, idx) {
@@ -1392,17 +1567,28 @@ function cTurnHtml(t, idx) {
   if (t.duration) meta.push(escapeHtml(t.duration));
   if (t.project) meta.push(escapeHtml(t.project));
 
-  let actions = '';
+  let footerFlow = '';
   if (t.status === 'running') {
-    actions = `<button type="button" onclick="cOpenExec()" class="c-action m-btn-ghost">明細</button>
-               <button type="button" onclick="cAbortTask()" class="c-action"
-                 style="background:var(--m-rose-soft);color:var(--m-rose-text);border:1px solid rgba(188,139,139,.35)">中止</button>`;
+    footerFlow = `<div class="c-turn-actions">
+      <button type="button" onclick="cOpenExec()" class="c-action m-btn-ghost">明細</button>
+      <button type="button" onclick="cAbortTask()" class="c-action"
+        style="background:var(--m-rose-soft);color:var(--m-rose-text);border:1px solid rgba(188,139,139,.35)">中止</button>
+    </div>`;
   } else if (t.status === 'failed' || t.status === 'aborted') {
-    actions = `<button type="button" onclick="cContinue('${id}')" class="c-action m-btn-primary font-semibold">重試</button>`;
+    footerFlow = `<div class="c-turn-actions">
+      <button type="button" onclick="cContinue('${id}')" class="c-action m-btn-primary font-semibold">重試</button>
+    </div>`;
   } else {
-    actions = `<button type="button" onclick="cContinue('${id}')" class="c-action transition"
-                style="background:transparent;color:#8FACBF;border:1px solid rgba(124,155,181,.38)">以此任務接續</button>
-              <button type="button" onclick="cShowDiff()" class="c-action m-btn-ghost">專案檔案 Diff</button>`;
+    footerFlow = `<div class="c-turn-footer-flow">
+      <div class="c-turn-actions">
+        <button type="button" onclick="cContinue('${id}')" class="c-action transition"
+          style="background:transparent;color:#8FACBF;border:1px solid rgba(124,155,181,.38)">以此任務接續</button>
+      </div>
+      ${cOutputFilesHtml(t)}
+      <div class="c-turn-actions">
+        <button type="button" onclick="cShowDiff()" class="c-action m-btn-ghost">專案檔案 Diff</button>
+      </div>
+    </div>`;
   }
 
   const { mainResult, reviewText } = cSplitResultAndReview(t);
@@ -1418,7 +1604,8 @@ function cTurnHtml(t, idx) {
     result = `<div class="c-turn-bubble" style="color:var(--m-faint)">（此輪沒有產出成果）</div>`;
   }
 
-  const reviewDrawer = reviewText ? `
+  // 審查明細只在「進階明細」開啟時才提供；一般用戶只看到成果
+  const reviewDrawer = (cAdvanced && reviewText) ? `
     <details class="c-review-collapse m-collapse">
       <summary>
         <span class="inline-flex items-center gap-1.5">
@@ -1447,16 +1634,16 @@ function cTurnHtml(t, idx) {
       <div class="c-turn-bubble">${escapeHtml(t.prompt || '')}</div>
     </div>
 
-    <!-- 左邊：Agent 回覆（先呈現最終結果，下方收合 Agent 交叉審查） -->
+    <!-- 左邊：只呈現成果（回覆內容 + 位於「以此任務接續」與「專案檔案 Diff」間預設展示的 Output 產出文檔欄） -->
     <div class="c-turn-agent">
       <div class="c-turn-label">
-        <span class="c-conn-badge" style="background:var(--m-sage-soft);color:var(--m-sage)">🤖 Agent 執行結果</span>
-        ${agents}
-        ${meta.map(m => `<span class="c-conn-badge" style="background:transparent;color:var(--m-faint)">${m}</span>`).join('')}
+        <span class="c-conn-badge" style="background:var(--m-sage-soft);color:var(--m-sage)">📦 成果</span>
+        ${cAdvanced ? agents : ''}
+        ${cAdvanced ? meta.map(m => `<span class="c-conn-badge" style="background:transparent;color:var(--m-faint)">${m}</span>`).join('') : ''}
       </div>
       ${result}
       ${reviewDrawer}
-      <div class="c-turn-actions">${actions}</div>
+      ${footerFlow}
     </div>
   </div>`;
 }
@@ -1501,16 +1688,16 @@ function cRenderConversation() {
   }).join('');
 
   head.innerHTML = `<span class="c-conv-title truncate">${escapeHtml(th.title)}</span>
-    ${agents}
     <span class="c-conn-badge" style="background:transparent;color:var(--m-faint)">${th.turns} 輪</span>
-    ${th.project ? `<span class="c-conn-badge" style="background:transparent;color:var(--m-faint)">${escapeHtml(th.project)}</span>` : ''}
-    ${th.mode ? `<span class="c-conn-badge" style="background:var(--m-mist-soft);color:var(--m-mist)">${escapeHtml(th.mode)}</span>` : ''}
+    ${cAdvanced ? agents : ''}
+    ${(cAdvanced && th.project) ? `<span class="c-conn-badge" style="background:transparent;color:var(--m-faint)">${escapeHtml(th.project)}</span>` : ''}
+    ${(cAdvanced && th.mode) ? `<span class="c-conn-badge" style="background:var(--m-mist-soft);color:var(--m-mist)">${escapeHtml(th.mode)}</span>` : ''}
     <span class="flex-1"></span>
-    <button type="button" onclick="cToggleAllReviews()" class="c-action m-btn-ghost" title="一鍵展開或收合所有 Agent 交叉審查明細">🔍 展開/收合審查</button>
+    <button type="button" onclick="cToggleAdvanced()" class="c-action m-btn-ghost" aria-pressed="${cAdvanced ? 'true' : 'false'}" title="顯示或隱藏 Agent 名稱、耗時、交叉審查等技術細節（預設隱藏，只看成果）">${cAdvanced ? '🔍 隱藏進階明細' : '🔍 顯示進階明細'}</button>
     <button type="button" onclick="cSetCenterMode('overview')" class="c-action m-btn-ghost">任務總覽</button>`;
 
   turns.innerHTML = th.tasks.map((t, i) => cTurnHtml(t, i)).join('');
-
+  cHydrateOpenFiles();
   // live slot：只有「本頁面剛派工的那一串」才顯示 legacy 的 hero card，
   // 否則會顯示跟目前對話串無關的成果。
   if (slot) {
@@ -1771,10 +1958,14 @@ function cTaskCard(t, opts) {
 
       ${liveBlock}
 
-      <!-- 第二行：動作列 -->
+      <!-- 第二行：動作列 + 預設展示的 Output 產出文檔下載欄 + 專案檔案 Diff -->
       <div class="mt-2.5 flex items-center gap-1.5 flex-wrap justify-end">
         ${cTaskActions(t, expanded)}
       </div>
+      ${t.status === 'done' ? `<div class="mt-2.5">${cOutputFilesHtml(t)}</div>
+      <div class="mt-2 flex flex-wrap gap-1.5">
+        <button type="button" onclick="cShowDiff()" class="c-action m-btn-ghost">專案檔案 Diff</button>
+      </div>` : ''}
     </div>
 
     <div class="c-body ${expanded ? '' : 'hidden'} px-4 pb-3.5">
@@ -1819,6 +2010,7 @@ function cRenderStream() {
     html += cTaskCard(t, { expanded: !!t.expanded });
   });
   host.innerHTML = html;
+  cHydrateOpenFiles();
   if (main) main.scrollTop = keepScroll;   // 重新渲染不要把使用者捲回原位
   cUpdateCounts();
   cRenderItemList();
@@ -1994,6 +2186,7 @@ async function cLoadTasks() {
         summary: (h.consensus_source || (ok ? '成功' : '失敗')).slice(0, 28),
         consensus: h.consensus || '',
         review_details: h.review_details || '',
+        outputFiles: Array.isArray(h.output_files) ? h.output_files : [],
         expanded: false,
         body: `<div class="rounded-xl p-3 space-y-2 m-line" style="background:var(--m-panel-2)">
                  <div class="text-[11px] font-mono leading-[1.7]" style="color:var(--m-dim)">
@@ -2081,6 +2274,7 @@ function cPollRecoverTask(taskId, promptText, threadId) {
           card.status = 'done';
           card.summary = '成功';
           card.consensus = match.consensus;
+          card.outputFiles = Array.isArray(match.output_files) ? match.output_files : [];
           card.duration = match.latency_ms != null ? `${(match.latency_ms/1000).toFixed(1)}s` : card.duration;
           card.body = `<div class="rounded-xl p-3 space-y-2 m-line" style="background:var(--m-panel-2)">
             <div class="text-[11px] font-mono whitespace-pre-wrap leading-[1.7] max-h-56 overflow-y-auto" style="color:var(--m-dim)">${escapeHtml(match.consensus)}</div>
@@ -2228,6 +2422,9 @@ function cFinishTask(ok, summaryHtml, consensus) {
     card.body = summaryHtml || '';
     card.consensus = consensus || '';
     card.review_details = (typeof latestReviewDetailsText !== 'undefined' && latestReviewDetailsText) ? latestReviewDetailsText : '';
+    // 本輪產出文件：由 legacy submitDispatch 在成功時寫入 latestProducedFiles
+    card.outputFiles = (ok && typeof latestProducedFiles !== 'undefined' && Array.isArray(latestProducedFiles))
+      ? latestProducedFiles.slice() : [];
     card.expanded = true;
   }
   cRunningTask = null;
@@ -2335,6 +2532,7 @@ async function cLoadSidebarDatabase() {
     if (badge) badge.textContent = String(items.length);
     const pageCount = document.getElementById('c-db-page-count');
     if (pageCount) pageCount.textContent = String(items.length);
+    if (typeof cRenderConversation === 'function') cRenderConversation();
     if (!host) return;
     if (!items.length) {
       host.innerHTML = '<div class="text-[11px] py-4 text-center" style="color:var(--m-faint)">尚無資料庫產物</div>';
@@ -2406,11 +2604,17 @@ function cFilterArtifactsPage(queryText, badgeType) {
         </h4>
         <p class="text-[11px] text-slate-400 font-mono truncate" title="${escapeHtml(item.path)}">${escapeHtml(item.path)}</p>
       </div>
-      <div class="pt-4 flex items-center justify-between border-t border-white/5 mt-3">
-        <span class="text-[10px] text-slate-400 font-mono">${escapeHtml(item.mtime)}</span>
-        <button onclick="openArtifact('${escapeHtml(item.path)}', '${escapeHtml(item.name)}')" class="px-2.5 py-1 rounded bg-white/5 hover:bg-sky-500 hover:text-white text-xs text-sky-400 transition font-medium">
-          查看內容 &rarr;
-        </button>
+      <div class="pt-4 flex items-center justify-between border-t border-white/5 mt-3 gap-2">
+        <span class="text-[10px] text-slate-400 font-mono truncate">${escapeHtml(item.mtime)}</span>
+        <div class="flex items-center gap-1.5 shrink-0">
+          <a href="/api/workbench/artifacts/download?path=${encodeURIComponent(item.path)}" download="${escapeHtml(item.name)}"
+             class="px-2.5 py-1 rounded bg-emerald-500/20 hover:bg-emerald-500 hover:text-white text-xs text-emerald-300 border border-emerald-500/30 transition font-medium">
+            📥 下載
+          </a>
+          <button onclick="openArtifact('${escapeHtml(item.path)}', '${escapeHtml(item.name)}')" class="px-2.5 py-1 rounded bg-white/5 hover:bg-sky-500 hover:text-white text-xs text-sky-400 transition font-medium">
+            查看內容 &rarr;
+          </button>
+        </div>
       </div>
     </div>
   `).join('');
@@ -3119,6 +3323,7 @@ function cCompactComposer() {
 
 // ── 啟動 ────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+  document.body.classList.toggle('c-adv', cAdvanced);
   cRenderAgentChips();
   cRenderAgentStatusPanel();
   cSetView('timeline');

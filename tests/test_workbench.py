@@ -624,5 +624,53 @@ def test_agent_skills_and_result_review_split(tmp_path) -> None:
     assert "c-turn-user" in html_c
     assert "c-turn-agent" in html_c
     assert "c-review-collapse" in html_c
+    assert "c-turn-files" in html_c
+    assert "cOutputFilesHtml" in html_c
+    assert "cToggleAdvanced" in html_c
     assert "opencode" in html_c
     assert "zcode" not in html_c.lower()
+
+    # 4. Test _collect_output_files deduplicates output files across shared and per-agent diffs
+    from scripts.status_server import _collect_output_files
+
+    files = _collect_output_files(
+        {
+            "shared_changed_files": [
+                {"path": "docs/report.md", "full_path": "/ws/docs/report.md", "status": "A", "size": "1.2 KB"}
+            ],
+            "results": [
+                {
+                    "cwd": "/ws",
+                    "changed_files": [
+                        {"path": "docs/report.md", "status": "A"},
+                        {"path": "src/main.py", "status": "M", "size": "0.8 KB"},
+                    ],
+                }
+            ],
+        }
+    )
+    assert [f["path"] for f in files] == ["docs/report.md", "src/main.py"]
+    assert files[1]["full_path"] == "/ws/src/main.py"
+
+    # 5. Test default-displayed output download panel between 以此任務接續 and 專案檔案 Diff
+    assert "c-output-download-panel" in html_c
+    assert "/api/workbench/artifacts/download" in html_c
+    from web.workbench import resolve_downloadable_artifact
+
+    resolved = resolve_downloadable_artifact("README.zh-TW.md")
+    assert resolved is not None and resolved.name == "README.zh-TW.md"
+    assert resolve_downloadable_artifact(".env") is None
+
+    # 6. Verify all inline <script> blocks in rendered HTML have valid JS syntax
+    import re
+    import shutil
+    import subprocess
+
+    if shutil.which("node"):
+        for idx, script_body in enumerate(re.findall(r"<script[^>]*>(.*?)</script>", html_c, re.S)):
+            if not script_body.strip():
+                continue
+            js_file = tmp_path / f"script_{idx}.js"
+            js_file.write_text(script_body, encoding="utf-8")
+            chk = subprocess.run(["node", "--check", str(js_file)], capture_output=True, text=True)
+            assert chk.returncode == 0, f"JS syntax error in script {idx}: {chk.stderr}"
