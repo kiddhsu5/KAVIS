@@ -1,126 +1,88 @@
-# K.H.A.V.I.S. Telegram bot — deployment guide
+# K.H.A.V.I.S. 部署指南（騰訊雲 / 任一 Ubuntu VM）
 
-Run the dispatch bot on **Aliyun ECS / Lighthouse** or any Linux VPS.
+> 目標架構：整個項目的運行在雲端 VM 上，本地 Mac 只做開發。
+> 一鍵安裝：`bash deploy/install.sh`
 
-## TL;DR (Aliyun ECS, recommended)
+## 架構總覽
 
-```bash
-# 1. On the Mac — fill .env, build image, push to Aliyun Container Registry
-cd /path/to/khavis
-cp deploy/.env.example .env       # fill BOT_TOKEN, WEBHOOK_SECRET, ALLOWED_CHAT_IDS
-ALIYUN_ECS_HOST=root@<public-ip> bash deploy/scripts/deploy-aliyun.sh
-
-# 2. On the ECS — make sure bot.example.com resolves to <public-ip>
-#    (A record in your DNS provider) and inbound 80+443 are open.
-
-# 3. After first deploy, set the webhook. secret_token MUST equal
-#    WEBHOOK_SECRET — the bot rejects (403) any update without it.
-curl -sS "https://api.telegram.org/bot${BOT_TOKEN}/setWebhook" -d "url=https://bot.example.com/webhook" -d "secret_token=${WEBHOOK_SECRET}"
-
-# 4. From Telegram: send /start to the bot, expect a welcome reply.
+```
+瀏覽器 ── https ──► nginx (443) ──► khavis-workbench (127.0.0.1:8080)
+                                        │
+                                        ├─ K.A.V.I.S. 內建 agent
+                                        │   ├─ 本地：LangGraph 7 角色團隊協同
+                                        │   └─ 遠端：kavis-adapter (127.0.0.1:18081)
+                                        │            └─ hermes -z（openclaw × hermes 環境）
+                                        ├─ Telegram bot（khavis-bot，選配）
+                                        └─ 供應商 API pools（.env keys）
 ```
 
-The deploy script does all the work — `git clone` on first run, `git pull` after, `docker compose up -d`. **It expects you to `scp .env user@host:~/khavis-bot/.env` separately** (out-of-band secret delivery).
+- **K.A.V.I.S.** 是項目內建的唯一協同 agent：對話中勾選即調度本地 LangGraph
+  團隊（Planner/Coder×2/Debater/Critic/Verifier/Learner）；裝了
+  `kavis-adapter` 後，遠端 openclaw × hermes 節點是同一個 agent 的雲端執行點。
 
-## Files
-
-| File | Purpose |
-|---|---|
-| `Dockerfile` | multi-stage build (Python 3.12-slim + Caddy 2.8-alpine) |
-| `Caddyfile` | TLS termination, reverse proxy → `bot:8080` |
-| `docker-compose.yml` | caddy + bot services, shared network |
-| `entrypoint.sh` | starts Caddy, then uvicorn |
-| `scripts/deploy-aliyun.sh` | ECS build+push+deploy helper |
-| `scripts/deploy-tencentcloud.sh` | CVM/TCR build+push+deploy helper |
-| `.env.example` | template for the secrets file |
-| `certs/` (mount) | optional: existing Let's Encrypt chain + private key |
-
-## Secrets
-
-| Variable | Where it goes | Notes |
-|---|---|---|
-| `BOT_TOKEN` | `.env` (project root, used by docker-compose via `env_file`) | required |
-| `WEBHOOK_SECRET` | `.env` | **required in webhook mode**; 1-256 chars of `[A-Za-z0-9_-]`, no BOT_TOKEN fallback. Pass the same value to `setWebhook` as `secret_token` |
-| `ALLOWED_CHAT_IDS` | `.env`, comma-separated int chat IDs | empty = reject all |
-| `BACKEND_TIMEOUT_S` | optional, default 180 | per-backend hard timeout |
-| `LONG_POLL_TIMEOUT_S` | optional, default 30 | getUpdates timeout |
-| `BOT_MODE` | optional, `webhook` (default) or `polling` | polling skips Caddy (and needs no `WEBHOOK_SECRET`) |
-| `BOT_MAX_CONCURRENCY` | optional, default 4 | updates processed in parallel (background tasks) |
-
-A copy of `BOT_TOKEN` and `ALLOWED_CHAT_IDS` lives at `.env.example` for reference; **never** commit a real `.env`.
-
-## TLS
-
-The `Caddyfile` handles both modes automatically:
-
-1. **Existing cert mounted** at `deploy/certs/bot.example.com/{fullchain,privkey}.pem`: Caddy serves the cert directly. Useful when migrating from a previous deployment.
-2. **No cert mounted**: Caddy auto-issues via ACME HTTP-01 on first request. Requires ports 80 + 443 to be reachable from the public internet.
-
-For Cloudflare-fronted tenants or VPS providers that block inbound 80/443, add a Cloudflare DNS module and switch the ACME challenge to DNS-01.
-
-The historical cert from `deploy/certs/bot.example.com/` may already be expired — verify `notAfter` before reusing it.
-
-## Mode: webhook vs polling
-
-- **webhook** (default): Caddy serves HTTPS, Telegram POSTs updates to `/webhook`. Public endpoint required.
-- **polling**: set `BOT_MODE=polling` in `.env`. The bot loops `getUpdates` itself; no public endpoint needed. Drop the `caddy` service from compose.
-
-## Endpoints exposed
-
-- `POST /webhook` — Telegram webhook (header `X-Telegram-Bot-Api-Secret-Token` must equal `WEBHOOK_SECRET`). Acknowledged immediately; the dispatch runs in the background and redelivered `update_id`s are dropped.
-- `POST /webhook/{secret}` — same, with the secret also in the URL path (the header is still required)
-- `GET /healthz` — JSON status, used by Docker healthcheck + Telegram `/status`
-
-## First deployment checklist (Aliyun ECS)
-
-1. **Provision ECS** — 1 vCPU / 1 GB RAM is plenty for a single-user bot. Pick an image with Docker pre-installed (Aliyun's "Container-optimized OS" works).
-2. **Open inbound ports** — 22 (SSH), 80 (ACME HTTP-01), 443 (webhook).
-3. **DNS** — add A record `bot.example.com → <ECS public IP>`.
-4. **Clone the repo on the ECS** (one-time): `ssh root@<ip> "git clone https://github.com/kiddhsu5/K.H.A.V.I.S..git ~/khavis-bot"`.
-5. **Copy `.env` to the ECS** (out-of-band, never commit it): `scp .env root@<ip>:~/khavis-bot/.env`.
-6. **Run `deploy/scripts/deploy-aliyun.sh`** from your Mac. It pulls the image and rolls the container.
-7. **Wait ~30 s**, then `ssh root@<ip> "curl -fsS https://bot.example.com/healthz"` — should return `{"status":"ok",...}`.
-8. **Set webhook** (one-time): `curl -sS "https://api.telegram.org/bot${BOT_TOKEN}/setWebhook" -d "url=https://bot.example.com/webhook" -d "secret_token=${WEBHOOK_SECRET}"`.
-9. **Smoke-test** — send `/start` to the bot in Telegram; expect a welcome reply with `chat_id`.
-
-## Local-only testing (no cloud VPS)
+## 一鍵安裝（全新 VM）
 
 ```bash
-cd /path/to/khavis
-BOT_MODE=polling BOT_TOKEN=... ALLOWED_CHAT_IDS=... python -m bot.main --mode polling
+# 基本安裝（~/khavis，port 8080）
+bash deploy/install.sh
+
+# 完整安裝：含 K.A.V.I.S. 遠端派工橋接器（需已裝 hermes）
+bash deploy/install.sh --with-adapter
+
+# 自訂路徑與埠
+bash deploy/install.sh --home /opt/khavis --port 8080 --with-adapter
 ```
 
-No Caddy, no port 443. Useful for development.
+安裝器行為：環境檢查（Python ≥ 3.11）→ clone repo → venv + 依賴 → `.env`
+初始化（已存在不覆蓋）→ systemd 服務 → 健康檢查。
 
-## Upgrading
+## 既有非 git 部署的遷移
+
+若機器上已有舊版 `~/khavis`（scp 檔案堆），安裝器會把它搬到
+`~/khavis-preinstall-<時間戳>` 再 clone。之後手動回復運行資料：
 
 ```bash
-git pull
-docker compose -f deploy/docker-compose.yml build bot
-docker compose -f deploy/docker-compose.yml up -d
+OLD=~/khavis-preinstall-<時間戳>
+cp "$OLD/.env" ~/khavis/.env
+cp "$OLD/config/workbench_catalog.json" ~/khavis/config/ 2>/dev/null || true
+cp -r "$OLD/workspace" ~/khavis/ 2>/dev/null || true
+cp -r "$OLD/logs" ~/khavis/ 2>/dev/null || true
+sudo systemctl restart khavis-workbench
 ```
 
-The `deploy/scripts/deploy-aliyun.sh` script wraps this for you and pushes the new image to ACR.
+## 日常維運
 
-## Troubleshooting
+| 操作 | 指令 |
+| --- | --- |
+| 升級版本 | `git -C ~/khavis pull && sudo systemctl restart khavis-workbench` |
+| 看日誌 | `journalctl -u khavis-workbench -n 50 --no-pager` |
+| 重啟 | `sudo systemctl restart khavis-workbench` |
+| K.A.V.I.S. 橋接器 | `systemctl --user status kavis-adapter` |
+| 橋接器健康 | `curl -s http://127.0.0.1:18081/healthz` |
 
-| Symptom | Check |
-|---|---|
-| `curl /healthz` returns 000 / refused | bot container not up — `docker compose logs bot` |
-| `curl /healthz` 502 | Caddy can't reach bot — check `docker network inspect` |
-| Telegram 400 "message to be replied not found" | bot using stale code; restart with new image |
-| ACME challenge fails (no cert) | inbound 80 blocked — open it |
-| Bot silent / log shows `kiddhsu5/khavis.py not found` | wrong project_root, fix `args.project_root` in `entrypoint.sh` |
+## 對外服務（nginx）
 
-## Cleanup / uninstall
+監聽 127.0.0.1:8080，僅本機可達。對外請以 nginx 反代並上 TLS：
 
-```bash
-# Stop everything
-docker compose -f deploy/docker-compose.yml down
-
-# Wipe bot data (volumes)
-docker volume rm khavis-bot_caddy_data khavis-bot_caddy_config
-
-# Remove the cloned repo on the ECS
-ssh root@<ip> "rm -rf ~/khavis-bot"
+```nginx
+server {
+    listen 443 ssl;
+    server_name khavis.example.com;
+    ssl_certificate     /etc/ssl/certs/khavis.pem;
+    ssl_certificate_key /etc/ssl/private/khavis.key;
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_read_timeout 300s;   # 多 Agent 協同可能超過 60s
+    }
+}
 ```
+
+## 環境變數
+
+見 `.env.example`。重點：
+
+- 供應商 keys（`MINIMAX_API_KEY`、`ZHIPUAI_API_KEY`…）— BYOK，各自計費
+- `KHAVIS_API_KEY` — Workbench 寫操作令牌（對外服務強烈建議設定）
+- `KAVIS_TENCENT_DISPATCH_URL` — K.A.V.I.S. 遠端派工通道（`--with-adapter` 自動寫入）
+- `KAVIS_TENCENT_ENDPOINT` — 騰訊雲節點健康探測位址（預設 443 狀態頁）
