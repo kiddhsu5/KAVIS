@@ -990,50 +990,33 @@ def get_agent_fleet_status() -> list[dict[str, Any]]:
             "options": ["LangGraph 7-Role"],
             "adjustable": False,
             "custom": False,
-            "plan": "全付費方案容錯 + Ollama 兜底",
-            "desc": "LangGraph 7 角色異質多 Agent 協同流水線 (Planner/Coder/Debater/Verifier)",
+            "plan": "本地 LangGraph 協同 + 騰訊雲同名節點 + Ollama 兜底",
+            "desc": "單一 K.A.V.I.S. Agent：本地 LangGraph 7 角色流水線 + 騰訊雲 openclaw × hermes 同名遠端節點",
             "tier": "Master",
             "icon": "fa-sitemap",
             "color": "#38BDF8",
-        },
-        {
-            "id": "kavis-tencent",
-            "name": "K.A.V.I.S. (Tencent)",
-            "binary": "remote",
-            "model": "openclaw × hermes",
-            "default_model": "openclaw × hermes",
-            "options": ["openclaw × hermes"],
-            "adjustable": False,
-            "custom": False,
-            "plan": "騰訊雲常駐節點 (hermes gateway + openclaw)",
-            "desc": "騰訊雲 openclaw × hermes 合併運作的 K.A.V.I.S. 遠端節點 (Telegram 閘道 + Agent 執行環境)",
-            "tier": "Remote",
-            "icon": "fa-cloud",
-            "color": "#A78BFA",
         },
     ]
 
     for a in agents:
         if a["id"] == "khavis":
-            a["installed"] = True
-            a["path"] = "internal://langgraph/7-roles"
-            a["version"] = "v0.5.0 (LangGraph 7 Roles)"
-            a["status"] = "ready"
-            continue
-
-        if a["id"] == "kavis-tencent":
+            # 合併的 K.A.V.I.S. Agent：本地 LangGraph 團隊 + 騰訊雲同名節點狀態
             probe = _tencent_kavis_probe_cached()
             a["installed"] = True
-            a["path"] = str(probe.get("endpoint") or "remote://tencent-cloud")
+            a["path"] = (
+                "internal://langgraph/7-roles + "
+                + str(probe.get("endpoint") or "remote://tencent-cloud")
+            )
             if probe.get("ok"):
                 a["status"] = "ready"
                 a["version"] = (
-                    f"Online (HTTP {probe.get('http_code')}, "
+                    "v0.5.0 LangGraph 7 Roles · Tencent Online "
+                    f"(HTTP {probe.get('http_code')}, "
                     f"{'dispatch ready' if probe.get('dispatch_wired') else 'monitor-only'})"
                 )
             else:
-                a["status"] = "unreachable"
-                a["version"] = f"Offline ({probe.get('detail')})"
+                a["status"] = "ready"
+                a["version"] = f"v0.5.0 LangGraph 7 Roles · Tencent Offline ({probe.get('detail')})"
             continue
 
         binary_path = shutil.which(a["binary"])
@@ -2232,30 +2215,11 @@ _WORKBENCH_PAGE_HEAD = """<!DOCTYPE html>
                 </div>
                 <div>
                   <div class="font-bold text-white text-xs">K.A.V.I.S.</div>
-                  <div class="text-[10px] text-cyan-400 font-mono truncate mt-0.5">LangGraph 7-Role</div>
+                  <div class="text-[10px] text-cyan-400 font-mono truncate mt-0.5">LangGraph × 騰訊雲節點</div>
                 </div>
                 <div class="text-[10px] text-slate-400 flex items-center justify-between pt-1 border-t border-white/5">
                   <span>Master DAG</span>
                   <i class="fas fa-check-circle text-sky-400 check-indicator"></i>
-                </div>
-              </div>
-
-              <!-- Node 7: K.A.V.I.S. (Tencent) — openclaw × hermes merged remote node -->
-              <div id="node-card-kavis-tencent" onclick="toggleAgentNode('kavis-tencent')" class="agent-node-card cursor-pointer rounded-xl p-3 bg-[#0E1525] border border-white/10 flex flex-col justify-between space-y-2.5 select-none">
-                <input type="checkbox" name="agent_target" value="kavis-tencent" class="hidden" onchange="syncTopologyBeams()">
-                <div class="flex items-center justify-between">
-                  <div class="w-8 h-8 rounded-lg bg-violet-500/20 border border-violet-500/30 flex items-center justify-center text-violet-400">
-                    <i class="fas fa-cloud"></i>
-                  </div>
-                  <span id="badge-node-kavis-tencent" class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-slate-400">待命</span>
-                </div>
-                <div>
-                  <div class="font-bold text-white text-xs">K.A.V.I.S. (Tencent)</div>
-                  <div class="text-[10px] text-violet-400 font-mono truncate mt-0.5">openclaw × hermes</div>
-                </div>
-                <div class="text-[10px] text-slate-400 flex items-center justify-between pt-1 border-t border-white/5">
-                  <span>遠端常駐節點</span>
-                  <i class="fas fa-check-circle text-slate-600 check-indicator"></i>
                 </div>
               </div>
             </div>
@@ -2508,7 +2472,7 @@ _WORKBENCH_PAGE_HEAD = """<!DOCTYPE html>
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 class="text-xl font-bold text-white">雲端主機主機 Agent 集群與用戶自訂 Agent 拓撲</h2>
-            <p class="text-xs text-slate-400">包含 Claude Code (MiniMax-M3.1-Flash), Codex, Antigravity (AGY), MiniMax Code, OpenCode (opencode), K.A.V.I.S. 團隊、騰訊雲 K.A.V.I.S. 遠端節點 (openclaw × hermes) 以及您自訂掛載的 Agent</p>
+            <p class="text-xs text-slate-400">包含 Claude Code (MiniMax-M3.1-Flash), Codex, Antigravity (AGY), MiniMax Code, OpenCode (opencode), K.A.V.I.S. 團隊（本地 LangGraph + 騰訊雲同名節點）以及您自訂掛載的 Agent</p>
           </div>
           <button type="button" onclick="switchTab('command'); document.getElementById('custom-agent-panel').classList.remove('hidden');" class="px-3.5 py-2 rounded-xl bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 border border-pink-500/30 text-xs font-bold transition">
             <i class="fas fa-plug mr-1"></i>➕ 新增自訂 Agent

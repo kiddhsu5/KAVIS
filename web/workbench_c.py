@@ -34,19 +34,21 @@ _LINES: Final[list[str]] = _WORKBENCH_PAGE_HEAD.split("\n")
 # contract check in tests/test_workbench.py).
 # 注意：行號與 legacy markup 綁定。在 workbench.py 的拓撲／views 區塊增刪行
 # 之後，必須同步更新這張表（insertion after line 648 → 全部 +N）。
+# 注意：行號與 legacy markup 綁定；在 workbench.py 的拓撲／views 區塊
+# 增刪行之後必須同步更新這張表。
 _SLICES: Final[dict[str, tuple[int, int]]] = {
     # 工作區 + Git worktree/diff 主控台
     "workspace": (250, 327),
     # 拓撲畫布 + Agent 節點 + 協同模式 + 任務範本 (不含輸入框, 見 composer)
-    "topology": (329, 721),
+    "topology": (329, 702),
     # 快速範本 + textarea + 能力路由 + 派工按鈕
-    "composer": (722, 775),
+    "composer": (703, 756),
     # 執行面板：狀態列、pipeline stepper、延遲圖、成果容器
-    "result": (780, 866),
+    "result": (761, 847),
     # VIEW 2-5：交付文件 / 額度熔斷 / Agent 集群 / 部署精靈
-    "views": (870, 1000),
+    "views": (851, 981),
     # 產物預覽抽屜
-    "drawers": (1005, 1028),
+    "drawers": (986, 1009),
 }
 
 
@@ -745,7 +747,7 @@ _SIDEBAR: Final[str] = """
   <div class="shrink-0 px-3 pt-3 pb-2 flex items-center gap-2.5 border-b m-line">
     <div class="v-brand-mark w-9 h-9 rounded-xl grid place-items-center text-sm font-black shrink-0" style="color:#fff">K</div>
     <div class="min-w-0 flex-1">
-      <div class="v-brand-name text-base font-black tracking-tight leading-none">K.A.V.I.S.</div>
+      <div class="v-brand-name text-base font-black tracking-tight leading-none">K.H.A.V.I.S.</div>
       <div class="text-[10px] mt-0.5 flex items-center gap-1" style="color:var(--m-faint)">
         <span class="w-1.5 h-1.5 rounded-full m-live" style="background:var(--v-emerald)"></span>智慧工作台 · 節點在線
       </div>

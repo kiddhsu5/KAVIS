@@ -67,7 +67,7 @@ def test_render_workbench_html() -> None:
 
 def test_get_agent_fleet_status() -> None:
     fleet = get_agent_fleet_status()
-    assert len(fleet) >= 7
+    assert len(fleet) >= 6
     ids = [a["id"] for a in fleet]
     assert "claude" in ids
     assert "codex" in ids
@@ -75,25 +75,21 @@ def test_get_agent_fleet_status() -> None:
     assert "minimax" in ids
     assert "opencode" in ids
     assert "khavis" in ids
-    assert "kavis-tencent" in ids
+    # kavis-tencent 已併入 khavis：單一 K.A.V.I.S. Agent，不再有獨立遠端節點項目
+    assert "kavis-tencent" not in ids
 
     claude_node = next(a for a in fleet if a["id"] == "claude")
     assert claude_node["model"] == "gemini-4-argon"
     codex_node = next(a for a in fleet if a["id"] == "codex")
     assert codex_node["model"] == "kimi-k3.1-pro"
 
+    # 合併後的 K.A.V.I.S. Agent：本地 LangGraph 團隊 + 騰訊雲同名節點狀態
     khavis_node = next(a for a in fleet if a["id"] == "khavis")
     assert khavis_node["installed"] is True
     assert khavis_node["status"] == "ready"
-    # Agent 已由 K.H.A.V.I.S. 更名為 K.A.V.I.S.
     assert khavis_node["name"] == "K.A.V.I.S. Team"
-
-    # 騰訊雲 openclaw × hermes 合併節點：監控指標齊備且誠實標示離線（stub 探測）
-    tencent_node = next(a for a in fleet if a["id"] == "kavis-tencent")
-    assert tencent_node["name"] == "K.A.V.I.S. (Tencent)"
-    assert tencent_node["installed"] is True
-    assert tencent_node["status"] == "unreachable"
-    assert "openclaw" in tencent_node["model"].lower()
+    assert "Tencent" in khavis_node["version"]  # stub 探測 → Offline (stubbed)
+    assert "openclaw" in khavis_node["desc"].lower()
 
 
 def test_list_deliverable_artifacts() -> None:
@@ -604,16 +600,17 @@ def test_database_endpoint(monkeypatch) -> None:
     assert data["threads"][0]["thread"] == "t1"
 
 
-def test_fleet_has_kavis_rename_and_tencent_node() -> None:
-    """Agent 改名 K.A.V.I.S. + 騰訊雲 openclaw × hermes 合併節點併入架構。"""
+def test_fleet_has_kavis_rename_and_merged_tencent() -> None:
+    """Agent 改名 K.A.V.I.S.；騰訊雲節點併入同一 agent（拓撲不再有獨立卡片）。"""
     html = render_workbench_html()
 
-    # 拓撲 Node 6 已改名；新增 Node 7 騰訊雲節點卡片
+    # 拓撲 Node 6 維持 K.A.V.I.S. 單一節點，副標題標示合併身份
     assert ">K.A.V.I.S.</div>" in html
     assert ">K.H.A.V.I.S.</div>" not in html
-    assert 'id="node-card-kavis-tencent"' in html
-    assert 'value="kavis-tencent"' in html
-    assert "openclaw × hermes" in html
+    assert "LangGraph × 騰訊雲節點" in html
+    # Node 7 已移除：不再有獨立的 kavis-tencent 拓撲卡片
+    assert 'id="node-card-kavis-tencent"' not in html
+    assert 'value="kavis-tencent"' not in html
 
 
 def test_workspace_and_worktree_endpoints() -> None:
