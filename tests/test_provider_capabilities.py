@@ -119,6 +119,51 @@ def test_model_catalog_distinguishes_duplicate_provider_models() -> None:
     )
 
 
+def test_model_catalog_respects_persisted_selection() -> None:
+    """使用者勾選的清單是權威：供應商回傳的其他模型不得自動復活。"""
+    providers = [
+        {
+            "env": "ZHIPUAI_API_KEY",
+            "label": "智譜 GLM",
+            "status": "ok",
+            "models": [
+                {"id": m, "ref": f"ZHIPUAI_API_KEY::{m}"}
+                for m in ("glm-4.5", "glm-5", "glm-5.3-flashx", "glm-5.3")
+            ],
+        },
+    ]
+    # 使用者只勾選兩個 → 動態清單不得覆蓋
+    catalog = build_model_catalog(
+        {"opencode": "ZHIPUAI_API_KEY::glm-5.3-flashx"},
+        providers,
+        fallback_options={"opencode": ["ZHIPUAI_API_KEY::glm-5.3-flashx", "ZHIPUAI_API_KEY::glm-5"]},
+        agent_provider_envs={"opencode": {"ZHIPUAI_API_KEY"}},
+    )
+    assert catalog["options"]["opencode"] == [
+        "ZHIPUAI_API_KEY::glm-5.3-flashx",
+        "ZHIPUAI_API_KEY::glm-5",
+    ]
+    assert "ZHIPUAI_API_KEY::glm-4.5" not in catalog["options"]["opencode"]
+    assert catalog["active_model_refs"]["opencode"] == "ZHIPUAI_API_KEY::glm-5.3-flashx"
+
+    # 當前模型被取消勾選 → 仍可運作，但 active 會被補到清單最前面
+    catalog2 = build_model_catalog(
+        {"opencode": "ZHIPUAI_API_KEY::glm-4.5"},
+        providers,
+        fallback_options={"opencode": ["ZHIPUAI_API_KEY::glm-5"]},
+        agent_provider_envs={"opencode": {"ZHIPUAI_API_KEY"}},
+    )
+    assert catalog2["options"]["opencode"][0] == "ZHIPUAI_API_KEY::glm-4.5"
+
+    # 無勾選紀錄 → 維持動態行為（向後相容）
+    catalog3 = build_model_catalog(
+        {"opencode": "glm-5"},
+        providers,
+        agent_provider_envs={"opencode": {"ZHIPUAI_API_KEY"}},
+    )
+    assert "ZHIPUAI_API_KEY::glm-4.5" in catalog3["options"]["opencode"]
+
+
 def test_attachment_storage_blocks_traversal_and_sensitive_files(tmp_path: Path) -> None:
     content = base64.b64encode(b"hello attachment").decode()
     refs = _store_dispatch_attachments(

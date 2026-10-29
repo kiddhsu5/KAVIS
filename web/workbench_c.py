@@ -1194,6 +1194,178 @@ function cOpenPage(tab, pushUrl = true) {
   }
 }
 
+// ── Agent 模型勾選（從供應商抓清單 → 使用者勾選 → 勾選結果為權威清單） ──
+let cPickerAgent = null;
+let cPickerModels = [];      // [{ref, model, provider_label}]
+let cPickerSelected = new Set();
+
+async function cOpenAgentModelPicker(agentId) {
+  if (!agentId) return;
+  cPickerAgent = agentId;
+  const fp = document.getElementById('c-fullpage');
+  const content = document.getElementById('c-fullpage-content');
+  if (!fp || !content) return;
+  content.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+  const detail = document.getElementById('c-turn-detail-page');
+  if (detail) detail.classList.add('hidden');
+  let page = document.getElementById('c-agent-model-picker-page');
+  if (!page) {
+    page = document.createElement('div');
+    page.id = 'c-agent-model-picker-page';
+    content.appendChild(page);
+  }
+  page.classList.remove('hidden');
+  const label = (C_AGENT_LABELS[agentId] || agentId);
+  const ti = document.getElementById('c-fullpage-title');
+  if (ti) ti.textContent = `模型勾選 · ${label}`;
+  const ic = document.getElementById('c-fullpage-ic');
+  if (ic) ic.className = 'v-nav-ic v-ic-agents';
+  fp.classList.remove('hidden');
+  content.scrollTop = 0;
+
+  page.innerHTML = '<div class="max-w-3xl mx-auto px-4 py-6 text-[12px] font-mono" style="color:var(--m-faint)">⏳ 正在從供應商抓取模型清單…</div>';
+  try {
+    const res = await fetch('/api/workbench/agent_models', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'fetch', agent: agentId })
+    });
+    const data = await res.json();
+    if (!res.ok || data.ok === false) {
+      page.innerHTML = `<div class="max-w-3xl mx-auto px-4 py-6 text-[12px] text-rose-300">抓取失敗：${escapeHtml(data.detail || ('HTTP ' + res.status))}</div>`;
+      return;
+    }
+    cPickerModels = data.models || [];
+    cPickerSelected = new Set(data.selected || []);
+    // 已勾選但供應商清單沒有的（手動新增/舊清單）也列出，標示為自訂
+    cPickerSelected.forEach(ref => {
+      if (!cPickerModels.some(m => m.ref === ref)) {
+        const id = ref.includes('::') ? ref.split('::').pop() : ref;
+        cPickerModels.push({ ref, model: id, provider_label: '自訂 / 手動' });
+      }
+    });
+    cRenderAgentModelPicker(data.agent_label || label, data.active || '', data.unreachable_providers || []);
+  } catch (err) {
+    page.innerHTML = `<div class="max-w-3xl mx-auto px-4 py-6 text-[12px] text-rose-300">連線錯誤：${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function cRenderAgentModelPicker(agentLabel, activeRef, unreachable) {
+  const page = document.getElementById('c-agent-model-picker-page');
+  if (!page) return;
+  const groups = {};
+  cPickerModels.forEach(m => {
+    const g = m.provider_label || '其他';
+    (groups[g] = groups[g] || []).push(m);
+  });
+  const selCount = cPickerSelected.size;
+  page.innerHTML = `
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 py-5 space-y-3">
+      <div class="v-detail-sec">
+        <div class="flex items-center justify-between gap-2">
+          <div>
+            <div class="text-xs font-bold" style="color:var(--m-bone)">為「${escapeHtml(agentLabel)}」勾選可用模型</div>
+            <div class="text-[10px] mt-0.5" style="color:var(--m-faint)">從供應商即時清單勾選；勾選結果會成為此 Agent 的權威模型清單（× 刪除不再被復活）</div>
+          </div>
+          <span class="text-[11px] font-mono" style="color:var(--m-sage)">已勾選 <span id="c-picker-count">${selCount}</span> 個</span>
+        </div>
+        <div class="flex items-center gap-1.5 mt-2.5">
+          <input id="c-picker-filter" type="search" oninput="cRenderPickerList()" placeholder="搜尋過濾模型…" autocomplete="off"
+                 class="flex-1 bg-transparent border border-white/10 rounded px-2 py-1 text-[11px] font-mono text-white placeholder-slate-500 focus:outline-none focus:border-sky-400" />
+          <button type="button" onclick="cSaveAgentModelSelection()" class="px-3.5 py-1.5 rounded-lg m-btn-primary text-xs font-bold shrink-0">💾 儲存勾選</button>
+        </div>
+        ${activeRef ? `<div class="text-[10px] font-mono mt-1.5" style="color:var(--m-faint)">目前使用：<span style="color:var(--m-sage)">${escapeHtml(modelRefLabel(activeRef))}</span>（若取消勾選會自動切到第一個勾選項）</div>` : ''}
+        ${unreachable && unreachable.length ? `<div class="text-[10px] mt-1.5" style="color:var(--m-apricot)">⚠️ 無法抓取：${escapeHtml(unreachable.join('、'))}（金鑰未設定或供應商離線）</div>` : ''}
+      </div>
+
+      <div class="flex items-center gap-1.5">
+        <input id="c-picker-manual" type="text" placeholder="手動新增自訂模型 ID…" autocomplete="off"
+               onkeydown="if(event.key==='Enter'){event.preventDefault();cPickerAddManual();}"
+               class="flex-1 bg-[#050811] border border-white/15 rounded-lg px-2.5 py-1.5 text-[11px] font-mono text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400" />
+        <button type="button" onclick="cPickerAddManual()" class="px-2.5 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/35 text-[11px] font-bold shrink-0">＋加入</button>
+      </div>
+
+      <div id="c-picker-list" class="space-y-2.5"></div>
+    </div>`;
+  cRenderPickerList();
+}
+
+function cRenderPickerList() {
+  const host = document.getElementById('c-picker-list');
+  if (!host) return;
+  const kw = ((document.getElementById('c-picker-filter') || {}).value || '').trim().toLowerCase();
+  const groups = {};
+  cPickerModels.forEach(m => {
+    const hit = !kw || m.ref.toLowerCase().includes(kw) || (m.provider_label || '').toLowerCase().includes(kw);
+    if (hit) (groups[m.provider_label || '其他'] = groups[m.provider_label || '其他'] || []).push(m);
+  });
+  const keys = Object.keys(groups).sort();
+  if (!keys.length) { host.innerHTML = '<div class="text-[11px] py-4 text-center" style="color:var(--m-faint)">沒有符合的模型</div>'; return; }
+  host.innerHTML = keys.map(g => `
+    <div class="v-thread-card">
+      <div class="v-thread-head" style="cursor:default">
+        <span class="v-proj-dot" style="background:var(--v-sky)"></span>
+        <span class="v-thread-title">${escapeHtml(g)}</span>
+        <span class="v-thread-meta">${groups[g].length} 個模型</span>
+      </div>
+      <div class="v-thread-body">
+        ${groups[g].map(m => `
+          <label class="v-turn-doc-row" style="cursor:pointer">
+            <input type="checkbox" ${cPickerSelected.has(m.ref) ? 'checked' : ''}
+                   onchange="cPickerToggle('${escapeHtml(m.ref)}', this.checked)" class="accent-emerald-400 shrink-0" />
+            <span class="v-doc-name">${escapeHtml(m.model)}</span>
+            ${cPickerSelected.has(m.ref) ? '<span class="v-thread-meta" style="color:var(--m-sage)">✓ 已選</span>' : ''}
+          </label>`).join('')}
+      </div>
+    </div>`).join('');
+  const cnt = document.getElementById('c-picker-count');
+  if (cnt) cnt.textContent = String(cPickerSelected.size);
+}
+
+function cPickerToggle(ref, on) {
+  if (on) cPickerSelected.add(ref); else cPickerSelected.delete(ref);
+  const cnt = document.getElementById('c-picker-count');
+  if (cnt) cnt.textContent = String(cPickerSelected.size);
+}
+
+function cPickerAddManual() {
+  const inp = document.getElementById('c-picker-manual');
+  const id = ((inp && inp.value) || '').trim();
+  if (!id) { cToast('請輸入模型 ID', 'err'); return; }
+  if (!/^[A-Za-z0-9._:\\-\\/]{1,120}$/.test(id)) { cToast('模型 ID 格式無效', 'err'); return; }
+  // 手動項用裸 ID 當 ref（與舊新增行為一致，dispatch 才能正確解析）
+  const ref = id;
+  if (!cPickerModels.some(m => m.ref === ref)) cPickerModels.push({ ref, model: id, provider_label: '自訂 / 手動' });
+  cPickerSelected.add(ref);
+  if (inp) inp.value = '';
+  cRenderPickerList();
+}
+
+async function cSaveAgentModelSelection() {
+  if (!cPickerAgent) return;
+  const models = Array.from(cPickerSelected);
+  if (!models.length) { cToast('請至少勾選一個模型', 'err'); return; }
+  try {
+    const res = await fetch('/api/workbench/agent_models', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'set', agent: cPickerAgent, models })
+    });
+    const data = await res.json();
+    if (!res.ok || data.ok === false) {
+      cToast('儲存失敗：' + (data.detail || ('HTTP ' + res.status)), 'err');
+      return;
+    }
+    cToast(`✅ 已更新模型清單（${models.length} 個）`, 'ok');
+    cFullpageHide();
+    if (typeof location !== 'undefined' && location.pathname !== '/workbench') {
+      try { history.pushState({ page: 'command' }, '', '/workbench'); } catch (_) {}
+    }
+    switchTab('command');
+    setTimeout(() => { cOpenPage('agents'); }, 60);
+  } catch (err) {
+    cToast('儲存連線錯誤：' + err.message, 'err');
+  }
+}
+
 function cCloseFullpage() {
   cFullpageHide();
   // 全頁關閉 = 回到主對話串（網址同步，不觸發 push 迴圈）
@@ -3486,9 +3658,15 @@ async function cLoadAgentsAndProvidersPage() {
               </div>
             </div>
 
-            <!-- 可用模型標籤牆 (點擊切換 / ✏️ 改名 / × 刪除) -->
+            <!-- 已勾選模型 (點擊切換 / ✏️ 改名 / × 刪除；清單由供應商勾選維護) -->
             <div>
-              <div class="text-[10px] text-slate-400 mb-1">模型清單 (點名稱直接切換 · 點 ✏️ 修改 · 點 × 刪除):</div>
+              <div class="flex items-center justify-between gap-2 mb-1">
+                <div class="text-[10px] text-slate-400">已勾選模型 (點名稱切換 · ✏️ 改名 · × 刪除):</div>
+                <button type="button" onclick="cOpenAgentModelPicker('${escapeHtml(a.id)}')" class="px-2 py-0.5 rounded-md bg-sky-500/15 hover:bg-sky-500/30 text-sky-300 border border-sky-500/35 text-[10px] font-bold shrink-0 transition"
+                        title="從供應商即時清單勾選此 Agent 可用的模型">
+                  ⚙️ 從供應商勾選
+                </button>
+              </div>
               <div class="flex flex-wrap gap-1.5">
                 ${pillsHtml}
               </div>

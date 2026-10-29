@@ -396,14 +396,25 @@ def build_model_catalog(
             active_ref = model_id
         active_model_refs[agent_id] = active_ref
 
-        options = list(dynamic_options.get(agent_id) or [])
-        if not options:
-            options = [
-                str(item).strip()
-                for item in (fallback_options or {}).get(agent_id, [])
-                if str(item).strip()
-            ]
-        if active_ref not in options:
+        # 使用者勾選的清單是權威來源：有勾選紀錄時不再自動灌入供應商全量
+        # 清單（否則 × 刪除會在下一次 capabilities 抓取時被復活）。沒有勾選
+        # 紀錄的 agent 維持舊行為（動態供應商清單 → 預設清單）。
+        persisted = [
+            str(item).strip()
+            for item in ((fallback_options or {}).get(agent_id) or [])
+            if str(item).strip()
+        ]
+        if persisted:
+            options = persisted
+        else:
+            options = list(dynamic_options.get(agent_id) or [])
+            if not options:
+                options = [
+                    str(item).strip()
+                    for item in (fallback_options or {}).get(agent_id, [])
+                    if str(item).strip()
+                ]
+        if active_ref and active_ref not in options:
             options.insert(0, active_ref)
         deduped: list[str] = []
         for option in options:

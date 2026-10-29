@@ -579,6 +579,69 @@ def test_get_database_overview_groups_by_thread() -> None:
     assert all(t["thread"] != "t-x" for t in empty["threads"])
 
 
+def test_agent_models_set_and_fetch(monkeypatch) -> None:
+    """模型勾選：set 持久化為權威清單、fetch 回供應商即時清單 + 當前勾選。"""
+    # 1. set：勾選清單持久化
+    h_set = DummyStatusHandler(
+        "/api/workbench/agent_models",
+        method="POST",
+        body=b'{"action":"set","agent":"claude","models":["ZHIPUAI_API_KEY::glm-5.3-flashx","JUAPI_API_KEY::gemini-4-argon"]}',
+    )
+    h_set.do_POST()
+    assert h_set.responses[0][0] == 200
+    updated = json.loads(h_set.responses[0][1].decode("utf-8"))
+    assert "ZHIPUAI_API_KEY::glm-5.3-flashx" in updated["options"]["claude"]
+    assert "JUAPI_API_KEY::gemini-4-argon" in updated["options"]["claude"]
+
+    # 2. 再確認：capabilities 動態清單不得復活未勾選模型（此處以 config 直接驗證持久層）
+    from web.workbench import get_workbench_models_config
+
+    cfg = get_workbench_models_config()
+    assert "ZHIPUAI_API_KEY::glm-5.3-flashx" in cfg["options"]["claude"]
+
+    # 3. set：空清單 → 400
+    h_empty = DummyStatusHandler(
+        "/api/workbench/agent_models",
+        method="POST",
+        body=b'{"action":"set","agent":"claude","models":[]}',
+    )
+    h_empty.do_POST()
+    assert h_empty.responses[0][0] == 400
+
+    # 4. fetch：mock 供應商抓取
+    def fake_discover(specs, values, timeout_s=6.0):  # noqa: ANN001, ARG001
+        return [{
+            "env": specs[0]["env"], "label": "Stub", "status": "ok",
+            "models": [
+                {"id": "glm-a", "ref": "ZHIPUAI_API_KEY::glm-a", "provider_label": "Stub"},
+                {"id": "glm-b", "ref": "ZHIPUAI_API_KEY::glm-b", "provider_label": "Stub"},
+            ],
+        }]
+
+    monkeypatch.setattr("core.provider_capabilities.discover_provider_capabilities", fake_discover)
+    h_fetch = DummyStatusHandler(
+        "/api/workbench/agent_models",
+        method="POST",
+        body=b'{"action":"fetch","agent":"claude"}',
+    )
+    h_fetch.do_POST()
+    assert h_fetch.responses[0][0] == 200
+    data = json.loads(h_fetch.responses[0][1].decode("utf-8"))
+    assert data["ok"] is True
+    assert data["agent"] == "claude"
+    assert [m["model"] for m in data["models"]] == ["glm-a", "glm-b"]
+    assert isinstance(data["selected"], list)
+
+    # 5. 未知 Agent → 400
+    h_bad = DummyStatusHandler(
+        "/api/workbench/agent_models",
+        method="POST",
+        body=b'{"action":"fetch","agent":"nope"}',
+    )
+    h_bad.do_POST()
+    assert h_bad.responses[0][0] == 400
+
+
 def test_database_endpoint(monkeypatch) -> None:
     monkeypatch.setattr(
         _wb_module,

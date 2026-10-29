@@ -273,6 +273,43 @@ def update_workbench_models_config(payload: dict[str, Any]) -> dict[str, Any]:
         catalog["model_options"] = {}
         _save_workbench_catalog(catalog)
         _persist_env_updates(updates_by_env)
+
+    if action == "set_agent_models":
+        """使用者勾選結果 → 該 Agent 的權威模型清單。"""
+        from core.provider_capabilities import parse_model_ref  # noqa: PLC0415
+
+        agent_id = str(payload.get("agent") or "").strip().lower()
+        if agent_id not in AGENT_MODEL_SPECS:
+            raise ValueError(f"未知 Agent: {agent_id!r}")
+        raw = payload.get("models")
+        if not isinstance(raw, list) or not raw:
+            raise ValueError("請至少勾選一個模型")
+        refs: list[str] = []
+        for item in raw:
+            ref = str(item).strip()
+            if ref and _MODEL_NAME_RE.match(ref) and ref not in refs:
+                refs.append(ref)
+        if not refs:
+            raise ValueError("勾選的模型 ID 格式無效")
+
+        cur_cfg = get_workbench_models_config()
+        active = str(cur_cfg["models"].get(agent_id) or "").strip()
+        active_still_selected = any(
+            ref == active or parse_model_ref(ref)[1] == parse_model_ref(active)[1]
+            for ref in refs
+        ) if active else True
+        if not active_still_selected:
+            # 當前使用的模型被取消勾選 → 自動切到第一個勾選項
+            new_active = refs[0]
+            spec = AGENT_MODEL_SPECS[agent_id]
+            os.environ[spec["env"]] = new_active
+            updates_by_env[spec["env"]] = new_active
+
+        model_options_map[agent_id] = refs
+        catalog["model_options"] = model_options_map
+        _save_workbench_catalog(catalog)
+        _persist_env_updates(updates_by_env)
+        return get_workbench_models_config()
         return get_workbench_models_config()
 
     if action in ("add_model", "delete_model", "rename_model"):
@@ -712,6 +749,57 @@ def fetch_provider_model_list(payload: dict[str, Any]) -> dict[str, Any]:
         "models": model_ids,
         "count": len(model_ids),
         "fetched_at": result.get("fetched_at"),
+    }
+
+
+_AGENT_MODEL_LABELS = {aid: spec["label"] for aid, spec in AGENT_MODEL_SPECS.items()}
+
+
+def fetch_agent_model_catalog(payload: dict[str, Any]) -> dict[str, Any]:
+    """抓取指定 Agent 可用供應商的即時模型清單（供 UI 勾選）。
+
+    取代「Agent 模型清單自動列舉供應商全部模型」的舊行為：清單只在
+    勾選時抓取，使用者勾選的結果（catalog model_options）才是權威清單。
+    """
+    from core.provider_capabilities import discover_provider_capabilities  # noqa: PLC0415
+
+    agent_id = str(payload.get("agent") or "").strip().lower()
+    if agent_id not in AGENT_MODEL_SPECS:
+        raise ValueError(f"未知 Agent: {agent_id!r}")
+    allowed_envs = _AGENT_PROVIDER_ENVS.get(agent_id) or set()
+    specs = [dict(s) for s in _get_all_provider_specs() if s["env"] in allowed_envs]
+
+    values = dict(_read_env_file_vars(PROJECT_ROOT / ".env"))
+    for k, v in os.environ.items():
+        if k.isupper():
+            values.setdefault(k, v)
+
+    results = discover_provider_capabilities(specs, values, timeout_s=6.0)
+    models: list[dict[str, str]] = []
+    unreachable: list[str] = []
+    for r in results:
+        if r.get("status") != "ok":
+            if r.get("configured"):
+                unreachable.append(str(r.get("label") or r.get("env") or ""))
+            continue
+        for m in r.get("models") or []:
+            mid = str(m.get("id") or "").strip()
+            ref = str(m.get("ref") or "").strip()
+            if mid and ref:
+                models.append(
+                    {"ref": ref, "model": mid, "provider_label": str(m.get("provider_label") or "")}
+                )
+    models.sort(key=lambda x: x["ref"].lower())
+
+    cfg = get_workbench_models_config()
+    return {
+        "ok": True,
+        "agent": agent_id,
+        "agent_label": _AGENT_MODEL_LABELS.get(agent_id, agent_id),
+        "models": models,
+        "selected": list(cfg["options"].get(agent_id) or []),
+        "active": cfg["models"].get(agent_id) or "",
+        "unreachable_providers": unreachable,
     }
 
 

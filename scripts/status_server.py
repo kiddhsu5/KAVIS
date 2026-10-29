@@ -1144,6 +1144,57 @@ class Handler(BaseHTTPRequestHandler):
             )
             return
 
+        if path == "/api/workbench/agent_models":
+            content_len = int(self.headers.get("Content-Length", 0))
+            raw_body = self.rfile.read(content_len).decode("utf-8", errors="replace")
+            try:
+                payload = json.loads(raw_body)
+            except Exception:  # noqa: BLE001
+                payload = {}
+            payload = payload if isinstance(payload, dict) else {}
+            action = str(payload.get("action") or "fetch").strip().lower()
+
+            if action == "set":
+                from web.workbench import update_workbench_models_config  # noqa: PLC0415
+
+                try:
+                    updated = update_workbench_models_config(
+                        {"action": "set_agent_models",
+                         "agent": payload.get("agent"),
+                         "models": payload.get("models")}
+                    )
+                except ValueError as exc:
+                    self._send(
+                        400,
+                        json.dumps({"ok": False, "detail": str(exc)}, ensure_ascii=False).encode(),
+                        "application/json; charset=utf-8",
+                    )
+                    return
+                self._send(
+                    200,
+                    json.dumps({"ok": True, **updated}, ensure_ascii=False).encode(),
+                    "application/json; charset=utf-8",
+                )
+                return
+
+            from web.workbench import fetch_agent_model_catalog  # noqa: PLC0415
+
+            try:
+                result = fetch_agent_model_catalog(payload)
+            except ValueError as exc:
+                self._send(
+                    400,
+                    json.dumps({"ok": False, "detail": str(exc)}, ensure_ascii=False).encode(),
+                    "application/json; charset=utf-8",
+                )
+                return
+            self._send(
+                200,
+                json.dumps(result, ensure_ascii=False).encode(),
+                "application/json; charset=utf-8",
+            )
+            return
+
         if path == "/api/workbench/workspace":
             content_len = int(self.headers.get("Content-Length", 0))
             raw_body = self.rfile.read(content_len).decode("utf-8", errors="replace")
