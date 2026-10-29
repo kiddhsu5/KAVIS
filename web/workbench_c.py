@@ -313,15 +313,23 @@ html:not(.dark) #live-results-container > div{
 .c-toast.c-err{border-color:rgba(188,139,139,.5);color:var(--m-rose-text)}
 .c-toast.c-ok{border-color:rgba(143,168,148,.5);color:#C2D6C5}
 
-/* 派工鈕沿用 legacy 的 markup（id 固定），這裡把它的霓虹漸層
-   換成莫蘭迪主色，讓整頁只有一個高對比元素。 */
+/* 派工鈕沿用 legacy 的 markup（id 固定）：改為品牌漸層、佔滿整行置中，
+   消除按鈕右側的空白區域。 */
 #btn-dispatch{
-  background:var(--m-mist) !important;
-  background-image:none !important;
-  color:var(--m-on-accent) !important;
-  box-shadow:0 10px 24px -12px rgba(124,155,181,.85) !important;
+  width:100% !important;
+  justify-content:center !important;
+  background:var(--v-brand-grad) !important;
+  background-image:var(--v-brand-grad) !important;
+  color:#fff !important;
+  border:0 !important;
+  box-shadow:0 10px 26px -10px rgba(139,92,246,.65),0 4px 12px -6px rgba(34,211,238,.4) !important;
+  font-weight:700;
 }
-#btn-dispatch:hover:not(:disabled){background:#8FACBF !important}
+#btn-dispatch:hover:not(:disabled){
+  background:linear-gradient(135deg,#A78BFA 0%,#60A5FA 52%,#67E8F9 100%) !important;
+  background-image:linear-gradient(135deg,#A78BFA 0%,#60A5FA 52%,#67E8F9 100%) !important;
+  box-shadow:0 12px 30px -10px rgba(139,92,246,.8),0 6px 16px -6px rgba(34,211,238,.5) !important;
+}
 #btn-dispatch:disabled{opacity:.45 !important;cursor:not-allowed}
 #btn-dispatch i{color:currentColor !important}
 
